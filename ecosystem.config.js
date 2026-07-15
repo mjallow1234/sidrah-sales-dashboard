@@ -3,7 +3,6 @@ module.exports = {
     {
       name: 'sidrah-sales-app',
       script: '.next/standalone/server.js',
-      args: '',
       instances: 1,
       autorestart: true,
       watch: false,

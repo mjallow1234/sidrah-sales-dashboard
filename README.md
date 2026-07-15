@@ -26,6 +26,8 @@ npm run build
 npm run start
 ```
 
+> Note: `npm run start` runs the standalone server at `node .next/standalone/server.js`.
+
 ## Deployment
 
 This repository is prepared for Hostinger Business Hosting deployment using a standalone Next.js build.
