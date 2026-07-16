@@ -23,7 +23,7 @@ Prepare the `sidrah-sales-app` Next.js 15 application for production deployment 
 ## Required Environment Variables
 - `NODE_ENV=production`
 - `PORT` (e.g. `3000`)
-- `NEXT_PUBLIC_GAS_API_BASE_URL` - URL to your Google Apps Script backend
+- `NEXT_PUBLIC_GAS_API_URL` - URL to your Google Apps Script backend
 - `NEXT_PUBLIC_GAS_API_KEY` - optional API key for GAS requests
 
 ## npm Commands
@@ -57,4 +57,4 @@ Prepare the `sidrah-sales-app` Next.js 15 application for production deployment 
 - On Hostinger, you can either:
   - build on the host and run `node .next/standalone/server.js`, or
   - build locally and upload `.next/standalone`, `package.json`, and `ecosystem.config.js`.
-- Always verify `NEXT_PUBLIC_GAS_API_BASE_URL` is reachable from the production host.
+- Always verify `NEXT_PUBLIC_GAS_API_URL` is reachable from the production host.

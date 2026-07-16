@@ -1,0 +1,155 @@
+{
+  "info": {
+    "name": "SIDRAH SALAAM Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "GET /vendors",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/vendors?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["vendors"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /vendors/:vendor_id",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/vendors/V001?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["vendors", "V001"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /products",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/products?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["products"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /inventory",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/inventory?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["inventory"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /vendorbalances",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/vendorbalances?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["vendorbalances"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /visitlogs",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/visitlogs?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["visitlogs"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /salesreps",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/salesreps?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["salesreps"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "GET /stats",
+      "request": {
+        "method": "GET",
+        "url": {
+          "raw": "{{baseUrl}}/stats?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["stats"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        }
+      }
+    },
+    {
+      "name": "POST /vendor",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/vendor?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["vendor"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vendor_name\": \"New Vendor Co\",\n  \"phone\": \"740999999\",\n  \"location\": \"Serrekunda\",\n  \"sales_rep_id\": \"S001\",\n  \"assigned_date\": \"2026-07-15\"\n}"
+        }
+      }
+    },
+    {
+      "name": "POST /visit",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/visit?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["visit"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vendor_id\": \"V001\",\n  \"product_id\": \"P001\",\n  \"sales_rep_id\": \"S001\",\n  \"stock_sold\": 12,\n  \"stock_added\": 8,\n  \"cash_collected\": 7200,\n  \"unit_price\": 900,\n  \"payment_method\": \"cash\",\n  \"payment_reference\": \"PAY12345\",\n  \"client_transaction_id\": \"txn-12345\",\n  \"latitude\": 13.450,\n  \"longitude\": -16.650,\n  \"notes\": \"Weekly visit\"\n}"
+        }
+      }
+    },
+    {
+      "name": "POST /visit (duplicate idempotent replay)",
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": {
+          "raw": "{{baseUrl}}/visit?apiKey={{apiKey}}",
+          "host": ["{{baseUrl}}"],
+          "path": ["visit"],
+          "query": [{ "key": "apiKey", "value": "{{apiKey}}" }]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"vendor_id\": \"V001\",\n  \"product_id\": \"P001\",\n  \"sales_rep_id\": \"S001\",\n  \"stock_sold\": 12,\n  \"stock_added\": 8,\n  \"cash_collected\": 7200,\n  \"unit_price\": 900,\n  \"payment_method\": \"cash\",\n  \"payment_reference\": \"PAY12345\",\n  \"client_transaction_id\": \"txn-12345\",\n  \"latitude\": 13.450,\n  \"longitude\": -16.650,\n  \"notes\": \"Weekly visit replay\"\n}"
+        }
+      }
+    }
+  ]
+}

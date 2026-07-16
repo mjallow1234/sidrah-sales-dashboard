@@ -14,18 +14,59 @@ export interface Vendor {
   phone: string;
   location: string;
   sales_rep: string;
+  sales_rep_id?: string;
   date_created: string;
   status: 'active' | 'inactive';
 }
 
+export interface Product {
+  product_id: string;
+  product_name: string;
+  category: string;
+  unit: string;
+  default_unit_price: number;
+  currency: string;
+  active: boolean;
+  date_created: string;
+  last_updated: string;
+}
+
+export interface SalesRep {
+  sales_rep_id: string;
+  name: string;
+  phone: string;
+  role: string;
+  status: 'active' | 'inactive';
+  date_created: string;
+  last_updated: string;
+}
+
 export interface Inventory {
   vendor_id: string;
+  product_id?: string;
   total_stock_supplied: number;
   total_stock_sold: number;
   current_stock: number;
-  expected_cash: number;
+  expected_cash?: number;
+  cash_collected?: number;
+  balance_owed?: number;
+  date_created?: string;
+  last_updated?: string;
+}
+
+export interface VendorBalance {
+  vendor_id: string;
+  total_expected_cash: number;
   cash_collected: number;
   balance_owed: number;
+  date_created: string;
+  last_updated: string;
+}
+
+export interface VisitResult {
+  visitLog: Record<string, unknown>;
+  inventory: Inventory;
+  vendorBalance: VendorBalance;
 }
 
 export interface Transaction {

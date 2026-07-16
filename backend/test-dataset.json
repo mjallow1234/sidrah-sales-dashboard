@@ -1,0 +1,31 @@
+{
+  "vendors": [
+    {
+      "vendor_name": "New Vendor Co",
+      "phone": "740999999",
+      "location": "Serrekunda",
+      "sales_rep_id": "S001",
+      "assigned_date": "2026-07-15"
+    }
+  ],
+  "visits": [
+    {
+      "vendor_id": "V001",
+      "product_id": "P001",
+      "sales_rep_id": "S001",
+      "stock_sold": 12,
+      "stock_added": 8,
+      "cash_collected": 7200,
+      "unit_price": 900,
+      "payment_method": "cash",
+      "payment_reference": "PAY12345",
+      "latitude": 13.450,
+      "longitude": -16.650,
+      "notes": "Weekly visit"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 20
+  }
+}

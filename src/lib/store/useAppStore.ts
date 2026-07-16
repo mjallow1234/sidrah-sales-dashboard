@@ -3,6 +3,11 @@ import type { Vendor } from '@/lib/types';
 
 interface VisitDraft {
   vendor_id: string;
+  product_id: string;
+  sales_rep_id: string;
+  unit_price: number;
+  payment_method: string;
+  payment_reference: string;
   stock_sold: number;
   cash_collected: number;
   stock_added: number;
@@ -26,6 +31,11 @@ export const useAppStore = create<AppState>((set) => ({
   selectedVendorId: '',
   visitDraft: {
     vendor_id: '',
+    product_id: '',
+    sales_rep_id: '',
+    unit_price: 0,
+    payment_method: 'cash',
+    payment_reference: '',
     stock_sold: 0,
     cash_collected: 0,
     stock_added: 0,
@@ -39,6 +49,11 @@ export const useAppStore = create<AppState>((set) => ({
     set({
       visitDraft: {
         vendor_id: vendorId,
+        product_id: '',
+        sales_rep_id: '',
+        unit_price: 0,
+        payment_method: 'cash',
+        payment_reference: '',
         stock_sold: 0,
         cash_collected: 0,
         stock_added: 0,

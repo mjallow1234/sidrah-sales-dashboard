@@ -1,23 +1,20 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import * as inventoryService from '@/services/inventoryService';
-import * as transactionService from '@/services/transactionService';
-import * as vendorService from '@/services/vendorService';
-import type { CreateTransactionPayload } from '@/services/transactionService';
-import type { DashboardStats, Inventory, Transaction, Vendor } from '@/lib/types';
+import { createProduct, createSalesRep, createVendor, createVisit, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
+import type { DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VisitResult } from '@/lib/types';
 
-export function useVendorsQuery() {
+export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
-    queryKey: ['vendors'],
-    queryFn: vendorService.getVendors,
+    queryKey: ['vendors', filters],
+    queryFn: () => getVendors(filters),
   });
 }
 
 export function useVendorQuery(vendorId: string) {
   return useQuery({
     queryKey: ['vendor', vendorId],
-    queryFn: () => vendorService.getVendorById(vendorId),
+    queryFn: () => getVendor(vendorId),
     enabled: !!vendorId,
   });
 }
@@ -25,42 +22,150 @@ export function useVendorQuery(vendorId: string) {
 export function useInventoryRecordsQuery() {
   return useQuery({
     queryKey: ['inventory'],
-    queryFn: inventoryService.getInventoryRecords,
+    queryFn: () => getInventory(),
   });
 }
 
 export function useInventoryByVendorQuery(vendorId: string) {
   return useQuery({
     queryKey: ['inventory', vendorId],
-    queryFn: () => inventoryService.getInventoryByVendor(vendorId),
+    queryFn: async () => {
+      const items = await getInventory({ vendorId });
+      return items[0];
+    },
     enabled: !!vendorId,
+  });
+}
+
+export function useVendorBalancesQuery() {
+  return useQuery({
+    queryKey: ['vendorBalances'],
+    queryFn: () => getVendorBalances(),
+  });
+}
+
+export function useProductsQuery() {
+  return useQuery({
+    queryKey: ['products'],
+    queryFn: () => getProducts(),
+  });
+}
+
+export function useSalesRepsQuery() {
+  return useQuery({
+    queryKey: ['salesReps'],
+    queryFn: () => getSalesReps(),
+  });
+}
+
+export function useProductQuery(productId: string) {
+  return useQuery({
+    queryKey: ['product', productId],
+    queryFn: () => getProduct(productId),
+    enabled: !!productId,
+  });
+}
+
+export function useSalesRepQuery(salesRepId: string) {
+  return useQuery({
+    queryKey: ['salesRep', salesRepId],
+    queryFn: () => getSalesRep(salesRepId),
+    enabled: !!salesRepId,
+  });
+}
+
+export function useStatsQuery() {
+  return useQuery({
+    queryKey: ['stats'],
+    queryFn: () => getStats(),
   });
 }
 
 export function useTransactionsByVendorQuery(vendorId: string) {
-  return useQuery({
-    queryKey: ['transactions', vendorId],
-    queryFn: () => transactionService.getTransactionsByVendor(vendorId),
+  return useQuery<Transaction[]>({
+    queryKey: ['visitLogs', vendorId],
+    queryFn: async () => {
+      const logs = await getVisitLogs({ vendorId });
+      return logs.map((log: any) => ({
+        transaction_id: log.visit_id,
+        date: log.date,
+        vendor_id: log.vendor_id,
+        opening_stock: Number(log.opening_stock) || 0,
+        stock_sold: Number(log.stock_sold) || 0,
+        stock_added: Number(log.stock_added) || 0,
+        cash_collected: Number(log.cash_collected) || 0,
+        closing_stock: Number(log.closing_stock) || 0,
+        sales_rep: log.sales_rep_id || '',
+        notes: log.notes || '',
+      }));
+    },
     enabled: !!vendorId,
   });
 }
 
-export function useDashboardStatsQuery() {
-  return useQuery({
-    queryKey: ['dashboardStats'],
-    queryFn: async () => {
-      const inventory = await inventoryService.getInventoryRecords();
-      const transactions = await transactionService.getTransactions();
-      const today = new Date().toISOString().slice(0, 10);
+export function useCreateVendorMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Vendor, Error, Parameters<typeof createVendor>[0]>({
+    mutationFn: createVendor,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
 
-      const todayTransactions = transactions.filter((item) => item.date === today);
-      return {
-        vendorsVisitedToday: todayTransactions.length,
-        bucketsSoldToday: todayTransactions.reduce((sum, item) => sum + item.stock_sold, 0),
-        cashCollectedToday: todayTransactions.reduce((sum, item) => sum + item.cash_collected, 0),
-        lowStockVendors: inventory.filter((item) => item.current_stock <= 20).length,
-        outstandingBalances: inventory.filter((item) => item.balance_owed > 0).length,
-      };
+export function useUpdateVendorMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Vendor, Error, { id: string; payload: Parameters<typeof updateVendor>[1] }>({
+    mutationFn: ({ id, payload }) => updateVendor(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+export function useCreateProductMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Product, Error, Parameters<typeof createProduct>[0]>({
+    mutationFn: createProduct,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+export function useUpdateProductMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<Product, Error, { id: string; payload: Parameters<typeof updateProduct>[1] }>({
+    mutationFn: ({ id, payload }) => updateProduct(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+export function useCreateSalesRepMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<SalesRep, Error, Parameters<typeof createSalesRep>[0]>({
+    mutationFn: createSalesRep,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['salesReps'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+    },
+  });
+}
+
+export function useUpdateSalesRepMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<SalesRep, Error, { id: string; payload: Parameters<typeof updateSalesRep>[1] }>({
+    mutationFn: ({ id, payload }) => updateSalesRep(id, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['salesReps'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
 }
@@ -68,77 +173,12 @@ export function useDashboardStatsQuery() {
 export function useCreateVisitMutation() {
   const queryClient = useQueryClient();
 
-  return useMutation<Transaction, Error, CreateTransactionPayload, {
-      previousTransactions?: Transaction[];
-      previousInventory?: Inventory;
-      previousStats?: DashboardStats;
-    }>({
-    mutationFn: async (payload) => {
-      const transaction = await transactionService.createTransaction(payload);
-      await inventoryService.updateInventoryForVisit(payload.vendor_id, payload.stock_sold, payload.stock_added, payload.cash_collected);
-      return transaction;
-    },
-    onMutate: async (payload) => {
-      await queryClient.cancelQueries({ queryKey: ['transactions', payload.vendor_id] as const });
-      await queryClient.cancelQueries({ queryKey: ['inventory', payload.vendor_id] as const });
-      await queryClient.cancelQueries({ queryKey: ['dashboardStats'] as const });
-
-      const previousTransactions = queryClient.getQueryData<Transaction[]>(['transactions', payload.vendor_id] as const);
-      const previousInventory = queryClient.getQueryData<Inventory>(['inventory', payload.vendor_id] as const);
-      const previousStats = queryClient.getQueryData<DashboardStats>(['dashboardStats'] as const);
-
-      const newTransaction: Transaction = {
-        transaction_id: `T_${Date.now()}`,
-        date: new Date().toISOString().slice(0, 10),
-        vendor_id: payload.vendor_id,
-        opening_stock: payload.opening_stock,
-        stock_sold: payload.stock_sold,
-        stock_added: payload.stock_added,
-        cash_collected: payload.cash_collected,
-        closing_stock: payload.opening_stock - payload.stock_sold + payload.stock_added,
-        sales_rep: payload.sales_rep,
-        notes: payload.notes,
-      };
-
-      queryClient.setQueryData<Transaction[]>(['transactions', payload.vendor_id] as const, (old) => [newTransaction, ...(old ?? [])]);
-
-      if (previousInventory) {
-        queryClient.setQueryData<Inventory>(['inventory', payload.vendor_id] as const, {
-          ...previousInventory,
-          total_stock_sold: previousInventory.total_stock_sold + payload.stock_sold,
-          total_stock_supplied: previousInventory.total_stock_supplied + payload.stock_added,
-          current_stock: previousInventory.total_stock_supplied + payload.stock_added - (previousInventory.total_stock_sold + payload.stock_sold),
-          cash_collected: previousInventory.cash_collected + payload.cash_collected,
-          balance_owed: Math.max(previousInventory.expected_cash - (previousInventory.cash_collected + payload.cash_collected), 0),
-        });
-      }
-
-      if (previousStats) {
-        queryClient.setQueryData<DashboardStats>(['dashboardStats'] as const, {
-          ...previousStats,
-          vendorsVisitedToday: previousStats.vendorsVisitedToday + 1,
-          bucketsSoldToday: previousStats.bucketsSoldToday + payload.stock_sold,
-          cashCollectedToday: previousStats.cashCollectedToday + payload.cash_collected,
-        });
-      }
-
-      return { previousTransactions, previousInventory, previousStats };
-    },
-    onError: (_error, payload, context) => {
-      if (context?.previousTransactions) {
-        queryClient.setQueryData(['transactions', payload.vendor_id] as const, context.previousTransactions);
-      }
-      if (context?.previousInventory) {
-        queryClient.setQueryData(['inventory', payload.vendor_id] as const, context.previousInventory);
-      }
-      if (context?.previousStats) {
-        queryClient.setQueryData(['dashboardStats'] as const, context.previousStats);
-      }
-    },
-    onSettled: (_, __, payload) => {
-      queryClient.invalidateQueries({ queryKey: ['transactions', payload.vendor_id] as const });
-      queryClient.invalidateQueries({ queryKey: ['inventory', payload.vendor_id] as const });
-      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] as const });
+  return useMutation<VisitResult, Error, Parameters<typeof createVisit>[0]>({
+    mutationFn: createVisit,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
     },
   });
 }

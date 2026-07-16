@@ -2,10 +2,10 @@
 
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
-import { useDashboardStatsQuery } from '@/lib/hooks/queries';
+import { useStatsQuery } from '@/lib/hooks/queries';
 
 export function DashboardShell() {
-  const { data: stats, isLoading, isError } = useDashboardStatsQuery();
+  const { data: stats, isLoading, isError } = useStatsQuery();
 
   return (
     <main className="min-h-screen px-4 pb-24 pt-8 sm:px-6 lg:px-8">

@@ -1,24 +1,30 @@
-import { fetchTransactions, fetchTransactionsByVendor, postTransaction } from '@/services/gasApi';
-import type { Transaction } from '@/lib/types';
+import { createVisit } from '@/services/gasApi';
+import type { Transaction, VisitResult } from '@/lib/types';
 
 export interface CreateTransactionPayload {
   vendor_id: string;
-  opening_stock: number;
+  product_id: string;
+  sales_rep_id: string;
   stock_sold: number;
   stock_added: number;
   cash_collected: number;
-  sales_rep: string;
-  notes: string;
+  unit_price: number;
+  payment_method: string;
+  payment_reference?: string;
+  client_transaction_id: string;
+  latitude?: number;
+  longitude?: number;
+  notes?: string;
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
-  return fetchTransactions();
+  return [];
 }
 
 export async function getTransactionsByVendor(vendorId: string): Promise<Transaction[]> {
-  return fetchTransactionsByVendor(vendorId);
+  return [];
 }
 
-export async function createTransaction(payload: CreateTransactionPayload): Promise<Transaction> {
-  return postTransaction(payload);
+export async function createTransaction(payload: CreateTransactionPayload): Promise<VisitResult> {
+  return createVisit(payload);
 }

@@ -1,14 +1,15 @@
 import type { Inventory, Vendor } from '@/lib/types';
-import { fetchInventoryByVendor, fetchVendorById, fetchVendors } from '@/services/gasApi';
+import { getInventory, getVendor, getVendors as fetchVendors } from '@/services/gasApi';
 
-export async function getVendors(): Promise<Vendor[]> {
+export async function getVendorList(): Promise<Vendor[]> {
   return fetchVendors();
 }
 
 export async function getVendorById(vendorId: string): Promise<Vendor | undefined> {
-  return fetchVendorById(vendorId);
+  return getVendor(vendorId);
 }
 
 export async function getVendorInventory(vendorId: string): Promise<Inventory | undefined> {
-  return fetchInventoryByVendor(vendorId);
+  const results = await getInventory({ vendorId });
+  return results[0];
 }

@@ -35,7 +35,7 @@ This repository is prepared for Hostinger Business Hosting deployment using a st
 ### Required environment variables
 - `NODE_ENV=production`
 - `PORT` (e.g. `3000`)
-- `NEXT_PUBLIC_GAS_API_BASE_URL`
+- `NEXT_PUBLIC_GAS_API_URL`
 - `NEXT_PUBLIC_GAS_API_KEY`
 
 ### Recommended Hostinger steps

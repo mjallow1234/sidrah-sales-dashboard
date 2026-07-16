@@ -22,7 +22,7 @@ Set these values in Hostinger Node.js app settings or via a production `.env` fi
 ```env
 NODE_ENV=production
 PORT=3000
-NEXT_PUBLIC_GAS_API_BASE_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
+NEXT_PUBLIC_GAS_API_URL=https://script.google.com/macros/s/YOUR_SCRIPT_ID/exec
 NEXT_PUBLIC_GAS_API_KEY=YOUR_API_KEY
 ```
 

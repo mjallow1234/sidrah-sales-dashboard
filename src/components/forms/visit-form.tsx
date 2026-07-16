@@ -1,14 +1,18 @@
 'use client';
 
-import { useEffect, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { useCreateVisitMutation, useInventoryByVendorQuery } from '@/lib/hooks/queries';
-import type { Vendor } from '@/lib/types';
+import { useCreateVisitMutation, useInventoryByVendorQuery, useProductsQuery, useSalesRepsQuery } from '@/lib/hooks/queries';
+import type { Vendor, Product, SalesRep } from '@/lib/types';
 
 const visitSchema = z.object({
   vendor_id: z.string().min(1, 'Vendor is required'),
+  product_id: z.string().min(1, 'Product is required'),
+  sales_rep_id: z.string().min(1, 'Sales rep is required'),
+  unit_price: z.number().min(0, 'Unit price must be 0 or more'),
+  payment_method: z.string().min(1, 'Payment method is required'),
   stock_sold: z.number().min(0, 'Stock sold must be 0 or more'),
   cash_collected: z.number().min(0, 'Cash collected must be 0 or more'),
   stock_added: z.number().min(0, 'Stock added must be 0 or more'),
@@ -32,15 +36,45 @@ export function VisitForm({ vendors }: VisitFormProps) {
     }
   }, [vendors, resetVisitDraft, visitDraft.vendor_id]);
 
+  const productQuery = useProductsQuery();
+  const salesRepsQuery = useSalesRepsQuery();
   const inventoryQuery = useInventoryByVendorQuery(visitDraft.vendor_id);
   const openingStock = inventoryQuery.data?.current_stock ?? 0;
-  const { mutate, error, status } = useCreateVisitMutation();
-  const isLoading = status === 'pending';
+  const { mutate, status, isSuccess, isPending } = useCreateVisitMutation();
   const isError = status === 'error';
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const products = productQuery.data ?? [];
+  const salesReps = salesRepsQuery.data ?? [];
+
+  useEffect(() => {
+    if (!visitDraft.vendor_id && vendors.length > 0) {
+      resetVisitDraft(vendors[0].vendor_id);
+    }
+  }, [vendors, resetVisitDraft, visitDraft.vendor_id]);
+
+  useEffect(() => {
+    if (!visitDraft.product_id && products.length > 0) {
+      setVisitDraft({ product_id: products[0].product_id, unit_price: products[0].default_unit_price });
+    }
+  }, [products, setVisitDraft, visitDraft.product_id]);
+
+  useEffect(() => {
+    if (!visitDraft.sales_rep_id && salesReps.length > 0) {
+      setVisitDraft({ sales_rep_id: salesReps[0].sales_rep_id });
+    }
+  }, [salesReps, setVisitDraft, visitDraft.sales_rep_id]);
+
+  useEffect(() => {
+    if (isSuccess) {
+      setSuccessMessage('Visit submitted successfully.');
+    }
+  }, [isSuccess]);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setErrorMessage(null);
+    setSuccessMessage(null);
 
     const result = visitSchema.safeParse(visitDraft);
     if (!result.success) {
@@ -48,14 +82,20 @@ export function VisitForm({ vendors }: VisitFormProps) {
       return;
     }
 
+    const clientTransactionId = `${visitDraft.vendor_id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
     mutate(
       {
         vendor_id: visitDraft.vendor_id,
-        opening_stock: openingStock,
+        product_id: visitDraft.product_id,
+        sales_rep_id: visitDraft.sales_rep_id,
         stock_sold: visitDraft.stock_sold,
         stock_added: visitDraft.stock_added,
         cash_collected: visitDraft.cash_collected,
-        sales_rep: 'Sales Agent',
+        unit_price: visitDraft.unit_price,
+        payment_method: visitDraft.payment_method,
+        payment_reference: visitDraft.payment_reference,
+        client_transaction_id: clientTransactionId,
         notes: visitDraft.notes,
       },
       {
@@ -142,8 +182,8 @@ export function VisitForm({ vendors }: VisitFormProps) {
         {isError ? <p className="text-sm text-rose-600">Unable to save visit. Please try again.</p> : null}
         {inventoryQuery.isError ? <p className="text-sm text-rose-600">Unable to load inventory for selected vendor.</p> : null}
 
-        <Button type="submit" className="w-full" disabled={isLoading || inventoryQuery.isLoading || !visitDraft.vendor_id}>
-          {isLoading ? 'Submitting…' : 'Submit Visit'}
+        <Button type="submit" className="w-full" disabled={isPending || inventoryQuery.isLoading || !visitDraft.vendor_id}>
+          {isPending ? 'Submitting…' : 'Submit Visit'}
         </Button>
       </form>
     </div>
