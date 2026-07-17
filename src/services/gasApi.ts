@@ -1,21 +1,5 @@
 import type { DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VisitResult } from '@/lib/types';
 
-const GAS_API_URL = process.env.NEXT_PUBLIC_GAS_API_URL;
-const GAS_API_KEY = process.env.NEXT_PUBLIC_GAS_API_KEY;
-
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('NEXT_PUBLIC_GAS_API_URL is not configured.');
-  }
-  return GAS_API_URL.replace(/\/+$/, '');
-}
-
-function makeUrl(path: string) {
-  const base = ensureBaseUrl();
-  const separator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${separator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}${path}${keyParam}`;
-}
 
 function getHeaders(method: string = 'GET'): HeadersInit {
   return method === 'POST'
@@ -26,7 +10,7 @@ function getHeaders(method: string = 'GET'): HeadersInit {
 }
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const url = makeUrl(path);
+  const url = path;
   let headers: HeadersInit = getHeaders(options.method ?? 'GET');
 
   if (options.headers) {
@@ -59,12 +43,12 @@ export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: 
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
-  const path = query ? `/vendors?${query}` : '/vendors';
+  const path = query ? `/api/vendors?${query}` : '/api/vendors';
   return fetchJson<{ status: string; data: Vendor[] }>(path).then((result) => result.data);
 }
 
 export async function getVendor(id: string) {
-  return fetchJson<{ status: string; data: Vendor }>(`/vendors/${encodeURIComponent(id)}`).then((result) => result.data);
+  return fetchJson<{ status: string; data: Vendor }>(`/api/vendors/${encodeURIComponent(id)}`).then((result) => result.data);
 }
 
 export async function getProducts(params?: { active?: boolean | string; category?: string }) {
@@ -72,12 +56,12 @@ export async function getProducts(params?: { active?: boolean | string; category
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
-  const path = query ? `/products?${query}` : '/products';
+  const path = query ? `/api/products?${query}` : '/api/products';
   return fetchJson<{ status: string; data: Product[] }>(path).then((result) => result.data);
 }
 
 export async function getProduct(id: string) {
-  return fetchJson<{ status: string; data: Product }>(`/product/${encodeURIComponent(id)}`).then((result) => result.data);
+  return fetchJson<{ status: string; data: Product }>(`/api/products/${encodeURIComponent(id)}`).then((result) => result.data);
 }
 
 export async function getSalesReps(params?: { status?: string }) {
@@ -85,12 +69,12 @@ export async function getSalesReps(params?: { status?: string }) {
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
-  const path = query ? `/salesreps?${query}` : '/salesreps';
+  const path = query ? `/api/salesreps?${query}` : '/api/salesreps';
   return fetchJson<{ status: string; data: SalesRep[] }>(path).then((result) => result.data);
 }
 
 export async function getSalesRep(id: string) {
-  return fetchJson<{ status: string; data: SalesRep }>(`/salesrep/${encodeURIComponent(id)}`).then((result) => result.data);
+  return fetchJson<{ status: string; data: SalesRep }>(`/api/salesreps/${encodeURIComponent(id)}`).then((result) => result.data);
 }
 
 export async function getInventory(params?: { vendorId?: string; productId?: string }) {
@@ -98,7 +82,7 @@ export async function getInventory(params?: { vendorId?: string; productId?: str
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
-  const path = query ? `/inventory?${query}` : '/inventory';
+  const path = query ? `/api/inventory?${query}` : '/api/inventory';
   return fetchJson<{ status: string; data: Inventory[] }>(path).then((result) => result.data);
 }
 
@@ -107,7 +91,7 @@ export async function getVendorBalances(params?: { vendorId?: string }) {
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
-  const path = query ? `/vendorbalances?${query}` : '/vendorbalances';
+  const path = query ? `/api/vendorbalances?${query}` : '/api/vendorbalances';
   return fetchJson<{ status: string; data: VendorBalance[] }>(path).then((result) => result.data);
 }
 
@@ -121,7 +105,7 @@ export async function getVisitLogs(params?: { vendorId?: string; salesRepId?: st
 }
 
 export async function getStats() {
-  return fetchJson<{ status: string; data: DashboardStats }>('/stats').then((result) => result.data);
+  return fetchJson<{ status: string; data: DashboardStats }>('/api/stats').then((result) => result.data);
 }
 
 export async function createVendor(payload: {
@@ -132,7 +116,7 @@ export async function createVendor(payload: {
   assigned_date?: string;
   status?: string;
 }) {
-  return fetchJson<{ status: string; data: Vendor }>('/vendor', {
+  return fetchJson<{ status: string; data: Vendor }>('/api/vendors', {
     method: 'POST',
     body: JSON.stringify(payload),
   }).then((result) => result.data);
@@ -145,9 +129,9 @@ export async function updateVendor(id: string, payload: Partial<{
   sales_rep_id: string;
   status: string;
 }>) {
-  return fetchJson<{ status: string; data: Vendor }>(`/vendor/${encodeURIComponent(id)}`, {
-    method: 'POST',
-    body: JSON.stringify({ _method: 'PUT', ...payload }),
+  return fetchJson<{ status: string; data: Vendor }>(`/api/vendors/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   }).then((result) => result.data);
 }
 
@@ -158,7 +142,7 @@ export async function createProduct(payload: {
   default_unit_price: number;
   currency: string;
 }) {
-  return fetchJson<{ status: string; data: Product }>('/product', {
+  return fetchJson<{ status: string; data: Product }>('/api/products', {
     method: 'POST',
     body: JSON.stringify(payload),
   }).then((result) => result.data);
@@ -172,15 +156,14 @@ export async function updateProduct(id: string, payload: Partial<{
   currency: string;
   active: boolean;
 }>) {
-  const body = { _method: 'PUT', ...payload };
-  return fetchJson<{ status: string; data: Product }>(`/product/${encodeURIComponent(id)}`, {
-    method: 'POST',
-    body: JSON.stringify(body),
+  return fetchJson<{ status: string; data: Product }>(`/api/products/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   }).then((result) => result.data);
 }
 
 export async function createSalesRep(payload: { full_name: string; phone: string }) {
-  return fetchJson<{ status: string; data: SalesRep }>('/salesrep', {
+  return fetchJson<{ status: string; data: SalesRep }>('/api/salesreps', {
     method: 'POST',
     body: JSON.stringify(payload),
   }).then((result) => result.data);
@@ -191,9 +174,9 @@ export async function updateSalesRep(id: string, payload: Partial<{
   phone: string;
   status: string;
 }>) {
-  return fetchJson<{ status: string; data: SalesRep }>(`/salesrep/${encodeURIComponent(id)}`, {
-    method: 'POST',
-    body: JSON.stringify({ _method: 'PUT', ...payload }),
+  return fetchJson<{ status: string; data: SalesRep }>(`/api/salesreps/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(payload),
   }).then((result) => result.data);
 }
 
@@ -212,7 +195,7 @@ export async function createVisit(payload: {
   longitude?: number;
   notes?: string;
 }) {
-  return fetchJson<{ status: string; data: VisitResult }>('/visit', {
+  return fetchJson<{ status: string; data: VisitResult }>('/api/visit', {
     method: 'POST',
     body: JSON.stringify(payload),
   }).then((result) => result.data);
