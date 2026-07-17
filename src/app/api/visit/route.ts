@@ -17,22 +17,35 @@ function makeUrl(path: string) {
   return `${base}${path}${keyParam}`;
 }
 
-export async function POST(request: NextRequest) {
-  const payload = await request.json();
-  const url = makeUrl('/visit');
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
+export async function POST(request: Request) {
+  try {
+    const payload = await request.json();
+    const url = makeUrl('/visit');
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
 
-  const text = await response.text();
-  return new Response(text, {
-    status: response.status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+    const text = await response.text();
+    return new Response(text, {
+      status: response.status,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    return Response.json(
+      {
+        error: String(error),
+        gasUrlExists: !!process.env.GAS_API_URL,
+        gasKeyExists: !!process.env.GAS_API_KEY,
+        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
+        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
+      },
+      { status: 500 }
+    );
+  }
 }

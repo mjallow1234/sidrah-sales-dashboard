@@ -18,16 +18,29 @@ function makeUrl(path: string) {
 }
 
 export async function GET(request: NextRequest) {
-  const url = makeUrl(`/stats${request.nextUrl.search}`);
-  const response = await fetch(url, {
-    method: 'GET',
-  });
+  try {
+    const url = makeUrl(`/stats${request.nextUrl.search}`);
+    const response = await fetch(url, {
+      method: 'GET',
+    });
 
-  const text = await response.text();
-  return new Response(text, {
-    status: response.status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+    const text = await response.text();
+    return new Response(text, {
+      status: response.status,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    return Response.json(
+      {
+        error: String(error),
+        gasUrlExists: !!process.env.GAS_API_URL,
+        gasKeyExists: !!process.env.GAS_API_KEY,
+        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
+        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
+      },
+      { status: 500 }
+    );
+  }
 }
