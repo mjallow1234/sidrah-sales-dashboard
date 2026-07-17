@@ -17,7 +17,7 @@ function makeUrl(path: string) {
   return `${base}${path}${keyParam}`;
 }
 
-function getHeaders(method: string = 'GET') {
+function getHeaders(method: string = 'GET'): HeadersInit {
   return method === 'POST'
     ? {
         'Content-Type': 'application/json',
@@ -27,12 +27,19 @@ function getHeaders(method: string = 'GET') {
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const url = makeUrl(path);
+  let headers: HeadersInit = getHeaders(options.method ?? 'GET');
+
+  if (options.headers) {
+    const merged = new Headers(headers);
+    new Headers(options.headers).forEach(function(value, key) {
+      merged.set(key, value);
+    });
+    headers = merged;
+  }
+
   const response = await fetch(url, {
     ...options,
-    headers: {
-      ...getHeaders(options.method ?? 'GET'),
-      ...(options.headers ?? {}),
-    },
+    headers,
   });
 
   const text = await response.text();
