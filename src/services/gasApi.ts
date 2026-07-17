@@ -17,10 +17,12 @@ function makeUrl(path: string) {
   return `${base}${path}${keyParam}`;
 }
 
-function getHeaders() {
-  return {
-    'Content-Type': 'application/json',
-  };
+function getHeaders(method: string = 'GET') {
+  return method === 'POST'
+    ? {
+        'Content-Type': 'application/json',
+      }
+    : {};
 }
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -28,7 +30,7 @@ async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T>
   const response = await fetch(url, {
     ...options,
     headers: {
-      ...getHeaders(),
+      ...getHeaders(options.method ?? 'GET'),
       ...(options.headers ?? {}),
     },
   });
