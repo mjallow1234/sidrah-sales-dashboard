@@ -25,6 +25,22 @@ export async function GET(request: NextRequest) {
     });
 
     const text = await response.text();
+    const contentType = response.headers.get('content-type');
+    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
+
+    if (diagnosticMode) {
+      return Response.json(
+        {
+          finalUrl: response.url,
+          status: response.status,
+          redirected: response.redirected,
+          contentType,
+          body: text,
+        },
+        { status: 200 }
+      );
+    }
+
     return new Response(text, {
       status: response.status,
       headers: {
