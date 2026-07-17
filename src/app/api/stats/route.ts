@@ -32,10 +32,16 @@ export async function GET(request: NextRequest) {
       return Response.json(
         {
           finalUrl: response.url,
+          responseUrl: response.url,
+          responseStatus: response.status,
+          responseHeaders: {
+            'content-type': response.headers.get('content-type'),
+            location: response.headers.get('location')
+          },
+          redirected: response.redirected,
           gasApiUrl: process.env.GAS_API_URL,
           constructedUrl: url,
           status: response.status,
-          redirected: response.redirected,
           contentType,
         },
         { status: 200 }
