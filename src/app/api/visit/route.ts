@@ -12,9 +12,9 @@ function ensureBaseUrl() {
 
 function makeUrl(path: string) {
   const base = ensureBaseUrl();
-  const separator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${separator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}${path}${keyParam}`;
+  const keySeparator = path.includes('?') ? '&' : '?';
+  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
 }
 
 export async function POST(request: Request) {
