@@ -3,9 +3,17 @@
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { useStatsQuery } from '@/lib/hooks/queries';
+import { logout } from '@/lib/auth';
+import { useRouter } from 'next/navigation';
 
 export function DashboardShell() {
+  const router = useRouter();
   const { data: stats, isLoading, isError } = useStatsQuery();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
     <main className="min-h-screen px-4 pb-24 pt-8 sm:px-6 lg:px-8">
@@ -16,8 +24,17 @@ export function DashboardShell() {
               <p className="text-sm uppercase tracking-[0.24em] text-sidrah-500">Dashboard</p>
               <h1 className="mt-2 text-2xl font-semibold text-slate-900">Field agent summary</h1>
             </div>
-            <div className="rounded-3xl bg-sidrah-50 px-4 py-3 text-sm text-sidrah-700">
-              Mobile-first workflow for vendor visits
+            <div className="flex items-center gap-3">
+              <div className="rounded-3xl bg-sidrah-50 px-4 py-3 text-sm text-sidrah-700">
+                Mobile-first workflow for vendor visits
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </section>

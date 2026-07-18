@@ -1,14 +1,12 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/app/providers';
+import { login } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -67,11 +65,6 @@ export default function LoginPage() {
           </p>
         </form>
 
-        <div className="mt-6 flex justify-center gap-3 text-sm text-slate-600">
-          <Link href="/dashboard" className="font-semibold text-sidrah-600 hover:text-sidrah-700">
-            Continue to dashboard
-          </Link>
-        </div>
       </div>
     </main>
   );

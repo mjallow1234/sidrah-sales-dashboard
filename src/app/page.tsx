@@ -20,9 +20,6 @@ export default function HomePage() {
             <Link href="/login" className="rounded-3xl bg-sidrah-500 px-5 py-4 text-white shadow-soft transition hover:bg-sidrah-600">
               Launch App
             </Link>
-            <Link href="/dashboard" className="rounded-3xl border border-slate-200 bg-white px-5 py-4 text-slate-900 shadow-soft transition hover:border-sidrah-300">
-              View Dashboard
-            </Link>
           </div>
 
           <section className="rounded-3xl border border-slate-200 bg-white p-5">

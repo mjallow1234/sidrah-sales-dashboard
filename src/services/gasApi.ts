@@ -38,26 +38,48 @@ async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T>
   }
 }
 
-export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
+export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string }): Promise<Vendor[]> {
   const query = params ? Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/vendors?${query}` : '/api/vendors';
-  return fetchJson<{ status: string; data: Vendor[] }>(path).then((result) => result.data);
+  return fetchJson<any>(path).then((result) => {
+    if (Array.isArray(result.data)) {
+      return result.data;
+    }
+
+    if (Array.isArray(result.data?.items)) {
+      return result.data.items;
+    }
+
+    return [];
+  });
 }
 
 export async function getVendor(id: string) {
   return fetchJson<{ status: string; data: Vendor }>(`/api/vendors/${encodeURIComponent(id)}`).then((result) => result.data);
 }
 
-export async function getProducts(params?: { active?: boolean | string; category?: string }) {
+export async function getProducts(params?: { active?: boolean | string; category?: string }): Promise<Product[]> {
   const query = params ? Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/products?${query}` : '/api/products';
-  return fetchJson<{ status: string; data: Product[] }>(path).then((result) => result.data);
+  const result = await fetchJson<any>(path);
+
+  console.log('PRODUCTS RESPONSE', result);
+
+  if (Array.isArray(result.data)) {
+    return result.data;
+  }
+
+  if (Array.isArray(result.data?.items)) {
+    return result.data.items;
+  }
+
+  return [];
 }
 
 export async function getProduct(id: string) {
