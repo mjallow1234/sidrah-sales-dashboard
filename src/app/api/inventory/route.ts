@@ -10,15 +10,19 @@ function ensureBaseUrl() {
   return GAS_API_URL.replace(/\/+$/, '');
 }
 
-function makeUrl(path: string) {
+function makeUrl(path: string, query?: URLSearchParams) {
   const base = ensureBaseUrl();
-  const keySeparator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
+  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  const normalizedPath = encodeURIComponent(path.replace(/^[\/\#]+/, ''));
+  const queryString = query?.toString() ?? '';
+  const queryParamString = queryString ? `&${queryString}` : '';
+  return `${base}?path=${normalizedPath}${queryParamString}${keyParam}`;
 }
 
 export async function GET(request: NextRequest) {
-  const url = makeUrl(`/inventory${request.nextUrl.search}`);
+  const queryParams = new URLSearchParams(request.nextUrl.searchParams);
+  queryParams.delete('diagnose');
+  const url = makeUrl('/inventory', queryParams);
   const response = await fetch(url, { method: 'GET' });
   const text = await response.text();
   return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
