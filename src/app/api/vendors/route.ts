@@ -12,8 +12,7 @@ function ensureBaseUrl() {
 
 function makeUrl(path: string) {
   const base = ensureBaseUrl();
-  const keySeparator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
   return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
 }
 
@@ -25,6 +24,22 @@ export async function GET(request: NextRequest) {
     });
 
     const text = await response.text();
+    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
+
+    if (diagnosticMode) {
+      return Response.json(
+        {
+          gasApiUrl: process.env.GAS_API_URL,
+          gasApiKey: process.env.GAS_API_KEY,
+          constructedUrl: url,
+          responseStatus: response.status,
+          responseHeaders: Object.fromEntries(response.headers.entries()),
+          body: text,
+        },
+        { status: 200 }
+      );
+    }
+
     return new Response(text, {
       status: response.status,
       headers: {

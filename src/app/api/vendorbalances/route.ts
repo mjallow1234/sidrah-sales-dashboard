@@ -12,14 +12,47 @@ function ensureBaseUrl() {
 
 function makeUrl(path: string) {
   const base = ensureBaseUrl();
-  const keySeparator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
   return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
 }
 
 export async function GET(request: NextRequest) {
-  const url = makeUrl(`/vendorbalances${request.nextUrl.search}`);
-  const response = await fetch(url, { method: 'GET' });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const url = makeUrl(`/vendorbalances${request.nextUrl.search}`);
+    const response = await fetch(url, { method: 'GET' });
+    const text = await response.text();
+    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
+
+    if (diagnosticMode) {
+      return Response.json(
+        {
+          gasApiUrl: process.env.GAS_API_URL,
+          gasApiKey: process.env.GAS_API_KEY,
+          constructedUrl: url,
+          responseStatus: response.status,
+          responseHeaders: Object.fromEntries(response.headers.entries()),
+          body: text,
+        },
+        { status: 200 }
+      );
+    }
+
+    return new Response(text, {
+      status: response.status,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (error) {
+    return Response.json(
+      {
+        error: String(error),
+        gasUrlExists: !!process.env.GAS_API_URL,
+        gasKeyExists: !!process.env.GAS_API_KEY,
+        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
+        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
+      },
+      { status: 500 }
+    );
+  }
 }
