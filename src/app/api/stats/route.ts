@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
           },
           redirected: response.redirected,
           gasApiUrl: process.env.GAS_API_URL,
+          gasApiKey: process.env.GAS_API_KEY,
           constructedUrl: url,
           status: response.status,
           contentType,

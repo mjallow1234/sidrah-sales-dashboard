@@ -1,6 +1,20 @@
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
 
+function ensureBaseUrl() {
+  if (!GAS_API_URL) {
+    throw new Error('GAS_API_URL is not configured.');
+  }
+  return GAS_API_URL.replace(/\/+$/, '');
+}
+
+function makeUrl(path: string) {
+  const base = ensureBaseUrl();
+  const keySeparator = path.includes('?') ? '&' : '?';
+  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
+}
+
 export async function GET() {
   if (!GAS_API_URL) {
     return Response.json(
@@ -11,10 +25,13 @@ export async function GET() {
     );
   }
 
-  const url = `${GAS_API_URL.replace(/\/+$/, '')}/stats?api_key=${encodeURIComponent(GAS_API_KEY ?? '')}`;
+  const url = makeUrl('/stats');
   const response = await fetch(url, { method: 'GET' });
   const body = await response.text();
   return Response.json({
+    gasApiUrl: process.env.GAS_API_URL,
+    gasApiKey: process.env.GAS_API_KEY,
+    constructedUrl: url,
     responseUrl: response.url,
     status: response.status,
     redirected: response.redirected,
