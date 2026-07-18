@@ -12,8 +12,7 @@ function ensureBaseUrl() {
 
 function makeUrl(path: string) {
   const base = ensureBaseUrl();
-  const keySeparator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
   return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
 }
 
