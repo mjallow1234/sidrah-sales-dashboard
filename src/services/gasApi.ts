@@ -69,8 +69,6 @@ export async function getProducts(params?: { active?: boolean | string; category
   const path = query ? `/api/products?${query}` : '/api/products';
   const result = await fetchJson<any>(path);
 
-  console.log('PRODUCTS RESPONSE', result);
-
   if (Array.isArray(result.data)) {
     return result.data;
   }

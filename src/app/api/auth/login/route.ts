@@ -49,14 +49,6 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('LOGIN ERROR:', error);
-
-    return NextResponse.json(
-      {
-        success: false,
-        error: error instanceof Error ? error.message : String(error),
-      },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false }, { status: 500 });
   }
 }
