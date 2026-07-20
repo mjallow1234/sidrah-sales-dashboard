@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ valid: false });
   }
 
-  const isValid = await verifySession(token);
-  return NextResponse.json({ valid: isValid });
+  const verification = await verifySession(token);
+  return NextResponse.json(verification);
 }
