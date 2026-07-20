@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSession } from '@/lib/session';
 
-const VALID_PHONE = process.env.AUTH_PHONE ?? 'ahmad';
-const VALID_PASSWORD = process.env.AUTH_PASSWORD ?? 'Jallow@123';
-const AUTH_USER_ID = process.env.AUTH_USER_ID ?? 'agent-1';
-const AUTH_USER_ROLE = process.env.AUTH_USER_ROLE ?? 'agent';
+const VALID_PHONE = process.env.AUTH_PHONE;
+const VALID_PASSWORD = process.env.AUTH_PASSWORD;
+const AUTH_USER_ID = process.env.AUTH_USER_ID;
+const AUTH_USER_ROLE = process.env.AUTH_USER_ROLE;
 const SESSION_MAX_AGE_SECONDS = 86400;
+
+if (!VALID_PHONE || !VALID_PASSWORD || !AUTH_USER_ID || !AUTH_USER_ROLE) {
+  throw new Error('AUTH_PHONE, AUTH_PASSWORD, AUTH_USER_ID, and AUTH_USER_ROLE must be configured');
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,8 +21,8 @@ export async function POST(request: NextRequest) {
     }
 
     const token = await createSession({
-      userId: AUTH_USER_ID,
-      role: AUTH_USER_ROLE,
+      userId: AUTH_USER_ID as string,
+      role: AUTH_USER_ROLE as string,
     });
 
     const response = NextResponse.json({ success: true });

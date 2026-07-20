@@ -29,7 +29,7 @@ export default function LoginPage() {
         return;
       }
 
-      setError('Invalid credentials. Use ahmad / Jallow@123');
+      setError('Invalid credentials. Please try again.');
     } catch (error) {
       setError('Unable to login. Please try again.');
     }
@@ -74,7 +74,7 @@ export default function LoginPage() {
           </Button>
 
           <p className="text-center text-sm text-slate-500">
-            Demo credentials: <strong>ahmad</strong> / <strong>Jallow@123</strong>
+            Enter your assigned credentials.
           </p>
         </form>
 
