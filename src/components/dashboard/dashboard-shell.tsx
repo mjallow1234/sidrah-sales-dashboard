@@ -3,15 +3,14 @@
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { useStatsQuery } from '@/lib/hooks/queries';
-import { logout } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
 
 export function DashboardShell() {
   const router = useRouter();
   const { data: stats, isLoading, isError } = useStatsQuery();
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
     router.push('/login');
   };
 

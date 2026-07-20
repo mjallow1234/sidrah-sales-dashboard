@@ -3,7 +3,6 @@
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
-import { login } from '@/lib/auth';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -11,15 +10,29 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    setError(null);
 
-    if (login(phone, password)) {
-      router.push('/dashboard');
-      return;
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone, password }),
+      });
+
+      const result = await response.json();
+      if (response.ok && result.success) {
+        router.push('/dashboard');
+        return;
+      }
+
+      setError('Invalid credentials. Use ahmad / Jallow@123');
+    } catch (error) {
+      setError('Unable to login. Please try again.');
     }
-
-    setError('Invalid credentials. Use ahmad / Jallow@123');
   };
 
   return (

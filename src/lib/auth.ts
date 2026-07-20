@@ -10,8 +10,7 @@ export function isAuthenticated(): boolean {
 
 export function login(phone: string, password: string): boolean {
   if (phone === 'ahmad' && password === 'Jallow@123') {
-    const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-    document.cookie = `sidrah_auth=true; path=/; max-age=86400; SameSite=Lax${secure}`;
+    document.cookie = 'sidrah_auth=true; path=/; max-age=86400; SameSite=Lax; Secure';
     return true;
   }
 
@@ -19,6 +18,5 @@ export function login(phone: string, password: string): boolean {
 }
 
 export function logout() {
-  const secure = window.location.protocol === 'https:' ? '; Secure' : '';
-  document.cookie = `sidrah_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax${secure}`;
+  document.cookie = 'sidrah_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax; Secure';
 }
