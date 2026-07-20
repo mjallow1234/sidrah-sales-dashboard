@@ -1,15 +1,17 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 
-const SESSION_SECRET = process.env.SESSION_SECRET;
 const SESSION_COOKIE_NAME = 'sidrah_session';
 const SESSION_MAX_AGE_SECONDS = 86400; // 24 hours
 
-if (!SESSION_SECRET) {
-  throw new Error('SESSION_SECRET must be defined in the environment');
-}
+function getSecretKey() {
+  const secret = process.env.SESSION_SECRET;
 
-const encoder = new TextEncoder();
-const secretKey = encoder.encode(SESSION_SECRET);
+  if (!secret) {
+    throw new Error('SESSION_SECRET must be defined');
+  }
+
+  return new TextEncoder().encode(secret);
+}
 
 export interface SessionPayload {
   userId: string;
@@ -21,7 +23,7 @@ export async function createSession(payload: SessionPayload) {
     .setProtectedHeader({ alg: 'HS256', typ: 'JWT' })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
-    .sign(secretKey);
+    .sign(getSecretKey());
 
   return jwt;
 }
@@ -34,7 +36,7 @@ export interface SessionVerificationResult {
 
 export async function verifySession(token: string): Promise<SessionVerificationResult> {
   try {
-    const { payload } = await jwtVerify(token, secretKey);
+    const { payload } = await jwtVerify(token, getSecretKey());
     return {
       valid: true,
       userId: typeof payload.userId === 'string' ? payload.userId : undefined,
