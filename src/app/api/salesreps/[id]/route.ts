@@ -10,11 +10,16 @@ function ensureBaseUrl() {
   return GAS_API_URL.replace(/\/+$/, '');
 }
 
-function makeUrl(path: string) {
+function buildGasUrl(path: string, query?: URLSearchParams) {
   const base = ensureBaseUrl();
-  const keySeparator = path.includes('?') ? '&' : '?';
-  const keyParam = GAS_API_KEY ? `${keySeparator}api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
+  const normalizedPath = path
+    .replace(/^\/+/, '')
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  const queryString = query?.toString() ?? '';
+  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
+  return `${base}?path=${normalizedPath}${queryString ? `&${queryString}` : ''}${keyParam}`;
 }
 
 function getIdFromUrl(request: Request) {
@@ -25,7 +30,7 @@ function getIdFromUrl(request: Request) {
 
 export async function GET(request: Request) {
   const id = getIdFromUrl(request);
-  const url = makeUrl(`/salesreps/${encodeURIComponent(id)}`);
+  const url = buildGasUrl(`/salesreps/${id}`);
   const response = await fetch(url, { method: 'GET' });
   const text = await response.text();
   return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
@@ -34,11 +39,16 @@ export async function GET(request: Request) {
 export async function PUT(request: Request) {
   const id = getIdFromUrl(request);
   const payload = await request.json();
-  const url = makeUrl(`/salesrep/${encodeURIComponent(id)}`);
+  const putPayload: Record<string, unknown> = {
+    _method: 'PUT',
+    ...payload,
+  };
+
+  const url = buildGasUrl(`/salesrep/${id}`);
   const response = await fetch(url, {
-    method: 'PUT',
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(putPayload),
   });
   const text = await response.text();
   return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });

@@ -10,15 +10,22 @@ function ensureBaseUrl() {
   return GAS_API_URL.replace(/\/+$/, '');
 }
 
-function makeUrl(path: string) {
+function makeUrl(path: string, query?: URLSearchParams) {
   const base = ensureBaseUrl();
+  const normalizedPath = path
+    .replace(/^\/+/, '')
+    .split('/')
+    .map(encodeURIComponent)
+    .join('/');
+  const queryString = query?.toString() ?? '';
   const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
+  return `${base}?path=${normalizedPath}${queryString ? `&${queryString}` : ''}${keyParam}`;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const url = makeUrl(`/salesreps${request.nextUrl.search}`);
+    const queryParams = new URLSearchParams(request.nextUrl.searchParams);
+  const url = makeUrl('/salesreps', queryParams);
     const response = await fetch(url, {
       method: 'GET',
     });
