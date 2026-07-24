@@ -13,7 +13,7 @@ const userSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   role: z.enum(['super_admin', 'admin', 'supervisor', 'agent']),
   status: z.enum(['active', 'inactive', 'suspended']),
-  password: z.string().min(1, 'Password is required').optional(),
+  password: z.string().optional(),
 });
 
 interface UserFormProps {
@@ -63,14 +63,17 @@ export function UserForm({ initialValues, userId, onSuccess }: UserFormProps) {
     }
 
     try {
-      const payload = {
+      const payload: Record<string, unknown> = {
         email: formState.email,
         phone: formState.phone,
         name: formState.name,
         role: formState.role,
         status: formState.status,
-        password: formState.password || undefined,
       };
+
+      if (formState.password) {
+        payload.password = formState.password;
+      }
 
       if (userId) {
         await updateMutation.mutateAsync({ id: userId, payload });

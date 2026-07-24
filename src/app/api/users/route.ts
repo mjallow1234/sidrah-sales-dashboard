@@ -24,19 +24,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'email, phone, name, and role are required.' }, { status: 400 });
   }
 
-  if (!password) {
-    return NextResponse.json({ status: 'error', message: 'Password is required.' }, { status: 400 });
-  }
-
   const actorId = await getSessionUserId(request);
-  const body = {
+  const body: Record<string, unknown> = {
     ...payload,
     created_by: actorId,
     updated_by: actorId,
     status: payload.status ?? 'active',
-    password_hash: hashPassword(password),
-    password_reset_required: String(payload.password_reset_required ?? 'false'),
   };
+
+  if (password) {
+    body.password_hash = hashPassword(password);
+    body.password_reset_required = String(payload.password_reset_required ?? 'false');
+  }
   delete (body as any).password;
   delete (body as any).user_id;
   delete (body as any).sales_rep_id;
