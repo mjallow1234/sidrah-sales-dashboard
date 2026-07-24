@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { NextRequest } from 'next/server';
 import { hashPassword } from '@/lib/password';
 import { verifySession } from '@/lib/session';
+import { fetchAppUserById, updateAppUser } from '@/services/appUserService';
 
 async function getSessionUserId(request: NextRequest) {
   const token = request.cookies.get('sidrah_session')?.value;
@@ -14,11 +15,8 @@ async function getSessionUserId(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.pathname.split('/').filter(Boolean).pop();
-  const response = await fetch(new URL(`/api/appusers/${encodeURIComponent(id ?? '')}`, request.url), {
-    method: 'GET',
-  });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
+  const result = await fetchAppUserById(id ?? '');
+  return new Response(result.text, { status: result.status, headers: { 'Content-Type': 'application/json' } });
 }
 
 export async function PUT(request: NextRequest) {
@@ -41,26 +39,15 @@ export async function PUT(request: NextRequest) {
     ...body,
   };
 
-  const response = await fetch(new URL(`/api/appusers/${encodeURIComponent(id ?? '')}`, request.url), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updatePayload),
-  });
-  const text = await response.text();
-  let parsedPayload: unknown;
-  try {
-    parsedPayload = JSON.parse(text);
-  } catch (err) {
-    parsedPayload = null;
+  const result = await updateAppUser(id ?? '', updatePayload);
+
+  let status = result.status;
+  if (typeof result.payload === 'object' && result.payload !== null && typeof (result.payload as any).statusCode === 'number') {
+    status = (result.payload as any).statusCode;
   }
 
-  let status = response.status;
-  if (parsedPayload && typeof (parsedPayload as any).statusCode === 'number') {
-    status = (parsedPayload as any).statusCode;
-  }
-
-  return new Response(JSON.stringify(payload ?? text), {
-    status: status,
+  return new Response(JSON.stringify(payload ?? result.text), {
+    status,
     headers: { 'Content-Type': 'application/json' },
   });
 }

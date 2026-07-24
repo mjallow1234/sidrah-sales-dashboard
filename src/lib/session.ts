@@ -1,4 +1,7 @@
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
+import { validateEnvironment } from '@/lib/env';
+
+validateEnvironment();
 
 const SESSION_COOKIE_NAME = 'sidrah_session';
 const SESSION_MAX_AGE_SECONDS = 86400; // 24 hours

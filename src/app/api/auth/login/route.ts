@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createSession } from '@/lib/session';
 import { verifyPassword } from '@/lib/password';
+import { fetchAppUserByPhone } from '@/services/appUserService';
 
 const SESSION_MAX_AGE_SECONDS = 86400;
 
@@ -12,20 +13,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'Phone and password are required.' }, { status: 400 });
   }
 
-  const lookupUrl = new URL(`/api/appusers/by-phone/${encodeURIComponent(phone)}`, request.url);
-  const apiResponse = await fetch(lookupUrl.toString(), {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (!apiResponse.ok) {
-    return NextResponse.json({ success: false }, { status: 401 });
-  }
-
-  const result = await apiResponse.json();
-  const appUser = result?.data ?? null;
+  const appUser = await fetchAppUserByPhone(phone);
 
   if (!appUser || appUser.status !== 'active' || !appUser.password_hash) {
     return NextResponse.json({ success: false }, { status: 401 });

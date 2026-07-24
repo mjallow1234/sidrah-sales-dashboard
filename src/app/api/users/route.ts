@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/password';
 import { verifySession } from '@/lib/session';
+import { createAppUser } from '@/services/appUserService';
 
 async function getSessionUserId(request: NextRequest) {
   const token = request.cookies.get('sidrah_session')?.value;
@@ -40,27 +41,15 @@ export async function POST(request: NextRequest) {
   delete (body as any).user_id;
   delete (body as any).sales_rep_id;
 
-  const response = await fetch(new URL('/api/appusers', request.url), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
+  const result = await createAppUser(body);
 
-  const text = await response.text();
-  let parsedPayload: unknown;
-  try {
-    parsedPayload = JSON.parse(text);
-  } catch (err) {
-    parsedPayload = null;
-  }
+  const status =
+    typeof result.payload === 'object' && result.payload !== null && typeof (result.payload as any).statusCode === 'number'
+      ? (result.payload as any).statusCode
+      : result.status;
 
-  let status = response.status;
-  if (parsedPayload && typeof (parsedPayload as any).statusCode === 'number') {
-    status = (parsedPayload as any).statusCode;
-  }
-
-  return new Response(JSON.stringify(parsedPayload ?? text), {
-    status: status,
+  return new Response(JSON.stringify(result.payload ?? result.text), {
+    status,
     headers: { 'Content-Type': 'application/json' },
   });
 }

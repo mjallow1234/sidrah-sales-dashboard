@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { createSession, verifySession } from '@/lib/session';
 import { hashPassword, verifyPassword } from '@/lib/password';
+import { fetchAppUserById, updateAppUser } from '@/services/appUserService';
 
 const SESSION_MAX_AGE_SECONDS = 86400;
 
@@ -27,17 +28,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, message: 'New password must be at least 8 characters.' }, { status: 400 });
   }
 
-  const userResponse = await fetch(new URL(`/api/appusers/${encodeURIComponent(session.userId)}`, request.url), {
-    method: 'GET',
-    headers: { 'Content-Type': 'application/json' },
-  });
-
-  if (!userResponse.ok) {
+  const userResult = await fetchAppUserById(session.userId);
+  if (!userResult.ok) {
     return NextResponse.json({ success: false, message: 'Unable to load user.' }, { status: 400 });
   }
 
-  const userPayload = await userResponse.json();
-  const appUser = userPayload?.data ?? null;
+  const userPayload = userResult.payload;
+  const appUser = typeof userPayload === 'object' && userPayload !== null ? (userPayload as any).data ?? null : null;
 
   if (!appUser || !appUser.password_hash) {
     return NextResponse.json({ success: false, message: 'User does not have a password set.' }, { status: 400 });
@@ -52,14 +49,9 @@ export async function POST(request: NextRequest) {
     password_reset_required: 'false',
   };
 
-  const updateResponse = await fetch(new URL(`/api/appusers/${encodeURIComponent(session.userId)}`, request.url), {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(updateBody),
-  });
+  const updateResult = await updateAppUser(session.userId, updateBody);
 
-  if (!updateResponse.ok) {
-    const updateText = await updateResponse.text();
+  if (!updateResult.ok) {
     return NextResponse.json({ success: false, message: 'Unable to update password.' }, { status: 500 });
   }
 
