@@ -1,6 +1,3 @@
-import type { NextRequest } from 'next/server';
-import { verifySession } from '@/lib/session';
-
 export type AppUserRole = 'super_admin' | 'admin' | 'supervisor' | 'agent';
 export const adminRoles = ['admin', 'super_admin'] as const;
 
@@ -86,9 +83,4 @@ export function canViewLink(role: string | undefined, href: string): boolean {
   }
 
   return true;
-}
-
-export async function getSessionFromRequest(request: NextRequest) {
-  const token = request.cookies.get('sidrah_session')?.value;
-  return token ? await verifySession(token) : { valid: false };
 }

@@ -1,5 +1,7 @@
+import 'server-only';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { validateEnvironment } from '@/lib/env';
+import type { NextRequest } from 'next/server';
 
 validateEnvironment();
 
@@ -54,6 +56,11 @@ export async function verifySession(token: string): Promise<SessionVerificationR
   } catch {
     return { valid: false };
   }
+}
+
+export async function getSessionFromRequest(request: NextRequest) {
+  const token = request.cookies.get('sidrah_session')?.value;
+  return token ? await verifySession(token) : { valid: false };
 }
 
 const cookieSecureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';
