@@ -44,22 +44,6 @@ export async function PUT(request: Request) {
     ...payload,
   };
 
-  if (!putPayload.sales_rep_id) {
-    const existingResponse = await fetch(buildGasUrl(`/appusers/${id}`), {
-      method: 'GET',
-    });
-    if (existingResponse.ok) {
-      try {
-        const existingBody = await existingResponse.json();
-        if (existingBody && existingBody.data && existingBody.data.sales_rep_id) {
-          putPayload.sales_rep_id = existingBody.data.sales_rep_id;
-        }
-      } catch (_) {
-        // ignore parse errors; continue with original payload
-      }
-    }
-  }
-
   const url = buildGasUrl(`/appuser/${id}`);
   const response = await fetch(url, {
     method: 'POST',

@@ -16,6 +16,8 @@ function getSecretKey() {
 export interface SessionPayload {
   userId: string;
   role: string;
+  sales_rep_id?: string;
+  passwordResetRequired?: boolean;
 }
 
 export async function createSession(payload: SessionPayload) {
@@ -32,6 +34,8 @@ export interface SessionVerificationResult {
   valid: boolean;
   userId?: string;
   role?: string;
+  sales_rep_id?: string;
+  passwordResetRequired?: boolean;
 }
 
 export async function verifySession(token: string): Promise<SessionVerificationResult> {
@@ -41,6 +45,8 @@ export async function verifySession(token: string): Promise<SessionVerificationR
       valid: true,
       userId: typeof payload.userId === 'string' ? payload.userId : undefined,
       role: typeof payload.role === 'string' ? payload.role : undefined,
+      sales_rep_id: typeof payload.sales_rep_id === 'string' ? payload.sales_rep_id : undefined,
+      passwordResetRequired: typeof payload.passwordResetRequired === 'boolean' ? payload.passwordResetRequired : undefined,
     };
   } catch {
     return { valid: false };

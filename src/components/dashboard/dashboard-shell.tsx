@@ -1,7 +1,6 @@
 'use client';
 
 import { StatsCard } from '@/components/dashboard/stats-card';
-import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { useStatsQuery } from '@/lib/hooks/queries';
 import { useRouter } from 'next/navigation';
 
@@ -15,7 +14,7 @@ export function DashboardShell() {
   };
 
   return (
-    <main className="min-h-screen px-4 pb-24 pt-8 sm:px-6 lg:px-8">
+    <div className="px-4 pb-24 pt-8 sm:px-6 sm:pb-8 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-8">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
           <div className="flex flex-wrap items-center justify-between gap-4">
@@ -78,7 +77,6 @@ export function DashboardShell() {
           </div>
         </section>
       </div>
-      <MobileBottomNav />
-    </main>
+    </div>
   );
 }

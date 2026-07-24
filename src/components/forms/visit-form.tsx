@@ -45,7 +45,11 @@ export function VisitForm({ vendors }: VisitFormProps) {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const products = productQuery.data ?? [];
-  const salesReps = salesRepsQuery.data ?? [];
+  const salesReps = Array.isArray(salesRepsQuery.data)
+    ? salesRepsQuery.data
+    : Array.isArray((salesRepsQuery.data as any)?.items)
+    ? (salesRepsQuery.data as any).items
+    : [];
 
   useEffect(() => {
     if (!visitDraft.vendor_id && vendors.length > 0) {

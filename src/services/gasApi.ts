@@ -1,4 +1,4 @@
-import type { DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VisitResult } from '@/lib/types';
+import type { AppUser, DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VisitResult } from '@/lib/types';
 
 
 function getHeaders(method: string = 'GET'): HeadersInit {
@@ -90,7 +90,17 @@ export async function getSalesReps(params?: { status?: string }) {
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/salesreps?${query}` : '/api/salesreps';
-  return fetchJson<{ status: string; data: SalesRep[] }>(path).then((result) => result.data);
+  return fetchJson<any>(path).then((result) => {
+    if (Array.isArray(result.data)) {
+      return result.data as SalesRep[];
+    }
+
+    if (Array.isArray(result.data?.items)) {
+      return result.data.items as SalesRep[];
+    }
+
+    return [] as SalesRep[];
+  });
 }
 
 export async function getSalesRep(id: string) {
@@ -217,6 +227,74 @@ export async function createVisit(payload: {
 }) {
   return fetchJson<{ status: string; data: VisitResult }>('/api/visit', {
     method: 'POST',
+    body: JSON.stringify(payload),
+  }).then((result) => result.data);
+}
+
+export async function getAppUsers(params?: { role?: string; status?: string; phone?: string }) {
+  const query = params
+    ? Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== null && value !== '')
+        .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+        .join('&')
+    : '';
+  const path = query ? `/api/appusers?${query}` : '/api/appusers';
+  return fetchJson<any>(path).then((result) => {
+    if (Array.isArray(result.data)) {
+      return result.data as AppUser[];
+    }
+
+    if (Array.isArray(result.data?.items)) {
+      return result.data.items as AppUser[];
+    }
+
+    return [] as AppUser[];
+  });
+}
+
+export async function getAppUser(id: string) {
+  return fetchJson<{ status: string; data: AppUser }>(`/api/appusers/${encodeURIComponent(id)}`).then((result) => result.data);
+}
+
+export async function createAppUser(payload: {
+  email: string;
+  phone: string;
+  name: string;
+  role: 'super_admin' | 'admin' | 'supervisor' | 'agent';
+  status: 'active' | 'inactive' | 'suspended';
+  sales_rep_id?: string;
+  password_hash: string;
+  password_reset_required?: string;
+  last_login?: string;
+  is_system_user?: string;
+  created_by: string;
+  updated_by: string;
+}) {
+  return fetchJson<{ status: string; data: AppUser }>('/api/appusers', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  }).then((result) => result.data);
+}
+
+export async function updateAppUser(id: string, payload: Partial<{
+  email: string;
+  phone: string;
+  name: string;
+  role: 'super_admin' | 'admin' | 'supervisor' | 'agent';
+  status: 'active' | 'inactive' | 'suspended';
+  sales_rep_id: string;
+  password_hash: string;
+  password_reset_required: string;
+  last_login: string;
+  is_system_user: string;
+  failed_login_count: number;
+  last_failed_login: string;
+  lockout_until: string;
+  updated_by: string;
+  password_changed_at: string;
+}>): Promise<AppUser> {
+  return fetchJson<{ status: string; data: AppUser }>(`/api/appusers/${encodeURIComponent(id)}`, {
+    method: 'PUT',
     body: JSON.stringify(payload),
   }).then((result) => result.data);
 }

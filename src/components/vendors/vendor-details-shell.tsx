@@ -30,7 +30,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
 
   if (isLoading) {
     return (
-      <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+      <main className="px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-soft">
           <p className="text-slate-700">Loading vendor details…</p>
         </div>
@@ -40,7 +40,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
 
   if (!vendor || isErrorState) {
     return (
-      <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
+      <main className="px-4 py-8 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-3xl rounded-3xl bg-white p-6 shadow-soft">
           <p className="text-slate-700">
             {vendor ? 'Unable to load vendor details.' : 'Vendor not found.'}
@@ -51,7 +51,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 pb-24 sm:px-6 lg:px-8">
+    <main className="px-4 py-8 pb-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
           <div className="flex flex-wrap items-center justify-between gap-4">

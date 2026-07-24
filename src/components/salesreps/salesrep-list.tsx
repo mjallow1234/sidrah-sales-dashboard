@@ -1,9 +1,15 @@
 'use client';
 
 import { useSalesRepsQuery } from '@/lib/hooks/queries';
+import type { SalesRep } from '@/lib/types';
 
 export function SalesRepList() {
-  const { data: salesReps, isLoading, isError } = useSalesRepsQuery();
+  const { data, isLoading, isError } = useSalesRepsQuery();
+  const salesReps: SalesRep[] = Array.isArray(data)
+    ? data
+    : Array.isArray((data as any)?.items)
+    ? (data as any).items
+    : [];
 
   return (
     <div className="space-y-4">

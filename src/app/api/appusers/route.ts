@@ -19,6 +19,29 @@ function makeUrl(path: string, query?: URLSearchParams) {
   return `${base}?path=${normalizedPath}${queryParamString}${keyParam}`;
 }
 
+function normalizeProxyResponse(text: string, response: Response) {
+  try {
+    var payload = JSON.parse(text);
+    var statusCode = payload && typeof payload.statusCode === 'number' ? payload.statusCode : response.status;
+    if (payload && payload.status === 'error' && !payload.statusCode) {
+      statusCode = 400;
+    }
+    return new Response(JSON.stringify(payload), {
+      status: statusCode,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  } catch (e) {
+    return new Response(text, {
+      status: response.status,
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+}
+
 export async function GET(request: NextRequest) {
   const queryParams = new URLSearchParams(request.nextUrl.searchParams);
   const url = makeUrl('/appusers', queryParams);
@@ -27,12 +50,7 @@ export async function GET(request: NextRequest) {
   });
 
   const text = await response.text();
-  return new Response(text, {
-    status: response.status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  return normalizeProxyResponse(text, response);
 }
 
 export async function POST(request: Request) {
@@ -48,10 +66,5 @@ export async function POST(request: Request) {
   });
 
   const text = await response.text();
-  return new Response(text, {
-    status: response.status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+  return normalizeProxyResponse(text, response);
 }

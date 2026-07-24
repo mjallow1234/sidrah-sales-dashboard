@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { NotificationBanner } from '@/components/ui/notification';
 import { useCreateVendorMutation, useSalesRepsQuery, useUpdateVendorMutation } from '@/lib/hooks/queries';
-import type { Vendor } from '@/lib/types';
+import type { SalesRep, Vendor } from '@/lib/types';
 
 const vendorSchema = z.object({
   vendor_name: z.string().min(1, 'Vendor name is required'),
@@ -34,11 +34,17 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
   const createMutation = useCreateVendorMutation();
   const updateMutation = useUpdateVendorMutation();
 
+  const salesReps: SalesRep[] = Array.isArray(salesRepsQuery.data)
+    ? salesRepsQuery.data
+    : Array.isArray((salesRepsQuery.data as any)?.items)
+    ? (salesRepsQuery.data as any).items
+    : [];
+
   useEffect(() => {
-    if (salesRepsQuery.data?.length && !formState.sales_rep_id) {
-      setFormState((current) => ({ ...current, sales_rep_id: salesRepsQuery.data[0].sales_rep_id }));
+    if (salesReps.length > 0 && !formState.sales_rep_id) {
+      setFormState((current) => ({ ...current, sales_rep_id: salesReps[0].sales_rep_id }));
     }
-  }, [salesRepsQuery.data, formState.sales_rep_id]);
+  }, [salesReps, formState.sales_rep_id]);
 
   function handleChange(field: keyof typeof formState, value: string) {
     setFormState((current) => ({ ...current, [field]: value }));
@@ -61,7 +67,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
       } else {
         await createMutation.mutateAsync(formState);
         setNotification({ type: 'success', message: 'Vendor created successfully' });
-        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: salesRepsQuery.data?.[0]?.sales_rep_id ?? '', status: 'active' });
+        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: salesReps[0]?.sales_rep_id ?? '', status: 'active' });
       }
       onSuccess?.();
     } catch (error) {
@@ -107,11 +113,15 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
             onChange={(event) => handleChange('sales_rep_id', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           >
-            {(salesRepsQuery.data ?? []).map((rep) => (
-              <option key={rep.sales_rep_id} value={rep.sales_rep_id}>
-                {rep.name}
-              </option>
-            ))}
+            {salesReps.length > 0 ? (
+              salesReps.map((rep) => (
+                <option key={rep.sales_rep_id} value={rep.sales_rep_id}>
+                  {rep.name}
+                </option>
+              ))
+            ) : (
+              <option value="">No sales reps available</option>
+            )}
           </select>
         </label>
         <label className="block text-sm text-slate-700">

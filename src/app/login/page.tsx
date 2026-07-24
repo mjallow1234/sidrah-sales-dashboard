@@ -25,7 +25,11 @@ export default function LoginPage() {
 
       const result = await response.json();
       if (response.ok && result.success) {
-        router.push('/dashboard');
+        if (result.passwordResetRequired) {
+          router.push('/change-password');
+        } else {
+          router.push('/dashboard');
+        }
         return;
       }
 
