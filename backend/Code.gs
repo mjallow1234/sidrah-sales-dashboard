@@ -12,21 +12,27 @@ function doPut(e) {
 
 function handleRequest(method, e) {
   resetSettingsCache();
-  var request = normalizeRequest(method, e);
+  var request;
   try {
+    verifyAndMigrateSpreadsheetSchema();
+    request = normalizeRequest(method, e);
     authenticateRequest(request);
     var response = dispatchRoute(request);
     logAudit(request, 'success', 'Request completed successfully');
     return createJsonOutput({ status: 'success', data: response });
   } catch (error) {
-    logAudit(request, 'error', error.message);
+    if (request) {
+      logAudit(request, 'error', error.message);
+    } else {
+      Logger.log('Schema validation failed: ' + error.message);
+    }
     return createErrorOutput(error);
   }
 }
 
 function normalizeRequest(method, e) {
   var body = {};
-  if (method === 'POST' && e.postData && e.postData.contents) {
+  if ((method === 'POST' || method === 'PUT' || method === 'PATCH') && e.postData && e.postData.contents) {
     try {
       body = JSON.parse(e.postData.contents);
     } catch (parseError) {
@@ -107,6 +113,8 @@ function handleGetRoute(segments, params) {
       return getVisitLogs(params);
     case 'salesreps':
       return segments.length === 1 ? getSalesReps(params) : getSalesRepById(segments[1]);
+    case 'appusers':
+      return segments.length === 1 ? getAppUsers(params) : getAppUserById(segments[1]);
     case 'stats':
       return getStats();
     default:
@@ -139,6 +147,10 @@ function handlePostRoute(segments, body) {
       return executeWithLock(function() {
         return createSalesRep(body);
       });
+    case 'appuser':
+      return executeWithLock(function() {
+        return createAppUser(body);
+      });
     default:
       throw createHttpError(404, 'Route not found.');
   }
@@ -164,6 +176,11 @@ function handlePutRoute(segments, body) {
       validateSalesRepUpdatePayload(body);
       return executeWithLock(function() {
         return updateSalesRep(id, body);
+      });
+    case 'appuser':
+      validateAppUserUpdatePayload(body);
+      return executeWithLock(function() {
+        return updateAppUser(id, body);
       });
     default:
       throw createHttpError(404, 'Route not found.');
@@ -366,6 +383,7 @@ function createSalesRep(body) {
     body.phone,
     'agent',
     'active',
+    'TRUE',
     getIsoDate(now),
     getIsoDatetime(now)
   ];
@@ -382,8 +400,261 @@ function updateSalesRep(salesRepId, body) {
   if (body.full_name !== undefined) updates.name = body.full_name;
   if (body.phone !== undefined) updates.phone = body.phone;
   if (body.status !== undefined) updates.status = body.status;
+  if (body.is_active !== undefined) updates.is_active = normalizeBooleanValue(body.is_active) ? 'TRUE' : 'FALSE';
   updates.last_updated = getIsoDatetime(new Date());
   return updateRowById('SalesReps', 'sales_rep_id', salesRepId, updates);
+}
+
+function deleteSalesRep(salesRepId) {
+  var sheet = getSpreadsheet().getSheetByName('SalesReps');
+  if (!sheet) {
+    throw createHttpError(500, 'Missing sheet: SalesReps');
+  }
+  var values = sheet.getDataRange().getValues();
+  if (values.length < 2) {
+    return false;
+  }
+  var headers = values[0].map(function(value) {
+    return String(value).trim();
+  });
+  var idIndex = headers.indexOf('sales_rep_id');
+  if (idIndex === -1) {
+    throw createHttpError(500, 'Missing sales_rep_id header in SalesReps sheet.');
+  }
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][idIndex]) === salesRepId) {
+      sheet.deleteRow(i + 1);
+      return true;
+    }
+  }
+  return false;
+}
+
+function getAppUsers(params) {
+  var rows = getSheetRows('AppUsers');
+  var filtered = rows.filter(function(row) {
+    if (params.role && row.role !== params.role) return false;
+    if (params.status && row.status !== params.status) return false;
+    return true;
+  }).map(normalizeAppUserBooleans);
+  var pagination = validatePagination(params);
+  return paginate(filtered, pagination.page, pagination.pageSize);
+}
+
+function getAppUserById(userId) {
+  var row = findRowById('AppUsers', 'user_id', userId);
+  if (!row) {
+    throw createHttpError(404, 'AppUser not found.');
+  }
+  return normalizeAppUserBooleans(row);
+}
+
+function createAppUser(body) {
+  var salesRepIdCreated = null;
+  try {
+    if (body.sales_rep_id !== undefined) {
+      delete body.sales_rep_id;
+    }
+
+    body.user_id = generateAppUserId();
+
+    if (body.role === 'agent') {
+      var salesRep = createSalesRep({ full_name: body.name, phone: body.phone });
+      body.sales_rep_id = salesRep.sales_rep_id;
+      salesRepIdCreated = salesRep.sales_rep_id;
+    } else {
+      delete body.sales_rep_id;
+    }
+
+    validateAppUserPayload(body);
+
+    var existingRows = getSheetRows('AppUsers');
+    validateUniqueAppUserFields(body, existingRows, null);
+    validateAppUserRoleSalesRepRules(body, existingRows, null);
+
+    var row = {
+      user_id: body.user_id,
+      email: body.email,
+      phone: body.phone,
+      name: body.name,
+      role: body.role,
+      status: body.status,
+      sales_rep_id: body.sales_rep_id || '',
+      password_hash: body.password_hash || '',
+      password_reset_required: normalizeBooleanValue(body.password_reset_required),
+      last_login: body.last_login || '',
+      is_system_user: normalizeBooleanValue(body.is_system_user),
+      failed_login_count: body.failed_login_count || 0,
+      last_failed_login: body.last_failed_login || '',
+      lockout_until: body.lockout_until || '',
+      created_by: body.created_by,
+      updated_by: body.updated_by,
+      password_changed_at: body.password_changed_at || '',
+      date_created: body.date_created || getIsoDate(new Date()),
+      last_updated: getIsoDatetime(new Date())
+    };
+
+    appendObjectRow('AppUsers', row);
+    return getAppUserById(body.user_id);
+  } catch (error) {
+    if (salesRepIdCreated) {
+      try {
+        deleteSalesRep(salesRepIdCreated);
+      } catch (rollbackError) {
+        Logger.log('Failed to rollback SalesRep: ' + rollbackError.message);
+      }
+    }
+    throw error;
+  }
+}
+
+function updateAppUser(userId, body) {
+  var existingRows = getSheetRows('AppUsers');
+  var currentRow = findRowById('AppUsers', 'user_id', userId);
+  if (!currentRow) {
+    throw createHttpError(404, 'AppUser not found.');
+  }
+
+  if (body.sales_rep_id !== undefined) {
+    delete body.sales_rep_id;
+  }
+
+  var currentRole = currentRow.role;
+  var targetRole = body.role !== undefined ? body.role : currentRole;
+  var currentSalesRepId = currentRow.sales_rep_id || '';
+  var createdSalesRepId = null;
+  var salesRepReverted = false;
+
+  if (currentRole !== 'agent' && targetRole === 'agent') {
+    var createdSalesRep = createSalesRep({ full_name: body.name || currentRow.name, phone: body.phone || currentRow.phone });
+    body.sales_rep_id = createdSalesRep.sales_rep_id;
+    createdSalesRepId = createdSalesRep.sales_rep_id;
+  } else if (targetRole === 'agent') {
+    body.sales_rep_id = currentSalesRepId;
+  } else {
+    body.sales_rep_id = currentSalesRepId;
+  }
+
+  if (currentRole === 'agent' && targetRole !== 'agent' && currentSalesRepId) {
+    updateSalesRep(currentSalesRepId, { status: 'inactive', is_active: 'FALSE' });
+  }
+
+  try {
+    validateUniqueAppUserFields(body, existingRows, userId);
+    validateAppUserRoleSalesRepRules(body, existingRows, currentRow);
+
+    var updates = {};
+    if (body.email !== undefined) updates.email = body.email;
+    if (body.phone !== undefined) updates.phone = body.phone;
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.role !== undefined) updates.role = body.role;
+    if (body.status !== undefined) updates.status = body.status;
+    if (body.sales_rep_id !== undefined) updates.sales_rep_id = body.sales_rep_id;
+    if (body.password_hash !== undefined) updates.password_hash = body.password_hash;
+    if (body.password_reset_required !== undefined) updates.password_reset_required = normalizeBooleanValue(body.password_reset_required);
+    if (body.last_login !== undefined) updates.last_login = body.last_login;
+    if (body.is_system_user !== undefined) updates.is_system_user = normalizeBooleanValue(body.is_system_user);
+    if (body.failed_login_count !== undefined) updates.failed_login_count = body.failed_login_count;
+    if (body.last_failed_login !== undefined) updates.last_failed_login = body.last_failed_login;
+    if (body.lockout_until !== undefined) updates.lockout_until = body.lockout_until;
+    if (body.updated_by !== undefined) updates.updated_by = body.updated_by;
+    if (body.password_changed_at !== undefined) updates.password_changed_at = body.password_changed_at;
+    updates.last_updated = getIsoDatetime(new Date());
+
+    return updateRowById('AppUsers', 'user_id', userId, updates);
+  } catch (error) {
+    if (createdSalesRepId) {
+      try {
+        deleteSalesRep(createdSalesRepId);
+      } catch (rollbackError) {
+        Logger.log('Failed to rollback SalesRep after AppUser update failure: ' + rollbackError.message);
+      }
+    }
+    if (currentRole === 'agent' && targetRole !== 'agent' && currentSalesRepId) {
+      try {
+        updateSalesRep(currentSalesRepId, { status: 'active', is_active: 'TRUE' });
+        salesRepReverted = true;
+      } catch (rollbackError) {
+        Logger.log('Failed to revert SalesRep status after AppUser update failure: ' + rollbackError.message);
+      }
+    }
+    throw error;
+  }
+}
+
+function appendObjectRow(sheetName, data) {
+  var sheet = getSpreadsheet().getSheetByName(sheetName);
+  if (!sheet) {
+    throw createHttpError(500, 'Missing sheet: ' + sheetName);
+  }
+  var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+    return String(value).trim();
+  });
+  var row = headers.map(function(header) {
+    return data[header] !== undefined ? data[header] : '';
+  });
+  appendRow(sheetName, row);
+}
+
+function normalizeUniqueKey(value) {
+  return value === undefined || value === null ? '' : String(value).trim();
+}
+
+function validateUniqueAppUserFields(body, rows, excludeUserId) {
+  rows.forEach(function(row) {
+    if (excludeUserId && normalizeUniqueKey(row.user_id) === normalizeUniqueKey(excludeUserId)) {
+      return;
+    }
+    if (body.user_id !== undefined && normalizeUniqueKey(row.user_id) === normalizeUniqueKey(body.user_id)) {
+      throw createHttpError(400, 'Duplicate user_id: ' + body.user_id);
+    }
+    if (body.email !== undefined && normalizeUniqueKey(row.email) === normalizeUniqueKey(body.email)) {
+      throw createHttpError(400, 'Duplicate email: ' + body.email);
+    }
+    if (body.phone !== undefined && normalizeUniqueKey(row.phone) === normalizeUniqueKey(body.phone)) {
+      throw createHttpError(400, 'Duplicate phone: ' + body.phone);
+    }
+    if (body.sales_rep_id !== undefined && normalizeUniqueKey(row.sales_rep_id) === normalizeUniqueKey(body.sales_rep_id)) {
+      throw createHttpError(400, 'Duplicate sales_rep_id: ' + body.sales_rep_id);
+    }
+  });
+}
+
+function validateAppUserRoleSalesRepRules(body, rows, currentRow) {
+  var role = body.role !== undefined ? body.role : (currentRow ? currentRow.role : null);
+  var salesRepId = body.sales_rep_id !== undefined ? body.sales_rep_id : (currentRow ? currentRow.sales_rep_id : null);
+
+  if (role === 'agent') {
+    if (!salesRepId) {
+      throw createHttpError(400, 'Agent AppUsers require sales_rep_id.');
+    }
+    validateForeignKey(salesRepId, 'SalesRep', getSheetRows('SalesReps'), 'sales_rep_id');
+    rows.forEach(function(row) {
+      if (currentRow && row.user_id === currentRow.user_id) {
+        return;
+      }
+      if (row.role === 'agent' && row.sales_rep_id === salesRepId) {
+        throw createHttpError(400, 'Duplicate sales_rep_id for agent: ' + salesRepId);
+      }
+    });
+  }
+}
+
+function normalizeBooleanValue(value) {
+  if (value === true || value === 'TRUE' || value === 'true') {
+    return true;
+  }
+  if (value === false || value === 'FALSE' || value === 'false') {
+    return false;
+  }
+  return false;
+}
+
+function normalizeAppUserBooleans(row) {
+  var normalized = Object.assign({}, row);
+  normalized.password_reset_required = normalizeBooleanValue(normalized.password_reset_required);
+  normalized.is_system_user = normalizeBooleanValue(normalized.is_system_user);
+  return normalized;
 }
 
 function getProductById(productId) {
@@ -917,6 +1188,10 @@ function generateProductId() {
 
 function generateVendorId() {
   return getNextSequentialId('Vendors', 'vendor_id', 'V', 3);
+}
+
+function generateAppUserId() {
+  return getNextSequentialId('AppUsers', 'user_id', 'U', 3);
 }
 
 function generateSalesRepId() {

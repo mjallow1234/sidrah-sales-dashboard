@@ -9,6 +9,9 @@ function createGoogleSheetsFoundation() {
     'SalesReps',
     'SystemSettings',
     'AppUsers',
+    'Permissions',
+    'AuthAuditLog',
+    'PasswordResetTokens',
     'AuditLogs',
     'TransactionJournal'
   ];
@@ -92,6 +95,7 @@ function createGoogleSheetsFoundation() {
       'phone',
       'role',
       'status',
+      'is_active',
       'date_created',
       'last_updated'
     ],
@@ -105,9 +109,54 @@ function createGoogleSheetsFoundation() {
     'AppUsers': [
       'user_id',
       'email',
+      'phone',
       'name',
       'role',
       'status',
+      'sales_rep_id',
+      'password_hash',
+      'password_reset_required',
+      'last_login',
+      'is_system_user',
+      'failed_login_count',
+      'last_failed_login',
+      'lockout_until',
+      'created_by',
+      'updated_by',
+      'password_changed_at',
+      'date_created',
+      'last_updated'
+    ],
+    'Permissions': [
+      'permission_id',
+      'role',
+      'resource',
+      'action',
+      'allowed',
+      'description',
+      'date_created',
+      'last_updated'
+    ],
+    'AuthAuditLog': [
+      'auth_audit_id',
+      'timestamp',
+      'user_id',
+      'email',
+      'event',
+      'status',
+      'ip_address',
+      'user_agent',
+      'details',
+      'date_created'
+    ],
+    'PasswordResetTokens': [
+      'token_id',
+      'user_id',
+      'email',
+      'token_hash',
+      'expires_at',
+      'used',
+      'created_by',
       'date_created',
       'last_updated'
     ],
@@ -175,13 +224,43 @@ function seedGoogleSheetsFoundation() {
   ];
 
   var salesRepRows = [
-    ['S001', 'Fatou', '740456789', 'agent', 'active', '2026-07-01', '2026-07-01T08:00:00Z'],
-    ['S002', 'Lamin', '740567890', 'agent', 'active', '2026-07-01', '2026-07-01T08:00:00Z']
+    ['S001', 'Fatou', '740456789', 'agent', 'active', 'TRUE', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['S002', 'Lamin', '740567890', 'agent', 'active', 'TRUE', '2026-07-01', '2026-07-01T08:00:00Z']
   ];
 
+  var now = new Date().toISOString();
+
   var appUserRows = [
-    ['U001', 'fatou@example.com', 'Fatou', 'admin', 'active', '2026-07-01', '2026-07-01T08:00:00Z'],
-    ['U002', 'lamin@example.com', 'Lamin', 'agent', 'active', '2026-07-01', '2026-07-01T08:00:00Z']
+    ['U001', 'admin@sidrah.com', '740000000', 'Admin', 'super_admin', 'active', '', hashPassword('Admin123!'), 0, '', '', 'system', 'system', now, now, now],
+    ['U002', 'fatou@sidrah.com', '740456789', 'Fatou', 'agent', 'active', 'S001', hashPassword('Agent123!'), 0, '', '', 'U001', 'U001', now, now, now],
+    ['U003', 'lamin@example.com', '740567890', 'Lamin', 'agent', 'active', 'S002', hashPassword('Agent123!'), 0, '', '', 'U001', 'U001', now, now, now]
+  ];
+
+  var permissionsRows = [
+    ['P001', 'super_admin', 'users', 'create', 'TRUE', 'Create AppUsers', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P002', 'super_admin', 'users', 'disable', 'TRUE', 'Disable AppUsers', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P003', 'super_admin', 'users', 'reset_password', 'TRUE', 'Reset AppUser passwords', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P004', 'super_admin', 'permissions', 'manage', 'TRUE', 'Manage permissions', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P005', 'admin', 'users', 'create', 'TRUE', 'Create supervisor/agent users', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P006', 'admin', 'users', 'disable', 'TRUE', 'Disable supervisor/agent users', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P007', 'admin', 'users', 'reset_password', 'TRUE', 'Reset passwords for non-super_admin', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P008', 'admin', 'vendors', 'create', 'TRUE', 'Create vendors', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P009', 'admin', 'vendors', 'update', 'TRUE', 'Update vendors', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P010', 'supervisor', 'vendors', 'create', 'TRUE', 'Create vendors', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P011', 'supervisor', 'vendors', 'update', 'TRUE', 'Update vendors', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P012', 'supervisor', 'visits', 'create', 'TRUE', 'Create visits', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P013', 'agent', 'visits', 'create', 'TRUE', 'Create visits', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P014', 'agent', 'vendors', 'read_assigned', 'TRUE', 'Read assigned vendors', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P015', 'agent', 'inventory', 'read_assigned', 'TRUE', 'Read assigned inventory', '2026-07-01', '2026-07-01T08:00:00Z'],
+    ['P016', 'agent', 'visitlogs', 'read_own', 'TRUE', 'Read own visit logs', '2026-07-01', '2026-07-01T08:00:00Z']
+  ];
+
+  var authAuditLogRows = [
+    ['A001', '2026-07-01T08:00:00Z', 'U001', 'admin@sidrah.com', 'login_success', 'success', '127.0.0.1', 'bootstrap', 'Bootstrap super_admin created from AUTH_*', '2026-07-01T08:00:00Z']
+  ];
+
+  var passwordResetTokensRows = [
+    ['T001', 'U002', 'fatou@sidrah.com', hashToken('reset-token-example'), '2026-07-02T08:00:00Z', 'FALSE', 'system', now, now]
   ];
 
   var settingsRows = [
@@ -197,7 +276,24 @@ function seedGoogleSheetsFoundation() {
   ss.getSheetByName('VisitLogs').getRange(2, 1, visitLogRows.length, visitLogRows[0].length).setValues(visitLogRows);
   ss.getSheetByName('SalesReps').getRange(2, 1, salesRepRows.length, salesRepRows[0].length).setValues(salesRepRows);
   ss.getSheetByName('AppUsers').getRange(2, 1, appUserRows.length, appUserRows[0].length).setValues(appUserRows);
+  ss.getSheetByName('Permissions').getRange(2, 1, permissionsRows.length, permissionsRows[0].length).setValues(permissionsRows);
+  ss.getSheetByName('AuthAuditLog').getRange(2, 1, authAuditLogRows.length, authAuditLogRows[0].length).setValues(authAuditLogRows);
+  ss.getSheetByName('PasswordResetTokens').getRange(2, 1, passwordResetTokensRows.length, passwordResetTokensRows[0].length).setValues(passwordResetTokensRows);
   ss.getSheetByName('SystemSettings').getRange(2, 1, settingsRows.length, settingsRows[0].length).setValues(settingsRows);
 
   Logger.log('Seed data written to Google Sheets foundation.');
+}
+
+function hashPassword(password) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, password, Utilities.Charset.UTF_8);
+  return 'sha256$' + digest.map(function(byte) {
+    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+  }).join('');
+}
+
+function hashToken(token) {
+  var digest = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, token, Utilities.Charset.UTF_8);
+  return digest.map(function(byte) {
+    return ('0' + (byte & 0xFF).toString(16)).slice(-2);
+  }).join('');
 }

@@ -45,6 +45,14 @@ This repository is prepared for Hostinger Business Hosting deployment using a st
 4. Start the server with `npm run start` or use PM2 via `ecosystem.config.js`.
 5. Set the Hostinger domain to `sales.sidrahsalaam.com`.
 
+## Deploying Apps Script
+
+Use the standardized PowerShell deployment script:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\deploy-gas.ps1
+```
+
 ## GitHub repository
 
 Repository: `sidrah-sales-dashboard`

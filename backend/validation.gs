@@ -102,6 +102,72 @@ function validateSalesRepUpdatePayload(body) {
   if (body.status !== undefined) validateStringField(body.status, 'status');
 }
 
+function validateAppUserPayload(body) {
+  validateRequiredFields(body, ['email', 'phone', 'name', 'role', 'status', 'password_hash']);
+  validateStringField(body.user_id, 'user_id');
+  validateStringField(body.email, 'email');
+  validateStringField(body.phone, 'phone');
+  validateStringField(body.name, 'name');
+  validateStringField(body.role, 'role');
+  validateStringField(body.status, 'status');
+  if (body.sales_rep_id !== undefined) {
+    validateStringField(body.sales_rep_id, 'sales_rep_id');
+  }
+  validateStringField(body.password_hash, 'password_hash');
+  validateStringField(body.password_reset_required, 'password_reset_required');
+  validateStringField(body.last_login, 'last_login');
+  validateStringField(body.is_system_user, 'is_system_user');
+  validateStringField(body.last_failed_login, 'last_failed_login');
+  validateStringField(body.lockout_until, 'lockout_until');
+  validateStringField(body.updated_by, 'updated_by');
+  validateStringField(body.password_changed_at, 'password_changed_at');
+  validateStringField(body.date_created, 'date_created');
+  validateStringField(body.last_updated, 'last_updated');
+
+  validateRoleWhitelist(body.role);
+  validateStatusWhitelist(body.status);
+}
+
+function validateAppUserUpdatePayload(body) {
+  if (!body || Object.keys(body).length === 0) {
+    throw createHttpError(400, 'At least one AppUser field must be provided.');
+  }
+  if (body.user_id !== undefined) validateStringField(body.user_id, 'user_id');
+  if (body.email !== undefined) validateStringField(body.email, 'email');
+  if (body.phone !== undefined) validateStringField(body.phone, 'phone');
+  if (body.name !== undefined) validateStringField(body.name, 'name');
+  if (body.role !== undefined) {
+    validateStringField(body.role, 'role');
+    validateRoleWhitelist(body.role);
+  }
+  if (body.status !== undefined) {
+    validateStringField(body.status, 'status');
+    validateStatusWhitelist(body.status);
+  }
+  if (body.sales_rep_id !== undefined) validateStringField(body.sales_rep_id, 'sales_rep_id');
+  if (body.password_hash !== undefined) validateStringField(body.password_hash, 'password_hash');
+  if (body.password_reset_required !== undefined) validateStringField(body.password_reset_required, 'password_reset_required');
+  if (body.last_login !== undefined) validateStringField(body.last_login, 'last_login');
+  if (body.is_system_user !== undefined) validateStringField(body.is_system_user, 'is_system_user');
+  if (body.last_failed_login !== undefined) validateStringField(body.last_failed_login, 'last_failed_login');
+  if (body.lockout_until !== undefined) validateStringField(body.lockout_until, 'lockout_until');
+  if (body.updated_by !== undefined) validateStringField(body.updated_by, 'updated_by');
+  if (body.password_changed_at !== undefined) validateStringField(body.password_changed_at, 'password_changed_at');
+  if (body.last_updated !== undefined) validateStringField(body.last_updated, 'last_updated');
+}
+
+function validateRoleWhitelist(value) {
+  if (value !== 'super_admin' && value !== 'admin' && value !== 'supervisor' && value !== 'agent') {
+    throw createHttpError(400, 'Invalid role: ' + value);
+  }
+}
+
+function validateStatusWhitelist(value) {
+  if (value !== 'active' && value !== 'inactive' && value !== 'suspended') {
+    throw createHttpError(400, 'Invalid status: ' + value);
+  }
+}
+
 function validateVendorUpdatePayload(body) {
   if (!body || Object.keys(body).length === 0) {
     throw createHttpError(400, 'At least one vendor field must be provided.');
