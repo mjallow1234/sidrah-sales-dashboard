@@ -114,6 +114,7 @@ function validateSalesRepUpdatePayload(body) {
 function validateAppUserPayload(body) {
   validateRequiredFields(body, ['email', 'phone', 'name', 'role', 'status', 'password_hash']);
   validateStringField(body.user_id, 'user_id');
+  validateStringField(body.username, 'username');
   validateStringField(body.email, 'email');
   validateStringField(body.phone, 'phone');
   validateStringField(body.name, 'name');
@@ -142,6 +143,7 @@ function validateAppUserUpdatePayload(body) {
     throw createHttpError(400, 'At least one AppUser field must be provided.');
   }
   if (body.user_id !== undefined) validateStringField(body.user_id, 'user_id');
+  if (body.username !== undefined) validateStringField(body.username, 'username');
   if (body.email !== undefined) validateStringField(body.email, 'email');
   if (body.phone !== undefined) validateStringField(body.phone, 'phone');
   if (body.name !== undefined) validateStringField(body.name, 'name');

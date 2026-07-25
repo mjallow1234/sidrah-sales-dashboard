@@ -28,3 +28,5 @@ Thumbs.db
 .env.local
 .env.production
 .env.test
+
+tsconfig.tsbuildinfo

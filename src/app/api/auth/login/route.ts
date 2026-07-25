@@ -24,7 +24,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false }, { status: 401 });
   }
 
-  const passwordResetRequired = appUser.password_reset_required === 'true' || appUser.password_reset_required === '1';
+  const passwordResetRequired =
+    (typeof appUser.password_reset_required === 'boolean' && appUser.password_reset_required) ||
+    String(appUser.password_reset_required).toLowerCase() === 'true' ||
+    appUser.password_reset_required === '1';
+
   const token = await createSession({
     userId: appUser.user_id,
     role: appUser.role ?? 'agent',

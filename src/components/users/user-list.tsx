@@ -26,8 +26,9 @@ export function UserList() {
               href={`/users/${encodeURIComponent(user.user_id)}`}
               className="block rounded-3xl border border-slate-200 bg-white p-5 shadow-soft transition hover:border-sidrah-500"
             >
-              <p className="text-lg font-semibold text-slate-900">{user.name || user.email}</p>
+              <p className="text-lg font-semibold text-slate-900">{user.username || user.name || user.email}</p>
               <p className="mt-2 text-sm text-slate-600">{user.email}</p>
+              <p className="mt-1 text-sm text-slate-500">Username: {user.username || user.user_id}</p>
               <p className="mt-2 text-sm text-slate-500">Phone: {String(user.phone || '')}</p>
               <p className="mt-2 text-sm text-slate-500">Role: {user.role}</p>
               <p className="mt-1 text-sm text-slate-500">Status: {user.status}</p>

@@ -187,6 +187,7 @@ function getExpectedSheetSchemas() {
       name: 'AppUsers',
       headers: [
         'user_id',
+        'username',
         'email',
         'phone',
         'name',
@@ -418,6 +419,109 @@ function getSchemaMigrations() {
         sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setValues(values);
         Logger.log('Migrated schema 2 -> 3: Added missing Products.sku and low_stock_threshold values to %s rows', rowsUpdated);
         return { success: true, rowsUpdated: rowsUpdated };
+      }
+    },
+    {
+      version: 4,
+      description: 'Add AppUsers.username column and backfill missing usernames',
+      migrate: function() {
+        var sheetName = 'AppUsers';
+        var sheet = getSpreadsheet().getSheetByName(sheetName);
+        if (!sheet) {
+          return { success: false, message: 'Missing sheet: ' + sheetName };
+        }
+
+        var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+          return String(value).trim();
+        });
+        var userIdIndex = headers.indexOf('user_id');
+        if (userIdIndex === -1) {
+          return { success: false, message: 'Unable to find user_id header in AppUsers' };
+        }
+
+        var usernameIndex = headers.indexOf('username');
+        if (usernameIndex === -1) {
+          sheet.insertColumnAfter(userIdIndex + 1);
+          sheet.getRange(1, userIdIndex + 2).setValue('username');
+          headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+            return String(value).trim();
+          });
+          usernameIndex = headers.indexOf('username');
+        }
+
+        if (usernameIndex === -1) {
+          return { success: false, message: 'Unable to add username header to AppUsers' };
+        }
+
+        var nameIndex = headers.indexOf('name');
+        if (nameIndex === -1) {
+          return { success: false, message: 'Unable to find name header in AppUsers' };
+        }
+
+        var lastRow = sheet.getLastRow();
+        if (lastRow < 2) {
+          return { success: true, rowsUpdated: 0 };
+        }
+
+        var values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+        var existingUsernames = [];
+        var rowsUpdated = 0;
+
+        values.forEach(function(row) {
+          var currentUsername = String(row[usernameIndex] || '').trim();
+          if (currentUsername !== '') {
+            existingUsernames.push(currentUsername.toLowerCase());
+          }
+        });
+
+        values.forEach(function(row) {
+          var rawUsername = String(row[usernameIndex] || '').trim();
+          if (rawUsername === '') {
+            var name = String(row[nameIndex] || '').trim();
+            var candidate = generateAppUserUsername(name);
+            var uniqueUsername = ensureUniqueAppUserUsername(candidate, existingUsernames);
+            row[usernameIndex] = uniqueUsername;
+            rowsUpdated += 1;
+          }
+        });
+
+        sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setValues(values);
+        Logger.log('Migrated schema 3 -> 4: Added missing AppUsers.username values to %s rows', rowsUpdated);
+        return { success: true, rowsUpdated: rowsUpdated };
+
+        function generateAppUserUsername(fullName) {
+          var name = String(fullName || '').trim().toLowerCase();
+          name = name.replace(/[^a-z0-9 ]+/g, '');
+          var parts = name.split(/\s+/).filter(function(part) {
+            return part !== '';
+          });
+          if (parts.length === 0) {
+            return 'user';
+          }
+          var firstInitial = parts[0].charAt(0);
+          var surname = parts.length === 1 ? parts[0] : parts[parts.length - 1];
+          var username = (firstInitial + surname).replace(/\s+/g, '');
+          if (!username) {
+            return firstInitial || surname || 'user';
+          }
+          return username;
+        }
+
+        function ensureUniqueAppUserUsername(base, existingUsernames) {
+          var normalizedBase = String(base || 'user').toLowerCase();
+          if (!normalizedBase) {
+            normalizedBase = 'user';
+          }
+
+          var candidate = normalizedBase;
+          var suffix = 1;
+          while (existingUsernames.indexOf(candidate.toLowerCase()) !== -1) {
+            suffix += 1;
+            candidate = normalizedBase + suffix;
+          }
+          existingUsernames.push(candidate.toLowerCase());
+          return candidate;
+        }
       }
     }
   ];

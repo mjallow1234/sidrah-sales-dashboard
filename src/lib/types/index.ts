@@ -73,6 +73,7 @@ export interface VisitResult {
 
 export interface AppUser {
   user_id: string;
+  username: string;
   email: string;
   phone: string;
   name: string;

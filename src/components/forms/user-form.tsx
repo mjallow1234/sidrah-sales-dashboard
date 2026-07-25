@@ -93,6 +93,18 @@ export function UserForm({ initialValues, userId, onSuccess }: UserFormProps) {
     <form className="space-y-4" onSubmit={handleSubmit}>
       {notification ? <NotificationBanner type={notification.type} message={notification.message} /> : null}
       <div className="space-y-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-soft">
+        {userId ? (
+          <label className="block text-sm text-slate-700">
+            Username
+            <input
+              type="text"
+              readOnly
+              value={initialValues?.username ?? ''}
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-100 px-4 py-3 outline-none text-slate-600"
+            />
+          </label>
+        ) : null}
+
         <label className="block text-sm text-slate-700">
           Email
           <input

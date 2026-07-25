@@ -57,7 +57,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\deploy-gas.ps1
 
 The Google Apps Script backend source is maintained in the `backend/` folder.
 - `backend/*.gs` is the canonical backend source of truth.
-- `scripts/deploy-gas.ps1` is the supported deployment method.
+- `root/appsscript.json` is the deployment manifest used by `scripts/deploy-gas.ps1`.
+- `scripts/deploy-gas.ps1` is the only supported deployment method.
 - Do not edit root-level legacy GAS artifacts such as `Code.js`, `validation.js`, `config.js`, or `AppUsersMigration.js`.
 - All schema changes must be implemented through `backend/schema_migrations.gs`.
 

@@ -96,18 +96,32 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    fetch('/api/auth')
-      .then((response) => response.json())
-      .then((data) => {
-        if (data?.valid) {
-          setUserName(data.userId ?? null);
-          setUserRole(data.role ?? null);
+    async function loadUser() {
+      try {
+        const authResponse = await fetch('/api/auth');
+        const authData = await authResponse.json();
+        if (!authData?.valid || !authData.userId) {
+          setUserName(null);
+          setUserRole(null);
+          return;
         }
-      })
-      .catch(() => {
+
+        setUserRole(authData.role ?? null);
+        const userResponse = await fetch(`/api/appusers/${encodeURIComponent(authData.userId)}`);
+        if (!userResponse.ok) {
+          setUserName(authData.userId);
+          return;
+        }
+
+        const userJson = await userResponse.json();
+        setUserName(userJson?.data?.username ?? authData.userId);
+      } catch {
         setUserName(null);
         setUserRole(null);
-      });
+      }
+    }
+
+    loadUser();
   }, [showAdminShell]);
 
   const activePath = useMemo(() => pathname ?? '', [pathname]);

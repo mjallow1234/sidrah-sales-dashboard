@@ -108,6 +108,7 @@ function createGoogleSheetsFoundation() {
     ],
     'AppUsers': [
       'user_id',
+      'username',
       'email',
       'phone',
       'name',

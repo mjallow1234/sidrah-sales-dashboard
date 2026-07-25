@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
   }
 
   const updateBody = {
-    password: newPassword,
+    password_hash: hashPassword(newPassword),
     password_reset_required: 'false',
   };
 
@@ -53,6 +53,26 @@ export async function POST(request: NextRequest) {
 
   if (!updateResult.ok) {
     return NextResponse.json({ success: false, message: 'Unable to update password.' }, { status: 500 });
+  }
+
+  const verifyResult = await fetchAppUserById(session.userId);
+  if (!verifyResult.ok) {
+    return NextResponse.json({ success: false, message: 'Unable to verify password update.' }, { status: 500 });
+  }
+
+  const verifyPayload = verifyResult.payload;
+  const updatedAppUser = typeof verifyPayload === 'object' && verifyPayload !== null ? (verifyPayload as any).data ?? null : null;
+
+  if (!updatedAppUser || !updatedAppUser.password_hash) {
+    return NextResponse.json({ success: false, message: 'Password update verification failed.' }, { status: 500 });
+  }
+
+  if (!verifyPassword(newPassword, updatedAppUser.password_hash)) {
+    return NextResponse.json({ success: false, message: 'Password update did not persist.' }, { status: 500 });
+  }
+
+  if (updatedAppUser.password_reset_required === 'true' || updatedAppUser.password_reset_required === '1' || updatedAppUser.password_reset_required === true) {
+    return NextResponse.json({ success: false, message: 'Password reset flag was not cleared.' }, { status: 500 });
   }
 
   const updatedToken = await createSession({

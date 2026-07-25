@@ -513,6 +513,7 @@ function createAppUser(body) {
     }
 
     body.user_id = generateAppUserId();
+    body.username = ensureUniqueAppUserUsername(generateAppUserUsername(body.name), getSheetRows('AppUsers'), null);
 
     if (body.role === 'agent') {
       var salesRep = createSalesRep({ full_name: body.name, phone: body.phone });
@@ -530,6 +531,7 @@ function createAppUser(body) {
 
     var row = {
       user_id: body.user_id,
+      username: body.username || '',
       email: body.email,
       phone: body.phone,
       name: body.name,
@@ -569,6 +571,10 @@ function updateAppUser(userId, body) {
   var currentRow = findRowById('AppUsers', 'user_id', userId);
   if (!currentRow) {
     throw createHttpError(404, 'AppUser not found.');
+  }
+
+  if (body.username !== undefined) {
+    delete body.username;
   }
 
   if (body.sales_rep_id !== undefined) {
@@ -656,6 +662,53 @@ function normalizeUniqueKey(value) {
   return value === undefined || value === null ? '' : String(value).trim();
 }
 
+function generateAppUserUsername(fullName) {
+  var name = String(fullName || '').trim().toLowerCase();
+  if (name.normalize) {
+    name = name.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  name = name.replace(/[^a-z0-9 ]+/g, ' ');
+  var parts = name.split(/\s+/).filter(function(part) {
+    return part !== '';
+  });
+  if (parts.length === 0) {
+    return 'user';
+  }
+  var firstInitial = parts[0].charAt(0);
+  var surname = parts.length === 1 ? parts[0] : parts[parts.length - 1];
+  var username = (firstInitial + surname).replace(/\s+/g, '');
+  return username || firstInitial || surname || 'user';
+}
+
+function getExistingAppUsernames(rows, excludeUserId) {
+  var usernames = [];
+  rows.forEach(function(row) {
+    if (excludeUserId && normalizeUniqueKey(row.user_id) === normalizeUniqueKey(excludeUserId)) {
+      return;
+    }
+    var username = String(row.username || '').trim().toLowerCase();
+    if (username) {
+      usernames.push(username);
+    }
+  });
+  return usernames;
+}
+
+function ensureUniqueAppUserUsername(base, rows, excludeUserId) {
+  var normalizedBase = String(base || 'user').trim().toLowerCase();
+  if (!normalizedBase) {
+    normalizedBase = 'user';
+  }
+  var existingUsernames = getExistingAppUsernames(rows, excludeUserId);
+  var candidate = normalizedBase;
+  var suffix = 1;
+  while (existingUsernames.indexOf(candidate) !== -1) {
+    suffix += 1;
+    candidate = normalizedBase + suffix;
+  }
+  return candidate;
+}
+
 function validateUniqueAppUserFields(body, rows, excludeUserId) {
   rows.forEach(function(row) {
     if (excludeUserId && normalizeUniqueKey(row.user_id) === normalizeUniqueKey(excludeUserId)) {
@@ -663,6 +716,9 @@ function validateUniqueAppUserFields(body, rows, excludeUserId) {
     }
     if (body.user_id !== undefined && normalizeUniqueKey(row.user_id) === normalizeUniqueKey(body.user_id)) {
       throw createHttpError(400, 'Duplicate user_id: ' + body.user_id);
+    }
+    if (body.username !== undefined && normalizeUniqueKey(row.username) === normalizeUniqueKey(body.username)) {
+      throw createHttpError(400, 'Duplicate username: ' + body.username);
     }
     if (body.email !== undefined && normalizeUniqueKey(row.email) === normalizeUniqueKey(body.email)) {
       throw createHttpError(400, 'Duplicate email: ' + body.email);
