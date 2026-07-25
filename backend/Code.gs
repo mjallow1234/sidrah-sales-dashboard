@@ -325,6 +325,7 @@ function createProduct(body) {
   var now = new Date();
   var productId = generateProductId();
   var sku = generateUniqueProductSku(body.product_name, productId);
+  // low_stock_threshold is informational only; 0 means no threshold is configured.
   var row = [
     productId,
     sku,
@@ -333,6 +334,7 @@ function createProduct(body) {
     body.unit,
     Number(body.default_unit_price),
     body.currency || 'GMD',
+    Number(body.low_stock_threshold),
     'TRUE',
     getIsoDate(now),
     getIsoDatetime(now)
@@ -355,6 +357,7 @@ function updateProduct(productId, body) {
   if (body.unit !== undefined) updates.unit = body.unit;
   if (body.default_unit_price !== undefined) updates.default_unit_price = Number(body.default_unit_price);
   if (body.currency !== undefined) updates.currency = body.currency;
+  if (body.low_stock_threshold !== undefined) updates.low_stock_threshold = Number(body.low_stock_threshold);
   if (body.active !== undefined) updates.active = body.active ? 'TRUE' : 'FALSE';
   updates.last_updated = getIsoDatetime(new Date());
   return updateRowById('Products', 'product_id', productId, updates);

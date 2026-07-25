@@ -18,6 +18,7 @@ export function ProductList() {
               <p className="font-semibold text-slate-900">{product.product_name}</p>
               <p className="mt-1 text-sm text-slate-600">{product.category} • {product.unit}</p>
               <p className="mt-1 text-sm text-slate-500">SKU: {product.sku}</p>
+              <p className="mt-1 text-sm text-slate-500">Low stock threshold: {product.low_stock_threshold}</p>
               <p className="mt-3 text-sm text-slate-500">Price: {product.currency} {product.default_unit_price.toLocaleString()}</p>
               <p className="mt-1 text-sm text-slate-500">Status: {product.active ? 'Active' : 'Inactive'}</p>
             </div>

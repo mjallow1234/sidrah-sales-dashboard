@@ -14,11 +14,12 @@ const productSchema = z.object({
   unit: z.string().min(1, 'Unit is required'),
   default_unit_price: z.number().min(0, 'Price must be at least 0'),
   currency: z.string().min(1, 'Currency is required'),
+  low_stock_threshold: z.number().min(0, 'Low stock threshold must be 0 or greater'),
   active: z.boolean(),
 });
 
 interface ProductFormProps {
-  initialValues?: Partial<{ product_name: string; category: string; unit: string; default_unit_price: number; currency: string; active: boolean; sku: string }>;
+  initialValues?: Partial<{ product_name: string; category: string; unit: string; default_unit_price: number; currency: string; low_stock_threshold: number; active: boolean; sku: string }>;
   productId?: string;
   onSuccess?: () => void;
 }
@@ -31,6 +32,7 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
     unit: initialValues?.unit ?? '',
     default_unit_price: initialValues?.default_unit_price ?? 0,
     currency: initialValues?.currency ?? 'GMD',
+    low_stock_threshold: initialValues?.low_stock_threshold ?? 0,
     active: initialValues?.active ?? true,
   });
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -58,7 +60,7 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
       } else {
         await createMutation.mutateAsync(formState);
         setNotification({ type: 'success', message: 'Product created successfully' });
-        setFormState({ product_name: '', category: categoryOptions[0], unit: '', default_unit_price: 0, currency: 'GMD', active: true });
+        setFormState({ product_name: '', category: categoryOptions[0], unit: '', default_unit_price: 0, currency: 'GMD', low_stock_threshold: 0, active: true });
       }
       onSuccess?.();
     } catch (error) {
@@ -132,6 +134,18 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
             onChange={(event) => handleChange('currency', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           />
+        </label>
+        <label className="block text-sm text-slate-700">
+          Low stock threshold
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={formState.low_stock_threshold}
+            onChange={(event) => handleChange('low_stock_threshold', Number(event.target.value))}
+            className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+          />
+          <p className="mt-1 text-xs text-slate-500">0 means no informational threshold is configured. It is stored as a numeric value only.</p>
         </label>
         <label className="flex items-center gap-3 text-sm text-slate-700">
           <input

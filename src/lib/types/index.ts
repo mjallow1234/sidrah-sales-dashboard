@@ -27,6 +27,7 @@ export interface Product {
   unit: string;
   default_unit_price: number;
   currency: string;
+  low_stock_threshold: number;
   active: boolean;
   date_created: string;
   last_updated: string;

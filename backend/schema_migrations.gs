@@ -114,6 +114,7 @@ function getExpectedSheetSchemas() {
         'unit',
         'default_unit_price',
         'currency',
+        'low_stock_threshold',
         'active',
         'date_created',
         'last_updated'
@@ -335,49 +336,87 @@ function getSchemaMigrations() {
         var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
           return String(value).trim();
         });
-        var expectedHeader = 'sku';
-        if (headers.indexOf(expectedHeader) !== -1) {
-          return { success: true, rowsUpdated: 0 };
-        }
-
         var productIdIndex = headers.indexOf('product_id');
         if (productIdIndex === -1) {
           return { success: false, message: 'Unable to find product_id header in Products' };
         }
 
-        sheet.insertColumnAfter(productIdIndex + 1);
-        sheet.getRange(1, productIdIndex + 2).setValue(expectedHeader);
+        var skuIndex = headers.indexOf('sku');
+        var thresholdIndex = headers.indexOf('low_stock_threshold');
+        var currencyIndex = headers.indexOf('currency');
+        if (currencyIndex === -1) {
+          return { success: false, message: 'Unable to find currency header in Products' };
+        }
+
+        if (skuIndex === -1) {
+          sheet.insertColumnAfter(productIdIndex + 1);
+          sheet.getRange(1, productIdIndex + 2).setValue('sku');
+          headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+            return String(value).trim();
+          });
+          skuIndex = headers.indexOf('sku');
+          currencyIndex = headers.indexOf('currency');
+          thresholdIndex = headers.indexOf('low_stock_threshold');
+        }
+
+        if (thresholdIndex === -1) {
+          var thresholdInsertIndex = currencyIndex + 2; // after currency
+          sheet.insertColumnAfter(currencyIndex + 1);
+          sheet.getRange(1, thresholdInsertIndex).setValue('low_stock_threshold');
+          headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+            return String(value).trim();
+          });
+          skuIndex = headers.indexOf('sku');
+          thresholdIndex = headers.indexOf('low_stock_threshold');
+        }
+
+        if (skuIndex === -1 || thresholdIndex === -1) {
+          return { success: false, message: 'Missing expected headers after adding sku or low_stock_threshold.' };
+        }
+
+        var productNameIndex = headers.indexOf('product_name');
+        if (productNameIndex === -1) {
+          return { success: false, message: 'Unable to find product_name header in Products' };
+        }
 
         var lastRow = sheet.getLastRow();
         if (lastRow < 2) {
           return { success: true, rowsUpdated: 0 };
         }
 
-        headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
-          return String(value).trim();
-        });
-        var productNameIndex = headers.indexOf('product_name');
-        var skuIndex = headers.indexOf('sku');
-        if (productNameIndex === -1 || skuIndex === -1) {
-          return { success: false, message: 'Missing expected headers after adding sku.' };
-        }
-
         var values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
         var existingSkus = [];
         var rowsUpdated = 0;
 
-        values.forEach(function(row, rowIndex) {
+        values.forEach(function(row) {
+          var rowUpdated = false;
           var productId = String(row[productIdIndex] || '').trim();
           var productName = String(row[productNameIndex] || '').trim();
-          var candidateSku = generateProductSku(productName, productId);
-          var uniqueSku = ensureUniqueProductSku(candidateSku, existingSkus);
-          existingSkus.push(uniqueSku);
-          row[skuIndex] = uniqueSku;
-          rowsUpdated += 1;
+          var rawSkuValue = row[skuIndex];
+          if (rawSkuValue === undefined || rawSkuValue === null || String(rawSkuValue).trim() === '') {
+            var candidateSku = generateProductSku(productName, productId);
+            var uniqueSku = ensureUniqueProductSku(candidateSku, existingSkus);
+            row[skuIndex] = uniqueSku;
+            existingSkus.push(uniqueSku);
+            rowUpdated = true;
+          } else {
+            existingSkus.push(String(rawSkuValue).trim());
+          }
+
+          var rawThresholdValue = row[thresholdIndex];
+          if (rawThresholdValue === undefined || rawThresholdValue === null || String(rawThresholdValue).trim() === '') {
+            // Preserve existing threshold values; only default missing entries to 0.
+            row[thresholdIndex] = 0;
+            rowUpdated = true;
+          }
+
+          if (rowUpdated) {
+            rowsUpdated += 1;
+          }
         });
 
         sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setValues(values);
-        Logger.log('Migrated schema 2 -> 3: Added Products.sku to %s rows', rowsUpdated);
+        Logger.log('Migrated schema 2 -> 3: Added missing Products.sku and low_stock_threshold values to %s rows', rowsUpdated);
         return { success: true, rowsUpdated: rowsUpdated };
       }
     }

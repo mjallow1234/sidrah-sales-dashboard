@@ -171,6 +171,7 @@ export async function createProduct(payload: {
   unit: string;
   default_unit_price: number;
   currency: string;
+  low_stock_threshold: number;
 }) {
   return fetchJson<{ status: string; data: Product }>('/api/products', {
     method: 'POST',
@@ -184,6 +185,7 @@ export async function updateProduct(id: string, payload: Partial<{
   unit: string;
   default_unit_price: number;
   currency: string;
+  low_stock_threshold: number;
   active: boolean;
 }>) {
   return fetchJson<{ status: string; data: Product }>(`/api/products/${encodeURIComponent(id)}`, {
