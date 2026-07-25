@@ -1,7 +1,16 @@
+import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
+
+function getIdFromUrl(request: Request) {
+  const url = new URL(request.url);
+  const pathSegments = url.pathname.split('/').filter(Boolean);
+  return pathSegments[pathSegments.length - 1] || '';
+}
 
 function ensureBaseUrl() {
   if (!GAS_API_URL) {
@@ -17,13 +26,12 @@ function makeUrl(path: string) {
   return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
 }
 
-function getIdFromUrl(request: Request) {
-  const url = new URL(request.url);
-  const pathSegments = url.pathname.split('/').filter(Boolean);
-  return pathSegments[pathSegments.length - 1] || '';
-}
+export async function GET(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
 
-export async function GET(request: Request) {
   const id = getIdFromUrl(request);
   const url = makeUrl(`/products/${encodeURIComponent(id)}`);
   const response = await fetch(url, { method: 'GET' });
@@ -31,7 +39,16 @@ export async function GET(request: Request) {
   return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   const id = getIdFromUrl(request);
   const payload = await request.json();
   const url = makeUrl(`/product/${encodeURIComponent(id)}`);

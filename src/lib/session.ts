@@ -1,6 +1,7 @@
 import 'server-only';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
 import { validateEnvironment } from '@/lib/env';
+import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 validateEnvironment();
@@ -61,6 +62,24 @@ export async function verifySession(token: string): Promise<SessionVerificationR
 export async function getSessionFromRequest(request: NextRequest) {
   const token = request.cookies.get('sidrah_session')?.value;
   return token ? await verifySession(token) : { valid: false };
+}
+
+export async function getVerifiedSession(request: NextRequest) {
+  const token = request.cookies.get('sidrah_session')?.value;
+  if (!token) {
+    return null;
+  }
+
+  const session = await verifySession(token);
+  return session.valid ? session : null;
+}
+
+export function unauthorizedResponse() {
+  return NextResponse.json({ status: 'error', message: 'Not authenticated.' }, { status: 401 });
+}
+
+export function forbiddenResponse() {
+  return NextResponse.json({ status: 'error', message: 'Insufficient permissions.' }, { status: 403 });
 }
 
 const cookieSecureFlag = process.env.NODE_ENV === 'production' ? '; Secure' : '';

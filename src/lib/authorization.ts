@@ -9,6 +9,10 @@ export function isSupervisorRole(role?: string): role is AppUserRole {
   return role === 'supervisor';
 }
 
+export function isAdminOrSupervisorRole(role?: string): role is AppUserRole {
+  return isAdminRole(role) || isSupervisorRole(role);
+}
+
 export function isAgentRole(role?: string): role is AppUserRole {
   return role === 'agent';
 }
