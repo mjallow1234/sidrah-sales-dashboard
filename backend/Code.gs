@@ -324,8 +324,10 @@ function getSalesReps(params) {
 function createProduct(body) {
   var now = new Date();
   var productId = generateProductId();
+  var sku = generateUniqueProductSku(body.product_name, productId);
   var row = [
     productId,
+    sku,
     body.product_name,
     body.category,
     body.unit,
@@ -340,6 +342,9 @@ function createProduct(body) {
 }
 
 function updateProduct(productId, body) {
+  if (body.sku !== undefined) {
+    throw createHttpError(400, 'sku cannot be updated.');
+  }
   var product = findRowById('Products', 'product_id', productId);
   if (!product) {
     throw createHttpError(404, 'Product not found.');
@@ -353,6 +358,54 @@ function updateProduct(productId, body) {
   if (body.active !== undefined) updates.active = body.active ? 'TRUE' : 'FALSE';
   updates.last_updated = getIsoDatetime(new Date());
   return updateRowById('Products', 'product_id', productId, updates);
+}
+
+function getAllProductSkus() {
+  return getSheetRows('Products')
+    .map(function(row) {
+      return String(row.sku || '').trim();
+    })
+    .filter(function(sku) {
+      return sku !== '';
+    });
+}
+
+function generateProductSku(productName, productId) {
+  var normalized = String(productName || '').trim().toUpperCase();
+  if (!normalized) {
+    return productId;
+  }
+  var sku = normalized
+    .replace(/[^A-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/-+/g, '-');
+  if (!sku) {
+    return productId;
+  }
+  return sku.length > 30 ? sku.slice(0, 30).replace(/-+$/g, '') : sku;
+}
+
+function generateUniqueProductSku(productName, productId) {
+  // Called from createProduct while holding executeWithLock().
+  // This ensures SKU uniqueness is enforced atomically for concurrent create requests.
+  var candidateSku = generateProductSku(productName, productId);
+  var existingSkus = getAllProductSkus();
+  return ensureUniqueProductSku(candidateSku, existingSkus, productId);
+}
+
+function ensureUniqueProductSku(candidateSku, existingSkus, fallbackProductId) {
+  var sku = String(candidateSku || '').trim();
+  if (!sku) {
+    sku = generateProductSku('', fallbackProductId);
+  }
+
+  var uniqueSku = sku;
+  var suffix = 1;
+  while (existingSkus.indexOf(uniqueSku) !== -1) {
+    uniqueSku = sku + '-' + suffix;
+    suffix += 1;
+  }
+  return uniqueSku;
 }
 
 function updateVendor(vendorId, body) {

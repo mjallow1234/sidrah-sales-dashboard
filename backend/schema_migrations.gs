@@ -108,6 +108,7 @@ function getExpectedSheetSchemas() {
       name: 'Products',
       headers: [
         'product_id',
+        'sku',
         'product_name',
         'category',
         'unit',
@@ -318,6 +319,65 @@ function getSchemaMigrations() {
         });
 
         Logger.log('Migrated schema 1 -> 2: Added SalesReps.is_active to %s rows', rowsUpdated);
+        return { success: true, rowsUpdated: rowsUpdated };
+      }
+    },
+    {
+      version: 3,
+      description: 'Add Products.sku column and backfill existing product SKUs',
+      migrate: function() {
+        var sheetName = 'Products';
+        var sheet = getSpreadsheet().getSheetByName(sheetName);
+        if (!sheet) {
+          return { success: false, message: 'Missing sheet: ' + sheetName };
+        }
+
+        var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+          return String(value).trim();
+        });
+        var expectedHeader = 'sku';
+        if (headers.indexOf(expectedHeader) !== -1) {
+          return { success: true, rowsUpdated: 0 };
+        }
+
+        var productIdIndex = headers.indexOf('product_id');
+        if (productIdIndex === -1) {
+          return { success: false, message: 'Unable to find product_id header in Products' };
+        }
+
+        sheet.insertColumnAfter(productIdIndex + 1);
+        sheet.getRange(1, productIdIndex + 2).setValue(expectedHeader);
+
+        var lastRow = sheet.getLastRow();
+        if (lastRow < 2) {
+          return { success: true, rowsUpdated: 0 };
+        }
+
+        headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+          return String(value).trim();
+        });
+        var productNameIndex = headers.indexOf('product_name');
+        var skuIndex = headers.indexOf('sku');
+        if (productNameIndex === -1 || skuIndex === -1) {
+          return { success: false, message: 'Missing expected headers after adding sku.' };
+        }
+
+        var values = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).getValues();
+        var existingSkus = [];
+        var rowsUpdated = 0;
+
+        values.forEach(function(row, rowIndex) {
+          var productId = String(row[productIdIndex] || '').trim();
+          var productName = String(row[productNameIndex] || '').trim();
+          var candidateSku = generateProductSku(productName, productId);
+          var uniqueSku = ensureUniqueProductSku(candidateSku, existingSkus);
+          existingSkus.push(uniqueSku);
+          row[skuIndex] = uniqueSku;
+          rowsUpdated += 1;
+        });
+
+        sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn()).setValues(values);
+        Logger.log('Migrated schema 2 -> 3: Added Products.sku to %s rows', rowsUpdated);
         return { success: true, rowsUpdated: rowsUpdated };
       }
     }

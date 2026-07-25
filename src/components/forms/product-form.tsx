@@ -18,12 +18,13 @@ const productSchema = z.object({
 });
 
 interface ProductFormProps {
-  initialValues?: Partial<{ product_name: string; category: string; unit: string; default_unit_price: number; currency: string; active: boolean }>;
+  initialValues?: Partial<{ product_name: string; category: string; unit: string; default_unit_price: number; currency: string; active: boolean; sku: string }>;
   productId?: string;
   onSuccess?: () => void;
 }
 
 export function ProductForm({ initialValues, productId, onSuccess }: ProductFormProps) {
+  const sku = initialValues?.sku ?? '';
   const [formState, setFormState] = useState({
     product_name: initialValues?.product_name ?? '',
     category: (initialValues?.category as typeof categoryOptions[number]) ?? categoryOptions[0],
@@ -69,6 +70,17 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
     <form className="space-y-4" onSubmit={handleSubmit}>
       {notification ? <NotificationBanner type={notification.type} message={notification.message} /> : null}
       <div className="space-y-2 rounded-3xl border border-slate-200 bg-white p-4 shadow-soft">
+        {productId && sku ? (
+          <label className="block text-sm text-slate-700">
+            SKU
+            <input
+              type="text"
+              value={sku}
+              disabled
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-100 px-4 py-3 text-slate-700 outline-none"
+            />
+          </label>
+        ) : null}
         <label className="block text-sm text-slate-700">
           Product name
           <input

@@ -21,6 +21,7 @@ export interface Vendor {
 
 export interface Product {
   product_id: string;
+  sku: string;
   product_name: string;
   category: string;
   unit: string;
