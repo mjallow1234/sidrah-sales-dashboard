@@ -1,6 +1,4 @@
 import type { NextRequest } from 'next/server';
-import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
-import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -20,17 +18,9 @@ function makeUrl(path: string, query?: URLSearchParams) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
-
   try {
-    const url = makeUrl('/products', request.nextUrl.searchParams);
-    const response = await fetch(url, {
-      method: 'GET',
-    });
-
+    const url = makeUrl('/transactions', request.nextUrl.searchParams);
+    const response = await fetch(url, { method: 'GET' });
     const text = await response.text();
     const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
 
@@ -48,49 +38,6 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
-    return Response.json(
-      {
-        error: String(error),
-        gasUrlExists: !!process.env.GAS_API_URL,
-        gasKeyExists: !!process.env.GAS_API_KEY,
-        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
-        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
-      },
-      { status: 500 }
-    );
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
-
-  if (!isAdminOrSupervisorRole(session.role)) {
-    return forbiddenResponse();
-  }
-
-  try {
-    const payload = await request.json();
-    const url = makeUrl('/product');
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await response.text();
     return new Response(text, {
       status: response.status,
       headers: {

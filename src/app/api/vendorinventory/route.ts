@@ -14,41 +14,15 @@ function makeUrl(path: string, query?: URLSearchParams) {
   const base = ensureBaseUrl();
   const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
   const queryString = query?.toString() ? `&${query.toString()}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#!]+/, ''))}${queryString}${keyParam}`;
+  return `${base}?path=${encodeURIComponent(path.replace(/^[\/\#]+/, ''))}${queryString}${keyParam}`;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const url = makeUrl('/stats', request.nextUrl.searchParams);
-    const response = await fetch(url, {
-      method: 'GET',
-    });
-
+    const queryParams = new URLSearchParams(request.nextUrl.searchParams);
+    const url = makeUrl('/vendorinventory', queryParams);
+    const response = await fetch(url, { method: 'GET' });
     const text = await response.text();
-    const contentType = response.headers.get('content-type');
-    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
-
-    if (diagnosticMode) {
-      return Response.json(
-        {
-          finalUrl: response.url,
-          responseUrl: response.url,
-          responseStatus: response.status,
-          responseHeaders: {
-            'content-type': response.headers.get('content-type'),
-            location: response.headers.get('location')
-          },
-          redirected: response.redirected,
-          gasApiUrl: process.env.GAS_API_URL,
-          gasApiKey: process.env.GAS_API_KEY,
-          constructedUrl: url,
-          status: response.status,
-          contentType,
-        },
-        { status: 200 }
-      );
-    }
-
     return new Response(text, {
       status: response.status,
       headers: {

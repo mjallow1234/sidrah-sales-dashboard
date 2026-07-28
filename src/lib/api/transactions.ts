@@ -1,15 +1,29 @@
 import type { Transaction } from '@/lib/types';
-import { getInventory, getVendors, getVendor, getSalesReps, getProducts, createVisit } from '@/services/gasApi';
+import { getVisitLogs, createVisit } from '@/services/gasApi';
+
+function mapVisitLogToTransaction(log: any): Transaction {
+  return {
+    transaction_id: log.visit_id,
+    date: log.date,
+    vendor_id: log.vendor_id,
+    opening_stock: Number(log.opening_stock) || 0,
+    stock_sold: Number(log.stock_sold) || 0,
+    stock_added: Number(log.stock_added) || 0,
+    cash_collected: Number(log.cash_collected) || 0,
+    closing_stock: Number(log.closing_stock) || 0,
+    sales_rep: log.sales_rep_id || '',
+    notes: log.notes || '',
+  };
+}
 
 export async function getTransactions(): Promise<Transaction[]> {
-  // Transactions are retrieved from visit logs via the vendor details path.
-  // Live visit transaction records are not exposed by a dedicated /transactions endpoint in the backend.
-  return [];
+  const logs = await getVisitLogs();
+  return logs.map(mapVisitLogToTransaction);
 }
 
 export async function getTransactionsByVendor(vendorId: string): Promise<Transaction[]> {
-  // This service is currently not connected to a live transactions endpoint.
-  return [];
+  const logs = await getVisitLogs({ vendorId });
+  return logs.map(mapVisitLogToTransaction);
 }
 
 export async function createTransaction(payload: {

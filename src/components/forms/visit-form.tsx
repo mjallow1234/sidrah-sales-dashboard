@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { useCreateVisitMutation, useInventoryByVendorQuery, useProductsQuery, useSalesRepsQuery } from '@/lib/hooks/queries';
+import { useCreateVisitMutation, useProductsQuery, useSalesRepsQuery, useVendorInventoryByVendorAndProductQuery } from '@/lib/hooks/queries';
 import type { Vendor, Product, SalesRep } from '@/lib/types';
 
 const visitSchema = z.object({
@@ -38,8 +38,9 @@ export function VisitForm({ vendors }: VisitFormProps) {
 
   const productQuery = useProductsQuery();
   const salesRepsQuery = useSalesRepsQuery();
-  const inventoryQuery = useInventoryByVendorQuery(visitDraft.vendor_id);
-  const openingStock = inventoryQuery.data?.current_stock ?? 0;
+  const vendorInventoryQuery = useVendorInventoryByVendorAndProductQuery(visitDraft.vendor_id, visitDraft.product_id);
+  const openingStock = vendorInventoryQuery.data?.current_stock ?? 0;
+  const hasVendorInventory = !!vendorInventoryQuery.data;
   const { mutate, status, isSuccess, isPending } = useCreateVisitMutation();
   const isError = status === 'error';
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -135,9 +136,24 @@ export function VisitForm({ vendors }: VisitFormProps) {
 
           <div className="rounded-3xl bg-slate-50 p-4">
             <p className="text-sm text-slate-500">Current stock</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-900">{inventoryQuery.isLoading ? '…' : openingStock}</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">{vendorInventoryQuery.isLoading ? '…' : openingStock}</p>
           </div>
         </div>
+
+        {!vendorInventoryQuery.isLoading && !hasVendorInventory ? (
+          <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+            <p className="font-semibold text-slate-900">This vendor has not received any stock yet.</p>
+            <p className="mt-2 text-slate-600">Supply stock before recording visits.</p>
+            <div className="mt-4">
+              <a
+                href={`/supply?vendorId=${visitDraft.vendor_id}`}
+                className="inline-flex rounded-3xl bg-sidrah-500 px-5 py-3 text-sm font-semibold text-white shadow-sm hover:bg-sidrah-600"
+              >
+                Supply Stock
+              </a>
+            </div>
+          </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block text-sm text-slate-700">
@@ -148,6 +164,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
               value={visitDraft.stock_sold}
               onChange={(event) => setVisitDraft({ stock_sold: Number(event.target.value) })}
               className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              disabled={!hasVendorInventory}
             />
           </label>
           <label className="block text-sm text-slate-700">
@@ -158,18 +175,21 @@ export function VisitForm({ vendors }: VisitFormProps) {
               value={visitDraft.cash_collected}
               onChange={(event) => setVisitDraft({ cash_collected: Number(event.target.value) })}
               className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              disabled={!hasVendorInventory}
             />
           </label>
-          <label className="block text-sm text-slate-700">
-            Stock Added
-            <input
-              type="number"
-              min={0}
-              value={visitDraft.stock_added}
-              onChange={(event) => setVisitDraft({ stock_added: Number(event.target.value) })}
-              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-            />
-          </label>
+          {hasVendorInventory ? (
+            <label className="block text-sm text-slate-700">
+              Stock Added
+              <input
+                type="number"
+                min={0}
+                value={visitDraft.stock_added}
+                onChange={(event) => setVisitDraft({ stock_added: Number(event.target.value) })}
+                className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              />
+            </label>
+          ) : null}
         </div>
 
         <label className="block text-sm text-slate-700">
@@ -184,9 +204,17 @@ export function VisitForm({ vendors }: VisitFormProps) {
 
         {errorMessage ? <p className="text-sm text-rose-600">{errorMessage}</p> : null}
         {isError ? <p className="text-sm text-rose-600">Unable to save visit. Please try again.</p> : null}
-        {inventoryQuery.isError ? <p className="text-sm text-rose-600">Unable to load inventory for selected vendor.</p> : null}
+        {vendorInventoryQuery.isError ? (
+          <p className="text-sm text-slate-600">
+            Inventory information is unavailable. Vendor details are still visible.
+          </p>
+        ) : null}
 
-        <Button type="submit" className="w-full" disabled={isPending || inventoryQuery.isLoading || !visitDraft.vendor_id}>
+        <Button
+          type="submit"
+          className="w-full"
+          disabled={isPending || vendorInventoryQuery.isLoading || !visitDraft.vendor_id || !hasVendorInventory}
+        >
           {isPending ? 'Submitting…' : 'Submit Visit'}
         </Button>
       </form>

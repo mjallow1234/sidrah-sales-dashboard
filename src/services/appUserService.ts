@@ -13,8 +13,10 @@ function ensureBaseUrl() {
 function makeUrl(path: string) {
   const base = ensureBaseUrl();
   const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  const normalizedPath = encodeURIComponent(path.replace(/^[\/#]+/, ''));
-  return `${base}?path=${normalizedPath}${keyParam}`;
+  const [route, query] = path.split('?');
+  const normalizedPath = encodeURIComponent(route.replace(/^[\/\#]+/, ''));
+  const queryString = query ? `&${query}` : '';
+  return `${base}?path=${normalizedPath}${queryString}${keyParam}`;
 }
 type AppUserServiceResult = {
   status: number;
@@ -71,13 +73,37 @@ async function fetchFromAppsScript(path: string, init?: RequestInit): Promise<Ap
 }
 
 export async function fetchAppUsersFromAppsScript(): Promise<AppUser[]> {
-  const result = await fetchFromAppsScript('/appusers', { method: 'GET' });
-  if (!result.ok) {
-    throw new Error(`Apps Script request failed with status ${result.status}: ${result.text}`);
+  const allUsers: AppUser[] = [];
+  let page = 1;
+  const pageSize = 50;
+
+  while (true) {
+    const result = await fetchFromAppsScript(`/appusers?page=${page}&pageSize=${pageSize}`, { method: 'GET' });
+    if (!result.ok) {
+      throw new Error(`Apps Script request failed with status ${result.status}: ${result.text}`);
+    }
+
+    const payload = (result.payload as any)?.data ?? result.payload;
+    const users = extractAppUsers(payload);
+    allUsers.push(...users);
+
+    const totalCount = typeof payload.totalCount === 'number'
+      ? payload.totalCount
+      : typeof payload.total_count === 'number'
+      ? payload.total_count
+      : null;
+
+    if (totalCount !== null && allUsers.length >= totalCount) {
+      break;
+    }
+    if (users.length < pageSize) {
+      break;
+    }
+
+    page += 1;
   }
 
-  const payload = (result.payload as any)?.data ?? result.payload;
-  return extractAppUsers(payload);
+  return allUsers;
 }
 
 export async function fetchAppUserByPhone(phone: string): Promise<AppUser | null> {

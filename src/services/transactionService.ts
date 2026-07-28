@@ -1,4 +1,4 @@
-import { createVisit } from '@/services/gasApi';
+import { createVisit, getTransactions as fetchTransactions, getTransactionsByVendor as fetchTransactionsByVendor } from '@/services/gasApi';
 import type { Transaction, VisitResult } from '@/lib/types';
 
 export interface CreateTransactionPayload {
@@ -18,11 +18,11 @@ export interface CreateTransactionPayload {
 }
 
 export async function getTransactions(): Promise<Transaction[]> {
-  return [];
+  return fetchTransactions();
 }
 
 export async function getTransactionsByVendor(vendorId: string): Promise<Transaction[]> {
-  return [];
+  return fetchTransactionsByVendor(vendorId);
 }
 
 export async function createTransaction(payload: CreateTransactionPayload): Promise<VisitResult> {

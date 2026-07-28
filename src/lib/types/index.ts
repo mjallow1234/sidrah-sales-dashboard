@@ -56,6 +56,17 @@ export interface Inventory {
   last_updated?: string;
 }
 
+export interface VendorInventory {
+  vendor_inventory_id: string;
+  vendor_id: string;
+  product_id: string;
+  current_stock: number;
+  total_stock_received: number;
+  total_stock_sold: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface VendorBalance {
   vendor_id: string;
   total_expected_cash: number;

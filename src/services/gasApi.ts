@@ -1,4 +1,4 @@
-import type { AppUser, DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VisitResult } from '@/lib/types';
+import type { AppUser, DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VendorInventory, VisitResult } from '@/lib/types';
 
 
 function getHeaders(method: string = 'GET'): HeadersInit {
@@ -31,11 +31,29 @@ async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T>
     throw new Error(`GAS API request failed: ${response.status} ${response.statusText} - ${text}`);
   }
 
+  let json;
   try {
-    return JSON.parse(text) as T;
+    json = JSON.parse(text);
   } catch (error) {
     throw new Error('Failed to parse JSON response from GAS API.');
   }
+
+  if (json && typeof json === 'object' && 'status' in json && json.status !== 'success') {
+    const message = json.message ?? json.error ?? 'Unknown GAS API error';
+    throw new Error(`GAS API error: ${message}`);
+  }
+
+  return json as T;
+}
+
+function unwrapListResponse<T>(result: { status: string; data: T[] } | { status: string; data: { items?: T[] } }) {
+  if (Array.isArray((result as any).data)) {
+    return (result as any).data as T[];
+  }
+  if (Array.isArray((result as any).data?.items)) {
+    return (result as any).data.items as T[];
+  }
+  return [] as T[];
 }
 
 export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string }): Promise<Vendor[]> {
@@ -44,17 +62,7 @@ export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: 
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/vendors?${query}` : '/api/vendors';
-  return fetchJson<any>(path).then((result) => {
-    if (Array.isArray(result.data)) {
-      return result.data;
-    }
-
-    if (Array.isArray(result.data?.items)) {
-      return result.data.items;
-    }
-
-    return [];
-  });
+  return fetchJson<any>(path).then((result) => unwrapListResponse<Vendor>(result));
 }
 
 export async function getVendor(id: string) {
@@ -67,17 +75,7 @@ export async function getProducts(params?: { active?: boolean | string; category
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/products?${query}` : '/api/products';
-  const result = await fetchJson<any>(path);
-
-  if (Array.isArray(result.data)) {
-    return result.data;
-  }
-
-  if (Array.isArray(result.data?.items)) {
-    return result.data.items;
-  }
-
-  return [];
+  return fetchJson<any>(path).then((result) => unwrapListResponse<Product>(result));
 }
 
 export async function getProduct(id: string) {
@@ -113,7 +111,7 @@ export async function getInventory(params?: { vendorId?: string; productId?: str
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/inventory?${query}` : '/api/inventory';
-  return fetchJson<{ status: string; data: Inventory[] }>(path).then((result) => result.data);
+  return fetchJson<any>(path).then((result) => unwrapListResponse<Inventory>(result));
 }
 
 export async function getVendorBalances(params?: { vendorId?: string }) {
@@ -122,7 +120,16 @@ export async function getVendorBalances(params?: { vendorId?: string }) {
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/vendorbalances?${query}` : '/api/vendorbalances';
-  return fetchJson<{ status: string; data: VendorBalance[] }>(path).then((result) => result.data);
+  return fetchJson<any>(path).then((result) => unwrapListResponse<VendorBalance>(result));
+}
+
+export async function getVendorInventory(params?: { vendorId?: string; productId?: string }): Promise<VendorInventory[]> {
+  const query = params ? Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&') : '';
+  const path = query ? `/api/vendorinventory?${query}` : '/api/vendorinventory';
+  return fetchJson<any>(path).then((result) => unwrapListResponse<VendorInventory>(result));
 }
 
 export async function getVisitLogs(params?: { vendorId?: string; salesRepId?: string; productId?: string; paymentMethod?: string; startDate?: string; endDate?: string }) {
@@ -130,8 +137,46 @@ export async function getVisitLogs(params?: { vendorId?: string; salesRepId?: st
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
-  const path = query ? `/visitlogs?${query}` : '/visitlogs';
-  return fetchJson<{ status: string; data: any[] }>(path).then((result) => result.data);
+  const path = query ? `/api/visitlogs?${query}` : '/api/visitlogs';
+  return fetchJson<any>(path).then((result) => unwrapListResponse<any>(result));
+}
+
+export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; paymentMethod?: string; startDate?: string; endDate?: string }) {
+  const query = params ? Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&') : '';
+  const path = query ? `/api/transactions?${query}` : '/api/transactions';
+  return fetchJson<any>(path).then((result) => unwrapListResponse<any>(result));
+}
+
+export async function getTransactionsByVendor(vendorId: string) {
+  return getTransactions({ vendorId });
+}
+
+export async function getVendorInventoryByVendor(vendorId: string) {
+  return getVendorInventory({ vendorId });
+}
+
+export async function getVendorInventoryByVendorAndProduct(vendorId: string, productId: string) {
+  const result = await getVendorInventory({ vendorId, productId });
+  return result[0];
+}
+
+export async function createSupply(payload: {
+  vendor_id: string;
+  product_id: string;
+  quantity: number;
+  date: string;
+  notes?: string;
+}) {
+  return fetchJson<{ status: string; data: any }>('/api/supply', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }).then((result) => result.data);
 }
 
 export async function getStats() {

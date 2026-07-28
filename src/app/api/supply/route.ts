@@ -19,7 +19,7 @@ function makeUrl(path: string) {
 export async function POST(request: Request) {
   try {
     const payload = await request.json();
-    const url = makeUrl('/visit');
+    const url = makeUrl('/supply');
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -29,6 +29,27 @@ export async function POST(request: Request) {
     });
 
     const text = await response.text();
+    let json;
+    try {
+      json = JSON.parse(text);
+    } catch {
+      json = null;
+    }
+
+    const successResponse = response.ok && json && typeof json === 'object' && json.status === 'success';
+    if (!successResponse) {
+      const message = json?.message || json?.error || `GAS API returned ${response.status}`;
+      return new Response(
+        JSON.stringify({ status: 'error', message }),
+        {
+          status: 502,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        },
+      );
+    }
+
     return new Response(text, {
       status: response.status,
       headers: {
@@ -38,7 +59,8 @@ export async function POST(request: Request) {
   } catch (error) {
     return Response.json(
       {
-        error: String(error),
+        status: 'error',
+        message: String(error),
         gasUrlExists: !!process.env.GAS_API_URL,
         gasKeyExists: !!process.env.GAS_API_KEY,
         gasUrlLength: process.env.GAS_API_URL?.length ?? 0,

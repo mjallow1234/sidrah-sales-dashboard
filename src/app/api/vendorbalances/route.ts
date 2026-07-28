@@ -10,15 +10,16 @@ function ensureBaseUrl() {
   return GAS_API_URL.replace(/\/+$/, '');
 }
 
-function makeUrl(path: string) {
+function makeUrl(path: string, query?: URLSearchParams) {
   const base = ensureBaseUrl();
   const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
+  const queryString = query?.toString() ? `&${query.toString()}` : '';
+  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${queryString}${keyParam}`;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const url = makeUrl(`/vendorbalances${request.nextUrl.search}`);
+    const url = makeUrl('/vendorbalances', request.nextUrl.searchParams);
     const response = await fetch(url, { method: 'GET' });
     const text = await response.text();
     const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';

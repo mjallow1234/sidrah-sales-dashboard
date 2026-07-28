@@ -1,8 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createProduct, createSalesRep, createVendor, createVisit, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
-import type { DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VisitResult } from '@/lib/types';
+import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
+import type { DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VendorInventory, VisitResult } from '@/lib/types';
 
 export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
@@ -34,6 +34,58 @@ export function useInventoryByVendorQuery(vendorId: string) {
       return items[0];
     },
     enabled: !!vendorId,
+  });
+}
+
+export function useVendorInventoryQuery(vendorId: string) {
+  return useQuery({
+    queryKey: ['vendorInventory', vendorId],
+    queryFn: async () => {
+      return getVendorInventory({ vendorId });
+    },
+    enabled: !!vendorId,
+  });
+}
+
+export function useVendorInventoryByVendorAndProductQuery(vendorId: string, productId: string) {
+  return useQuery<VendorInventory | undefined>({
+    queryKey: ['vendorInventory', vendorId, productId],
+    queryFn: async () => {
+      return getVendorInventoryByVendorAndProduct(vendorId, productId);
+    },
+    enabled: !!vendorId && !!productId,
+  });
+}
+
+export function useVendorBalanceQuery(vendorId: string) {
+  return useQuery({
+    queryKey: ['vendorBalance', vendorId],
+    queryFn: async () => {
+      const balances = await getVendorBalances({ vendorId });
+      return balances[0];
+    },
+    enabled: !!vendorId,
+  });
+}
+
+export function useTransactionsQuery() {
+  return useQuery<Transaction[]>({
+    queryKey: ['transactions'],
+    queryFn: async () => {
+      const logs = await getVisitLogs();
+      return logs.map((log: any) => ({
+        transaction_id: log.visit_id,
+        date: log.date,
+        vendor_id: log.vendor_id,
+        opening_stock: Number(log.opening_stock) || 0,
+        stock_sold: Number(log.stock_sold) || 0,
+        stock_added: Number(log.stock_added) || 0,
+        cash_collected: Number(log.cash_collected) || 0,
+        closing_stock: Number(log.closing_stock) || 0,
+        sales_rep: log.sales_rep_id || '',
+        notes: log.notes || '',
+      }));
+    },
   });
 }
 
@@ -177,8 +229,22 @@ export function useCreateVisitMutation() {
     mutationFn: createVisit,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorInventory'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+    },
+  });
+}
+
+export function useCreateSupplyMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation<any, Error, Parameters<typeof createSupply>[0]>({
+    mutationFn: createSupply,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendorInventory', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['vendor', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['visitLogs', variables.vendor_id] });
     },
   });
 }

@@ -65,6 +65,7 @@ const navSections = [
     title: 'Reports',
     links: [
       { label: 'Reports', href: '/reports', icon: BarChart3 },
+      { label: 'Transactions', href: '/transactions', icon: CalendarCheck },
     ],
   },
 ];

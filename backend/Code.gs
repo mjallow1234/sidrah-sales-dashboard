@@ -111,6 +111,14 @@ function handleGetRoute(segments, params) {
       return getVendorBalances(params);
     case 'visitlogs':
       return getVisitLogs(params);
+    case 'transactions':
+      return getTransactions(params);
+    case 'vendorinventory':
+      return getVendorInventory(params);
+    case 'runVendorInventoryMigration':
+      return executeWithLock(function() {
+        return runVendorInventoryMigration();
+      });
     case 'salesreps':
       return segments.length === 1 ? getSalesReps(params) : getSalesRepById(segments[1]);
     case 'appusers':
@@ -137,6 +145,11 @@ function handlePostRoute(segments, body) {
       return executeWithLock(function() {
         return createVisit(body);
       });
+    case 'supply':
+      validateSupplyPayload(body);
+      return executeWithLock(function() {
+        return createSupply(body);
+      });
     case 'product':
       validateProductPayload(body);
       return executeWithLock(function() {
@@ -150,6 +163,10 @@ function handlePostRoute(segments, body) {
     case 'appuser':
       return executeWithLock(function() {
         return createAppUser(body);
+      });
+    case 'runVendorInventoryMigration':
+      return executeWithLock(function() {
+        return runVendorInventoryMigration();
       });
     default:
       throw createHttpError(404, 'Route not found.');
@@ -224,10 +241,182 @@ function validateVisitPayload(body) {
   if (body.longitude !== undefined && body.longitude !== null && body.longitude !== '') {
     validateNumberField(body.longitude, 'longitude');
   }
-  validateNumberField(body.stock_sold, 'stock_sold');
-  validateNumberField(body.stock_added, 'stock_added');
-  validateNumberField(body.cash_collected, 'cash_collected');
-  validateNumberField(body.unit_price, 'unit_price');
+  validateNonNegativeNumberField(body.stock_sold, 'stock_sold');
+  validateNonNegativeNumberField(body.stock_added, 'stock_added');
+  validateNonNegativeNumberField(body.cash_collected, 'cash_collected');
+  validateNonNegativeNumberField(body.unit_price, 'unit_price');
+
+  if (Number(body.stock_sold) === 0 && Number(body.stock_added) === 0) {
+    throw createHttpError(400, 'Either stock_sold or stock_added must be greater than zero.');
+  }
+}
+
+function validateSupplyPayload(body) {
+  validateRequiredFields(body, ['vendor_id', 'product_id', 'quantity']);
+  validateStringField(body.vendor_id, 'vendor_id');
+  validateStringField(body.product_id, 'product_id');
+  validateNonNegativeNumberField(body.quantity, 'quantity');
+  if (Number(body.quantity) <= 0) {
+    throw createHttpError(400, 'Quantity must be greater than zero.');
+  }
+  validateStringField(body.notes, 'notes');
+  validateStringField(body.date, 'date');
+  if (body.date) {
+    validateDateField(body.date, 'date');
+  }
+}
+
+function createSupply(body) {
+  var transactionId = generateId('T');
+  appendTransactionJournalEntry(transactionId, '/supply', 'begin', 'pending', body, false);
+  Logger.log('createSupply entered with vendor_id=%s product_id=%s', body.vendor_id, body.product_id);
+
+  var vendors = getSheetRows('Vendors');
+  var firstVendorIds = vendors.slice(0, 5).map(function(row) { return row.vendor_id; });
+  Logger.log('Vendor IDs loaded: %s', firstVendorIds.join(', '));
+  if (!vendors.some(function(row) { return row.vendor_id === body.vendor_id; })) {
+    appendTransactionJournalEntry(transactionId, '/supply', 'invalid_vendor', 'failure', body, false);
+    Logger.log('Invalid vendor_id check failed for %s', body.vendor_id);
+    throw createHttpError(400, 'Invalid vendor_id.');
+  }
+  var products = getSheetRows('Products');
+  if (!products.some(function(row) { return row.product_id === body.product_id; })) {
+    appendTransactionJournalEntry(transactionId, '/supply', 'invalid_product', 'failure', body, false);
+    throw createHttpError(400, 'Invalid product_id.');
+  }
+
+  var inventoryRows = getSheetRows('Inventory');
+  var inventoryIndex = inventoryRows.findIndex(function(row) {
+    return row.vendor_id === body.vendor_id && row.product_id === body.product_id;
+  });
+  var inventoryExisted = inventoryIndex !== -1;
+  var inventoryRow = inventoryExisted ? inventoryRows[inventoryIndex] : null;
+  var inventoryRowNumber = inventoryExisted ? inventoryIndex + 2 : null;
+
+  var vendorInventoryRows = getSheetRows('VendorInventory');
+  var vendorInventoryIndex = vendorInventoryRows.findIndex(function(row) {
+    return row.vendor_id === body.vendor_id && row.product_id === body.product_id;
+  });
+  var vendorInventoryExisted = vendorInventoryIndex !== -1;
+  var vendorInventoryRow = vendorInventoryExisted ? vendorInventoryRows[vendorInventoryIndex] : null;
+  var vendorInventoryRowNumber = vendorInventoryExisted ? vendorInventoryIndex + 2 : null;
+
+  var quantity = Number(body.quantity);
+  var openingStock = inventoryRow ? Number(inventoryRow.current_stock) || 0 : 0;
+  var currentVendorStock = vendorInventoryRow ? Number(vendorInventoryRow.current_stock) || 0 : 0;
+  var closingStock = currentVendorStock + quantity;
+  var supplyDate = body.date ? getIsoDate(new Date(body.date)) : getIsoDate(new Date());
+
+  var inventoryBackup = {
+    values: inventoryRow ? [
+      inventoryRow.inventory_id,
+      inventoryRow.vendor_id,
+      inventoryRow.product_id,
+      inventoryRow.total_stock_supplied,
+      inventoryRow.total_stock_sold,
+      inventoryRow.current_stock,
+      inventoryRow.date_created,
+      inventoryRow.last_updated
+    ] : [],
+    rowNumber: inventoryRowNumber,
+    existed: inventoryExisted,
+    created: false
+  };
+
+  var vendorInventoryBackup = {
+    values: vendorInventoryRow ? [
+      vendorInventoryRow.vendor_inventory_id,
+      vendorInventoryRow.vendor_id,
+      vendorInventoryRow.product_id,
+      vendorInventoryRow.current_stock,
+      vendorInventoryRow.total_stock_received,
+      vendorInventoryRow.total_stock_sold,
+      vendorInventoryRow.created_at,
+      vendorInventoryRow.updated_at
+    ] : [],
+    rowNumber: vendorInventoryRowNumber,
+    existed: vendorInventoryExisted,
+    created: false
+  };
+
+  var supplyId = generateId('VL');
+  var timestamp = new Date().toISOString();
+
+  try {
+    appendTransactionJournalEntry(transactionId, '/supply', 'inventory_update', 'pending', body, false);
+    if (!inventoryExisted) {
+      appendRow('Inventory', [
+        generateId('I'),
+        body.vendor_id,
+        body.product_id,
+        quantity,
+        0,
+        quantity,
+        supplyDate,
+        getIsoDatetime(new Date())
+      ]);
+      var inventorySheet = getSpreadsheet().getSheetByName('Inventory');
+      inventoryRowNumber = inventorySheet.getLastRow();
+      inventoryRows = getSheetRows('Inventory');
+      inventoryIndex = inventoryRows.findIndex(function(row) {
+        return row.vendor_id === body.vendor_id && row.product_id === body.product_id;
+      });
+      inventoryRow = inventoryRows[inventoryIndex];
+      inventoryBackup.created = true;
+    } else {
+      updateInventoryRow(inventoryRowNumber, inventoryRow, 0, quantity, closingStock);
+    }
+    appendTransactionJournalEntry(transactionId, '/supply', 'inventory_update', 'success', body, false);
+
+    appendTransactionJournalEntry(transactionId, '/supply', 'vendor_inventory_update', 'pending', body, false);
+    if (!vendorInventoryExisted) {
+      vendorInventoryRow = createVendorInventoryRow(body.vendor_id, body.product_id, quantity);
+      var vendorInventorySheet = getSpreadsheet().getSheetByName('VendorInventory');
+      vendorInventoryRowNumber = vendorInventorySheet.getLastRow();
+      vendorInventoryBackup.created = true;
+    } else {
+      vendorInventoryRow = updateVendorInventoryRow(vendorInventoryRowNumber, vendorInventoryRow, 0, quantity);
+    }
+    appendTransactionJournalEntry(transactionId, '/supply', 'vendor_inventory_update', 'success', body, false);
+
+    appendTransactionJournalEntry(transactionId, '/supply', 'visit_append', 'pending', body, false);
+    appendRow('VisitLogs', [
+      supplyId,
+      timestamp,
+      supplyDate,
+      body.vendor_id,
+      body.product_id,
+      body.sales_rep_id || '',
+      currentVendorStock,
+      0,
+      quantity,
+      0,
+      0,
+      0,
+      closingStock,
+      'supply',
+      body.payment_reference || '',
+      body.client_transaction_id || '',
+      '',
+      '',
+      body.notes || '',
+      timestamp,
+      timestamp
+    ]);
+    appendTransactionJournalEntry(transactionId, '/supply', 'visit_append', 'success', body, false);
+    appendTransactionJournalEntry(transactionId, '/supply', 'complete', 'success', body, true);
+  } catch (error) {
+    appendTransactionJournalEntry(transactionId, '/supply', 'failure', 'failure', { error: error.message }, false);
+    rollbackInventory(inventoryBackup);
+    rollbackVendorInventory(vendorInventoryBackup);
+    throw error;
+  }
+
+  return {
+    supplyLog: getVisitLogById(supplyId),
+    inventory: getSheetRows('Inventory')[inventoryIndex],
+    vendorInventory: getVendorInventoryRow(body.vendor_id, body.product_id)
+  };
 }
 
 function getVendors(params) {
@@ -307,6 +496,22 @@ function getVisitLogs(params) {
     if (endDate && (!rowDate || rowDate > endDate)) return false;
     return true;
   });
+  var pagination = validatePagination(params);
+  return paginate(filtered, pagination.page, pagination.pageSize);
+}
+
+function getTransactions(params) {
+  return getVisitLogs(params);
+}
+
+function getVendorInventory(params) {
+  var rows = getSheetRows('VendorInventory');
+  var filtered = rows.filter(function(row) {
+    if (params.vendorId && row.vendor_id !== params.vendorId) return false;
+    if (params.productId && row.product_id !== params.productId) return false;
+    return true;
+  });
+
   var pagination = validatePagination(params);
   return paginate(filtered, pagination.page, pagination.pageSize);
 }
@@ -927,15 +1132,34 @@ function createVisit(body) {
   var inventoryRow = inventoryExisted ? inventoryRows[inventoryIndex] : null;
   var inventoryRowNumber = inventoryExisted ? inventoryIndex + 2 : null;
 
+  var vendorInventoryRows = getSheetRows('VendorInventory');
+  var vendorInventoryIndex = vendorInventoryRows.findIndex(function(row) {
+    return row.vendor_id === body.vendor_id && row.product_id === body.product_id;
+  });
+  var vendorInventoryExisted = vendorInventoryIndex !== -1;
+  var vendorInventoryRow = vendorInventoryExisted ? vendorInventoryRows[vendorInventoryIndex] : null;
+  var vendorInventoryRowNumber = vendorInventoryExisted ? vendorInventoryIndex + 2 : null;
+
   var stockSold = Number(body.stock_sold);
   var stockAdded = Number(body.stock_added);
   var cashCollected = Number(body.cash_collected);
   var unitPrice = Number(body.unit_price);
   var openingStock = inventoryRow ? Number(inventoryRow.current_stock) || 0 : 0;
+  var vendorOpeningStock = vendorInventoryRow
+    ? Number(vendorInventoryRow.current_stock) || 0
+    : inventoryRow
+    ? Number(inventoryRow.current_stock) || 0
+    : 0;
+  var availableVendorStock = vendorOpeningStock + stockAdded;
 
   if (stockSold > openingStock) {
     appendTransactionJournalEntry(transactionId, '/visit', 'stock_overflow', 'failure', body, false);
     throw createHttpError(400, 'stock_sold cannot exceed opening_stock.');
+  }
+
+  if (stockSold > availableVendorStock) {
+    appendTransactionJournalEntry(transactionId, '/visit', 'vendor_stock_overflow', 'failure', body, false);
+    throw createHttpError(400, 'Vendor does not have enough stock for this sale.');
   }
 
   if (!inventoryExisted) {
@@ -977,6 +1201,22 @@ function createVisit(body) {
     existed: inventoryExisted
   };
 
+  var vendorInventoryBackup = {
+    values: vendorInventoryRow ? [
+      vendorInventoryRow.vendor_inventory_id,
+      vendorInventoryRow.vendor_id,
+      vendorInventoryRow.product_id,
+      vendorInventoryRow.current_stock,
+      vendorInventoryRow.total_stock_received,
+      vendorInventoryRow.total_stock_sold,
+      vendorInventoryRow.created_at,
+      vendorInventoryRow.updated_at
+    ] : [],
+    rowNumber: vendorInventoryRowNumber,
+    existed: vendorInventoryExisted,
+    created: false
+  };
+
   var balanceBackup = balanceInfo.backup;
 
   var visitId = generateId('VL');
@@ -987,6 +1227,14 @@ function createVisit(body) {
     appendTransactionJournalEntry(transactionId, '/visit', 'inventory_update', 'pending', body, false);
     updateInventoryRow(inventoryRowNumber, inventoryRow, stockSold, stockAdded, closingStock);
     appendTransactionJournalEntry(transactionId, '/visit', 'inventory_update', 'success', body, false);
+
+    appendTransactionJournalEntry(transactionId, '/visit', 'vendor_inventory_update', 'pending', body, false);
+    if (!vendorInventoryExisted) {
+      appendTransactionJournalEntry(transactionId, '/visit', 'vendor_inventory_missing_after_migration', 'failure', body, false);
+      throw createHttpError(500, 'VendorInventory row missing after migration. Data integrity error.');
+    }
+    vendorInventoryRow = updateVendorInventoryRow(vendorInventoryRowNumber, vendorInventoryRow, stockSold, stockAdded);
+    appendTransactionJournalEntry(transactionId, '/visit', 'vendor_inventory_update', 'success', body, false);
 
     appendTransactionJournalEntry(transactionId, '/visit', 'balance_update', 'pending', body, false);
     updateVendorBalanceInfo(balanceInfo);
@@ -1020,6 +1268,7 @@ function createVisit(body) {
   } catch (error) {
     appendTransactionJournalEntry(transactionId, '/visit', 'failure', 'failure', { error: error.message }, false);
     rollbackInventory(inventoryBackup);
+    rollbackVendorInventory(vendorInventoryBackup);
     rollbackVendorBalance(balanceBackup);
     throw error;
   }
@@ -1027,6 +1276,7 @@ function createVisit(body) {
   return {
     visitLog: getVisitLogById(visitId),
     inventory: getSheetRows('Inventory')[inventoryIndex],
+    vendorInventory: vendorInventoryRow ? getVendorInventoryRow(body.vendor_id, body.product_id) : null,
     vendorBalance: getSheetRows('VendorBalances')[balanceInfo.index]
   };
 }
@@ -1198,6 +1448,56 @@ function getVendorBalanceRow(vendorId) {
   return rows.find(function(row) {
     return row.vendor_id === vendorId;
   }) || null;
+}
+
+function getVendorInventoryRow(vendorId, productId) {
+  var rows = getSheetRows('VendorInventory');
+  return rows.find(function(row) {
+    return row.vendor_id === vendorId && row.product_id === productId;
+  }) || null;
+}
+
+function createVendorInventoryRow(vendorId, productId, stockAdded) {
+  appendRow('VendorInventory', [
+    generateId('VI'),
+    vendorId,
+    productId,
+    stockAdded,
+    stockAdded,
+    0,
+    getIsoDate(new Date()),
+    getIsoDatetime(new Date())
+  ]);
+  var rows = getSheetRows('VendorInventory');
+  return rows[rows.length - 1];
+}
+
+function updateVendorInventoryRow(rowNumber, vendorInventoryRow, stockSold, stockAdded) {
+  var sheet = getSpreadsheet().getSheetByName('VendorInventory');
+  var values = [
+    vendorInventoryRow.vendor_inventory_id,
+    vendorInventoryRow.vendor_id,
+    vendorInventoryRow.product_id,
+    Number(vendorInventoryRow.current_stock) + stockAdded - stockSold,
+    Number(vendorInventoryRow.total_stock_received) + stockAdded,
+    Number(vendorInventoryRow.total_stock_sold) + stockSold,
+    vendorInventoryRow.created_at,
+    getIsoDatetime(new Date())
+  ];
+  sheet.getRange(rowNumber, 1, 1, values.length).setValues([values]);
+  return getSheetRows('VendorInventory')[rowNumber - 2];
+}
+
+function rollbackVendorInventory(backup) {
+  var sheet = getSpreadsheet().getSheetByName('VendorInventory');
+  if (!backup || !backup.rowNumber) {
+    return;
+  }
+  if (backup.created) {
+    sheet.deleteRow(backup.rowNumber);
+  } else {
+    sheet.getRange(backup.rowNumber, 1, 1, backup.values.length).setValues([backup.values]);
+  }
 }
 
 function appendTransactionJournalEntry(transactionId, endpoint, stage, status, payload, completed) {

@@ -134,6 +134,19 @@ function getExpectedSheetSchemas() {
       ]
     },
     {
+      name: 'VendorInventory',
+      headers: [
+        'vendor_inventory_id',
+        'vendor_id',
+        'product_id',
+        'current_stock',
+        'total_stock_received',
+        'total_stock_sold',
+        'created_at',
+        'updated_at'
+      ]
+    },
+    {
       name: 'VendorBalances',
       headers: [
         'vendor_id',
@@ -241,20 +254,43 @@ function runSchemaMigrations(schemaReport) {
   for (var i = 0; i < migrations.length; i++) {
     var migration = migrations[i];
     if (currentVersion < migration.version) {
-      var result = migration.migrate();
-      if (!result.success) {
+      var result;
+      try {
+        result = migration.migrate();
+      } catch (error) {
         return {
           success: false,
-          message: 'Migration to version ' + migration.version + ' failed: ' + result.message,
-          migrationLog: migrationLog
+          message: 'Migration to version ' + migration.version + ' threw an exception: ' + error.message,
+          migrationLog: migrationLog,
+          error: String(error)
         };
       }
+
+      if (!result || result.success !== true) {
+        return {
+          success: false,
+          message: 'Migration to version ' + migration.version + ' failed: ' + (result && result.message ? result.message : 'Unknown error'),
+          migrationLog: migrationLog,
+          details: result
+        };
+      }
+
+      if (typeof result.failed === 'number' && result.failed > 0 && result.allowFailedRows !== true) {
+        return {
+          success: false,
+          message: 'Migration to version ' + migration.version + ' failed because ' + result.failed + ' row(s) failed.',
+          migrationLog: migrationLog,
+          details: result
+        };
+      }
+
       currentVersion = migration.version;
       migrationLog.push({
         from: migration.version - 1,
         to: migration.version,
         description: migration.description,
         rowsUpdated: result.rowsUpdated || 0,
+        details: result,
         timestamp: new Date().toISOString()
       });
       setSystemSetting('schema_version', String(currentVersion));
@@ -279,6 +315,10 @@ function runSchemaMigrations(schemaReport) {
     message: 'Schema migrations applied successfully.',
     migrationLog: migrationLog
   };
+}
+
+function runVendorInventoryMigration() {
+  return runSchemaMigrations(null);
 }
 
 function getSchemaMigrations() {
@@ -523,8 +563,294 @@ function getSchemaMigrations() {
           return candidate;
         }
       }
+    },
+    {
+      version: 5,
+      description: 'Add VendorInventory sheet for vendor-held stock ledger',
+      migrate: function() {
+        var sheetName = 'VendorInventory';
+        var sheet = getSpreadsheet().getSheetByName(sheetName);
+        if (sheet) {
+          return { success: true, rowsUpdated: 0 };
+        }
+
+        sheet = getSpreadsheet().insertSheet(sheetName);
+        if (!sheet) {
+          return { success: false, message: 'Unable to create sheet: ' + sheetName };
+        }
+
+        var headers = [
+          'vendor_inventory_id',
+          'vendor_id',
+          'product_id',
+          'current_stock',
+          'total_stock_received',
+          'total_stock_sold',
+          'created_at',
+          'updated_at'
+        ];
+        sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+
+        return { success: true, rowsUpdated: 0 };
+      }
+    },
+    {
+      version: 6,
+      description: 'Populate missing VendorInventory rows from Inventory data',
+      migrate: function() {
+        var inventoryRows = getSheetRows('Inventory');
+        var created = 0;
+        var skipped = 0;
+        var failed = 0;
+        var failedPairs = [];
+
+        ensureVendorInventorySheet();
+
+        inventoryRows.forEach(function(inventoryRow, rowIndex) {
+          if (!inventoryRow.vendor_id || !inventoryRow.product_id) {
+            failed += 1;
+            failedPairs.push({
+              row: rowIndex + 2,
+              vendor_id: inventoryRow.vendor_id || null,
+              product_id: inventoryRow.product_id || null,
+              reason: 'Missing vendor_id or product_id'
+            });
+            return;
+          }
+
+          if (getVendorInventoryRow(inventoryRow.vendor_id, inventoryRow.product_id)) {
+            skipped += 1;
+            return;
+          }
+
+          try {
+            createVendorInventoryRowFromInventory(inventoryRow);
+            created += 1;
+          } catch (error) {
+            Logger.log('VendorInventory repair migration failed for inventory row ' + (rowIndex + 2) + ': ' + error.message);
+            failed += 1;
+            failedPairs.push({
+              row: rowIndex + 2,
+              vendor_id: inventoryRow.vendor_id,
+              product_id: inventoryRow.product_id,
+              reason: error.message
+            });
+          }
+        });
+
+        var report = {
+          scanned: inventoryRows.length,
+          existing: skipped,
+          created: created,
+          skipped: skipped,
+          failed: failed,
+          failedPairs: failedPairs
+        };
+
+        Logger.log('VendorInventory Repair Migration completed: scanned=%s, existing=%s, created=%s, skipped=%s, failed=%s', report.scanned, report.existing, report.created, report.skipped, report.failed);
+
+        return {
+          success: failed === 0,
+          message: 'VendorInventory Repair Migration',
+          report: report,
+          rowsUpdated: created,
+          created: created,
+          skipped: skipped,
+          failed: failed,
+          failedPairs: failedPairs
+        };
+      }
+    },
+    {
+      version: 7,
+      description: 'Repair missing VendorInventory rows from Inventory data',
+      migrate: function() {
+        var inventoryRows = getSheetRows('Inventory');
+        var created = 0;
+        var skipped = 0;
+        var failed = 0;
+        var failedPairs = [];
+
+        ensureVendorInventorySheet();
+
+        inventoryRows.forEach(function(inventoryRow, rowIndex) {
+          if (!inventoryRow.vendor_id || !inventoryRow.product_id) {
+            failed += 1;
+            failedPairs.push({
+              row: rowIndex + 2,
+              vendor_id: inventoryRow.vendor_id || null,
+              product_id: inventoryRow.product_id || null,
+              reason: 'Missing vendor_id or product_id'
+            });
+            return;
+          }
+
+          if (getVendorInventoryRow(inventoryRow.vendor_id, inventoryRow.product_id)) {
+            skipped += 1;
+            return;
+          }
+
+          try {
+            createVendorInventoryRowFromInventory(inventoryRow);
+            created += 1;
+          } catch (error) {
+            Logger.log('VendorInventory repair migration failed for inventory row ' + (rowIndex + 2) + ': ' + error.message);
+            failed += 1;
+            failedPairs.push({
+              row: rowIndex + 2,
+              vendor_id: inventoryRow.vendor_id,
+              product_id: inventoryRow.product_id,
+              reason: error.message
+            });
+          }
+        });
+
+        var report = {
+          scanned: inventoryRows.length,
+          existing: skipped,
+          created: created,
+          skipped: skipped,
+          failed: failed,
+          failedPairs: failedPairs
+        };
+
+        Logger.log('VendorInventory Repair Migration completed: scanned=%s, existing=%s, created=%s, skipped=%s, failed=%s', report.scanned, report.existing, report.created, report.skipped, report.failed);
+
+        return {
+          success: failed === 0,
+          message: 'VendorInventory Repair Migration',
+          report: report,
+          rowsUpdated: created,
+          created: created,
+          skipped: skipped,
+          failed: failed,
+          failedPairs: failedPairs
+        };
+      }
+    },
+    {
+      version: 8,
+      description: 'Repair missing VendorInventory rows from Inventory data',
+      migrate: function() {
+        var inventoryRows = getSheetRows('Inventory');
+        var created = 0;
+        var skipped = 0;
+        var failed = 0;
+        var failedPairs = [];
+
+        ensureVendorInventorySheet();
+
+        inventoryRows.forEach(function(inventoryRow, rowIndex) {
+          if (!inventoryRow.vendor_id || !inventoryRow.product_id) {
+            failed += 1;
+            failedPairs.push({
+              row: rowIndex + 2,
+              vendor_id: inventoryRow.vendor_id || null,
+              product_id: inventoryRow.product_id || null,
+              reason: 'Missing vendor_id or product_id'
+            });
+            return;
+          }
+
+          if (getVendorInventoryRow(inventoryRow.vendor_id, inventoryRow.product_id)) {
+            skipped += 1;
+            return;
+          }
+
+          try {
+            createVendorInventoryRowFromInventory(inventoryRow);
+            created += 1;
+          } catch (error) {
+            Logger.log('VendorInventory repair migration failed for inventory row ' + (rowIndex + 2) + ': ' + error.message);
+            failed += 1;
+            failedPairs.push({
+              row: rowIndex + 2,
+              vendor_id: inventoryRow.vendor_id,
+              product_id: inventoryRow.product_id,
+              reason: error.message
+            });
+          }
+        });
+
+        var report = {
+          scanned: inventoryRows.length,
+          existing: skipped,
+          created: created,
+          skipped: skipped,
+          failed: failed,
+          failedPairs: failedPairs
+        };
+
+        Logger.log('VendorInventory Repair Migration completed: scanned=%s, existing=%s, created=%s, skipped=%s, failed=%s', report.scanned, report.existing, report.created, report.skipped, report.failed);
+
+        return {
+          success: failed === 0,
+          message: 'VendorInventory Repair Migration',
+          report: report,
+          rowsUpdated: created,
+          created: created,
+          skipped: skipped,
+          failed: failed,
+          failedPairs: failedPairs
+        };
+      }
     }
   ];
+}
+
+function ensureVendorInventorySheet() {
+  var sheet = getSpreadsheet().getSheetByName('VendorInventory');
+  if (sheet) {
+    return;
+  }
+
+  sheet = getSpreadsheet().insertSheet('VendorInventory');
+  if (!sheet) {
+    throw new Error('Unable to create VendorInventory sheet');
+  }
+
+  var headers = [
+    'vendor_inventory_id',
+    'vendor_id',
+    'product_id',
+    'current_stock',
+    'total_stock_received',
+    'total_stock_sold',
+    'created_at',
+    'updated_at'
+  ];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+}
+
+function createVendorInventoryRowFromInventory(inventoryRow) {
+  if (!inventoryRow.vendor_id || !inventoryRow.product_id) {
+    throw new Error('Invalid inventory row: missing vendor_id or product_id');
+  }
+
+  var currentStock = Number(inventoryRow.current_stock);
+  var totalReceived = Number(inventoryRow.total_stock_supplied);
+  var totalSold = Number(inventoryRow.total_stock_sold);
+
+  if (isNaN(totalReceived)) {
+    totalReceived = currentStock;
+  }
+  if (isNaN(totalSold)) {
+    totalSold = 0;
+  }
+  if (isNaN(currentStock)) {
+    currentStock = totalReceived - totalSold;
+  }
+
+  appendRow('VendorInventory', [
+    generateId('VI'),
+    inventoryRow.vendor_id,
+    inventoryRow.product_id,
+    currentStock,
+    totalReceived,
+    totalSold,
+    getIsoDate(new Date()),
+    getIsoDatetime(new Date())
+  ]);
 }
 
 function setSystemSetting(key, value) {
