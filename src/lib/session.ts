@@ -1,10 +1,7 @@
 import 'server-only';
 import { SignJWT, jwtVerify, type JWTPayload } from 'jose';
-import { validateEnvironment } from '@/lib/env';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-validateEnvironment();
 
 const SESSION_COOKIE_NAME = 'sidrah_session';
 const SESSION_MAX_AGE_SECONDS = 86400; // 24 hours
@@ -24,6 +21,9 @@ export interface SessionPayload {
   role: string;
   sales_rep_id?: string;
   passwordResetRequired?: boolean;
+  display_name?: string;
+  full_name?: string;
+  username?: string;
 }
 
 export async function createSession(payload: SessionPayload) {
@@ -42,6 +42,9 @@ export interface SessionVerificationResult {
   role?: string;
   sales_rep_id?: string;
   passwordResetRequired?: boolean;
+  display_name?: string;
+  full_name?: string;
+  username?: string;
 }
 
 export async function verifySession(token: string): Promise<SessionVerificationResult> {
@@ -53,6 +56,9 @@ export async function verifySession(token: string): Promise<SessionVerificationR
       role: typeof payload.role === 'string' ? payload.role : undefined,
       sales_rep_id: typeof payload.sales_rep_id === 'string' ? payload.sales_rep_id : undefined,
       passwordResetRequired: typeof payload.passwordResetRequired === 'boolean' ? payload.passwordResetRequired : undefined,
+      display_name: typeof payload.display_name === 'string' ? payload.display_name : undefined,
+      full_name: typeof payload.full_name === 'string' ? payload.full_name : undefined,
+      username: typeof payload.username === 'string' ? payload.username : undefined,
     };
   } catch {
     return { valid: false };
