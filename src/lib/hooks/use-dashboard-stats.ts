@@ -1,4 +1,5 @@
 import { getInventoryRecords, getTransactions } from '@/lib/api';
+import { DEFAULT_DASHBOARD_STATS } from '@/lib/types';
 import type { DashboardStats } from '@/lib/types';
 
 export async function useDashboardStats(): Promise<DashboardStats> {
@@ -11,10 +12,12 @@ export async function useDashboardStats(): Promise<DashboardStats> {
   const cashCollectedToday = todayTransactions.reduce((sum, tx) => sum + tx.cash_collected, 0);
 
   return {
-    vendorsVisitedToday: visitedToday,
-    bucketsSoldToday,
-    cashCollectedToday,
+    ...DEFAULT_DASHBOARD_STATS,
+    vendorsVisited: visitedToday,
+    bucketsSold: bucketsSoldToday,
+    cashCollected: cashCollectedToday,
     lowStockVendors: inventory.filter((record) => record.current_stock <= 20).length,
     outstandingBalances: inventory.filter((record) => (record.balance_owed ?? 0) > 0).length,
+    totalActiveVendors: inventory.filter((record) => record.current_stock > 0).length,
   };
 }
