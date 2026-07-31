@@ -1,4 +1,4 @@
-import type { AppUser, DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VendorInventory, VisitResult } from '@/lib/types';
+import { normalizeDashboardStats, type AppUser, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 
 
 function getHeaders(method: string = 'GET'): HeadersInit {
@@ -132,7 +132,7 @@ export async function getVendorInventory(params?: { vendorId?: string; productId
   return fetchJson<any>(path).then((result) => unwrapListResponse<VendorInventory>(result));
 }
 
-export async function getVisitLogs(params?: { vendorId?: string; salesRepId?: string; productId?: string; paymentMethod?: string; startDate?: string; endDate?: string }) {
+export async function getVisitLogs(params?: { vendorId?: string; salesRepId?: string; productId?: string; paymentMethod?: string; startDate?: string; endDate?: string; market?: string }) {
   const query = params ? Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
@@ -141,13 +141,22 @@ export async function getVisitLogs(params?: { vendorId?: string; salesRepId?: st
   return fetchJson<any>(path).then((result) => unwrapListResponse<any>(result));
 }
 
-export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; paymentMethod?: string; startDate?: string; endDate?: string }) {
+export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; paymentMethod?: string; startDate?: string; endDate?: string; market?: string }) {
   const query = params ? Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
     .join('&') : '';
   const path = query ? `/api/transactions?${query}` : '/api/transactions';
   return fetchJson<any>(path).then((result) => unwrapListResponse<any>(result));
+}
+
+export async function getStats(params?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string }) {
+  const query = params ? Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&') : '';
+  const path = query ? `/api/stats?${query}` : '/api/stats';
+  return fetchJson<{ status: string; data?: Partial<DashboardStats> }>(path).then((result) => normalizeDashboardStats(result.data));
 }
 
 export async function getTransactionsByVendor(vendorId: string) {
@@ -179,16 +188,14 @@ export async function createSupply(payload: {
   }).then((result) => result.data);
 }
 
-export async function getStats() {
-  return fetchJson<{ status: string; data: DashboardStats }>('/api/stats').then((result) => result.data);
-}
-
 export async function createVendor(payload: {
   vendor_name: string;
   phone: string;
   location: string;
-  sales_rep_id: string;
+  sales_rep_id?: string;
   assigned_date?: string;
+  assigned_by?: string;
+  reason?: string;
   status?: string;
 }) {
   return fetchJson<{ status: string; data: Vendor }>('/api/vendors', {
@@ -201,7 +208,10 @@ export async function updateVendor(id: string, payload: Partial<{
   vendor_name: string;
   phone: string;
   location: string;
-  sales_rep_id: string;
+  sales_rep_id?: string;
+  assigned_date?: string;
+  assigned_by?: string;
+  reason?: string;
   status: string;
 }>) {
   return fetchJson<{ status: string; data: Vendor }>(`/api/vendors/${encodeURIComponent(id)}`, {
