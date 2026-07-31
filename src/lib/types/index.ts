@@ -13,9 +13,12 @@ export interface Vendor {
   vendor_name: string;
   phone: string;
   location: string;
-  sales_rep: string;
+  sales_rep?: string;
   sales_rep_id?: string;
+  assigned_date?: string;
+  assigned_by?: string;
   date_created: string;
+  last_updated?: string;
   status: 'active' | 'inactive';
 }
 
@@ -154,10 +157,43 @@ export interface Transaction {
   notes: string;
 }
 
+export interface DashboardFilters {
+  startDate: string;
+  endDate: string;
+  salesRepId: string;
+  vendorId: string;
+  productId: string;
+  market: string;
+}
+
 export interface DashboardStats {
-  vendorsVisitedToday: number;
-  bucketsSoldToday: number;
-  cashCollectedToday: number;
+  vendorsVisited: number;
+  bucketsSold: number;
+  cashCollected: number;
   lowStockVendors: number;
   outstandingBalances: number;
+  averageSalesPerVendor: number;
+  totalActiveVendors: number;
+  newVendorsInRange: number;
+  salesBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number; stock_sold: number }>;
+  collectionsBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number }>;
+  top10VendorsBySales?: Array<{ vendor_id: string; cash_collected: number }>;
+}
+
+export const DEFAULT_DASHBOARD_STATS: DashboardStats = {
+  vendorsVisited: 0,
+  bucketsSold: 0,
+  cashCollected: 0,
+  lowStockVendors: 0,
+  outstandingBalances: 0,
+  averageSalesPerVendor: 0,
+  totalActiveVendors: 0,
+  newVendorsInRange: 0,
+};
+
+export function normalizeDashboardStats(stats?: Partial<DashboardStats>): DashboardStats {
+  return {
+    ...DEFAULT_DASHBOARD_STATS,
+    ...(stats || {}),
+  };
 }
