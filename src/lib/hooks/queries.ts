@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
-import type { DashboardStats, Inventory, Product, SalesRep, Transaction, Vendor, VendorBalance, VendorInventory, VisitResult } from '@/lib/types';
+import { DEFAULT_DASHBOARD_STATS, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 
 export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
@@ -68,11 +68,11 @@ export function useVendorBalanceQuery(vendorId: string) {
   });
 }
 
-export function useTransactionsQuery() {
+export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string }) {
   return useQuery<Transaction[]>({
-    queryKey: ['transactions'],
+    queryKey: ['transactions', filters],
     queryFn: async () => {
-      const logs = await getVisitLogs();
+      const logs = await getVisitLogs(filters);
       return logs.map((log: any) => ({
         transaction_id: log.visit_id,
         date: log.date,
@@ -103,10 +103,11 @@ export function useProductsQuery() {
   });
 }
 
-export function useSalesRepsQuery() {
+export function useSalesRepsQuery(enabled = true) {
   return useQuery({
     queryKey: ['salesReps'],
     queryFn: () => getSalesReps(),
+    enabled,
   });
 }
 
@@ -126,10 +127,11 @@ export function useSalesRepQuery(salesRepId: string) {
   });
 }
 
-export function useStatsQuery() {
-  return useQuery({
-    queryKey: ['stats'],
-    queryFn: () => getStats(),
+export function useStatsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string }) {
+  return useQuery<DashboardStats>({
+    queryKey: ['stats', filters],
+    queryFn: () => getStats(filters),
+    initialData: DEFAULT_DASHBOARD_STATS,
   });
 }
 
