@@ -219,13 +219,19 @@ function executeWithLock(action) {
 }
 
 function validateVendorPayload(body) {
-  validateRequiredFields(body, ['vendor_name', 'phone', 'location', 'sales_rep_id']);
+  validateRequiredFields(body, ['vendor_name', 'phone', 'location']);
   validateStringField(body.vendor_name, 'vendor_name');
   validateStringField(body.phone, 'phone');
   validateStringField(body.location, 'location');
-  validateStringField(body.sales_rep_id, 'sales_rep_id');
-  validateStringField(body.assigned_date, 'assigned_date');
-  validateDateField(body.assigned_date, 'assigned_date');
+
+  if (body.sales_rep_id !== undefined && body.sales_rep_id !== null && body.sales_rep_id !== '') {
+    validateStringField(body.sales_rep_id, 'sales_rep_id');
+  }
+
+  if (body.assigned_date !== undefined && body.assigned_date !== null && body.assigned_date !== '') {
+    validateStringField(body.assigned_date, 'assigned_date');
+    validateDateField(body.assigned_date, 'assigned_date');
+  }
 }
 
 function validateVisitPayload(body) {
@@ -1043,21 +1049,30 @@ function getStats() {
 
 function createVendor(body) {
   var reps = getSheetRows('SalesReps');
-  validateForeignKey(body.sales_rep_id, 'SalesRep', reps, 'sales_rep_id');
+  if (body.sales_rep_id) {
+    validateForeignKey(body.sales_rep_id, 'SalesRep', reps, 'sales_rep_id');
+  }
 
   var dateCreated = body.date_created || getIsoDate(new Date());
   var createdAt = getIsoDatetime(new Date());
   var vendorId = generateVendorId();
   var status = body.status || 'active';
-  var assignedDate = body.assigned_date || getIsoDate(new Date());
+  var assignedDate = '';
+  var assignedBy = '';
+
+  if (body.sales_rep_id) {
+    assignedDate = body.assigned_date || getIsoDate(new Date());
+    assignedBy = body.assigned_by || '';
+  }
 
   var row = [
     vendorId,
     body.vendor_name,
     body.phone,
     body.location,
-    body.sales_rep_id,
+    body.sales_rep_id || '',
     assignedDate,
+    assignedBy,
     dateCreated,
     createdAt,
     status

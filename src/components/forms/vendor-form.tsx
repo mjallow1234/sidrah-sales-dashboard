@@ -11,7 +11,7 @@ const vendorSchema = z.object({
   vendor_name: z.string().min(1, 'Vendor name is required'),
   phone: z.string().min(1, 'Phone is required'),
   location: z.string().min(1, 'Location is required'),
-  sales_rep_id: z.string().min(1, 'Sales rep is required'),
+  sales_rep_id: z.string().optional(),
   status: z.enum(['active', 'inactive']),
 });
 
@@ -30,7 +30,9 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     status: initialValues?.status ?? 'active',
   });
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
-  const salesRepsQuery = useSalesRepsQuery();
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const canAssignVendor = userRole === 'supervisor' || userRole === 'admin' || userRole === 'super_admin';
+  const salesRepsQuery = useSalesRepsQuery(canAssignVendor);
   const createMutation = useCreateVendorMutation();
   const updateMutation = useUpdateVendorMutation();
 
@@ -40,11 +42,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     ? (salesRepsQuery.data as any).items
     : [];
 
-  useEffect(() => {
-    if (salesReps.length > 0 && !formState.sales_rep_id) {
-      setFormState((current) => ({ ...current, sales_rep_id: salesReps[0].sales_rep_id }));
-    }
-  }, [salesReps, formState.sales_rep_id]);
+  const showSalesRepSelect = canAssignVendor;
 
   function handleChange(field: keyof typeof formState, value: string) {
     setFormState((current) => ({ ...current, [field]: value }));
@@ -65,15 +63,56 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
         await updateMutation.mutateAsync({ id: vendorId, payload: formState });
         setNotification({ type: 'success', message: 'Vendor updated successfully' });
       } else {
-        await createMutation.mutateAsync(formState);
+        const creationPayload: {
+          vendor_name: string;
+          phone: string;
+          location: string;
+          status: string;
+          sales_rep_id?: string;
+        } = {
+          vendor_name: formState.vendor_name,
+          phone: formState.phone,
+          location: formState.location,
+          status: formState.status,
+        };
+
+        if (canAssignVendor && formState.sales_rep_id) {
+          creationPayload.sales_rep_id = formState.sales_rep_id;
+        }
+
+        await createMutation.mutateAsync(creationPayload);
         setNotification({ type: 'success', message: 'Vendor created successfully' });
-        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: salesReps[0]?.sales_rep_id ?? '', status: 'active' });
+        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: '', status: 'active' });
       }
       onSuccess?.();
     } catch (error) {
       setNotification({ type: 'error', message: (error as Error).message || 'Unable to save vendor.' });
     }
   }
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadSessionRole() {
+      try {
+        const response = await fetch('/api/auth');
+        const data = await response.json();
+        if (active && data?.valid) {
+          setUserRole(data.role ?? null);
+        }
+      } catch {
+        if (active) {
+          setUserRole(null);
+        }
+      }
+    }
+
+    loadSessionRole();
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
@@ -106,24 +145,25 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           />
         </label>
-        <label className="block text-sm text-slate-700">
-          Sales rep
-          <select
-            value={formState.sales_rep_id}
-            onChange={(event) => handleChange('sales_rep_id', event.target.value)}
-            className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-          >
-            {salesReps.length > 0 ? (
-              salesReps.map((rep) => (
-                <option key={rep.sales_rep_id} value={rep.sales_rep_id}>
-                  {rep.name}
-                </option>
-              ))
-            ) : (
-              <option value="">No sales reps available</option>
-            )}
-          </select>
-        </label>
+        {showSalesRepSelect ? (
+          <label className="block text-sm text-slate-700">
+            Sales rep
+            <select
+              value={formState.sales_rep_id}
+              onChange={(event) => handleChange('sales_rep_id', event.target.value)}
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+            >
+              <option value="">Unassigned</option>
+              {salesReps.length > 0 ? (
+                salesReps.map((rep) => (
+                  <option key={rep.sales_rep_id} value={rep.sales_rep_id}>
+                    {rep.name}
+                  </option>
+                ))
+              ) : null}
+            </select>
+          </label>
+        ) : null}
         <label className="block text-sm text-slate-700">
           Status
           <select

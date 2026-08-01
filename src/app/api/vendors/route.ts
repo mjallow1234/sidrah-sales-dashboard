@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
       ...payload,
       actor_role: session.role,
       actor_sales_rep_id: session.sales_rep_id || '',
-      assigned_by: payload.sales_rep_id ? session.userId || 'system' : undefined
+      ...(payload.sales_rep_id ? { assigned_by: session.userId || 'system' } : {}),
     };
     const queryParams = new URLSearchParams();
     if (GAS_PROXY_KEY) {
