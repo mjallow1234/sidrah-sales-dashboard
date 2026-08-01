@@ -27,7 +27,7 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
   }
 
   if (pathname === '/vendors/new') {
-    return isAdminRole(role) || isSupervisorRole(role);
+    return true;
   }
 
   if (pathname.startsWith('/vendors')) {
@@ -67,7 +67,7 @@ export function canViewLink(role: string | undefined, href: string): boolean {
   }
 
   if (href === '/vendors/new') {
-    return isAdminRole(role) || isSupervisorRole(role);
+    return true;
   }
 
   if (href === '/salesreps/new') {
