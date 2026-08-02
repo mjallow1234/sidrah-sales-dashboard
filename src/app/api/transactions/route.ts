@@ -1,4 +1,5 @@
 import type { NextRequest } from 'next/server';
+import { getVerifiedSession } from '@/lib/session';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -19,25 +20,19 @@ function makeUrl(path: string, query?: URLSearchParams) {
 
 export async function GET(request: NextRequest) {
   try {
-    const url = makeUrl('/transactions', request.nextUrl.searchParams);
-    const response = await fetch(url, { method: 'GET' });
-    const text = await response.text();
-    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
+    const session = await getVerifiedSession(request);
+    const queryParams = new URLSearchParams(request.nextUrl.searchParams.toString());
 
-    if (diagnosticMode) {
-      return Response.json(
-        {
-          gasApiUrl: process.env.GAS_API_URL,
-          gasApiKey: process.env.GAS_API_KEY,
-          constructedUrl: url,
-          responseStatus: response.status,
-          responseHeaders: Object.fromEntries(response.headers.entries()),
-          body: text,
-        },
-        { status: 200 }
-      );
+    if (session?.role === 'agent') {
+      const now = new Date();
+      const today = now.toISOString().slice(0, 10);
+      queryParams.set('startDate', today);
+      queryParams.set('endDate', today);
     }
 
+    const url = makeUrl('/transactions', queryParams);
+    const response = await fetch(url, { method: 'GET' });
+    const text = await response.text();
     return new Response(text, {
       status: response.status,
       headers: {
