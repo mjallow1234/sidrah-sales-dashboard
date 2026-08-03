@@ -3,6 +3,7 @@ import { getVerifiedSession } from '@/lib/session';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
+const GAS_PROXY_KEY = process.env.GAS_PROXY_KEY;
 
 function ensureBaseUrl() {
   if (!GAS_API_URL) {
@@ -28,6 +29,15 @@ export async function GET(request: NextRequest) {
       const today = now.toISOString().slice(0, 10);
       queryParams.set('startDate', today);
       queryParams.set('endDate', today);
+    }
+
+    queryParams.set('actor_role', session?.role || '');
+    queryParams.set('actor_sales_rep_id', session?.sales_rep_id || '');
+    if (session?.userId) {
+      queryParams.set('actor_user_id', session.userId);
+    }
+    if (GAS_PROXY_KEY) {
+      queryParams.set('proxy_key', GAS_PROXY_KEY);
     }
 
     const url = makeUrl('/transactions', queryParams);

@@ -1,7 +1,9 @@
 import type { NextRequest } from 'next/server';
+import { getVerifiedSession } from '@/lib/session';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
+const GAS_PROXY_KEY = process.env.GAS_PROXY_KEY;
 
 function ensureBaseUrl() {
   if (!GAS_API_URL) {
@@ -17,38 +19,42 @@ function makeUrl(path: string, query?: URLSearchParams) {
   return `${base}?path=${encodeURIComponent(path.replace(/^[\/#!]+/, ''))}${queryString}${keyParam}`;
 }
 
+function getTodayRange() {
+  const now = new Date();
+  const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+  return {
+    startDate: startDate.toISOString().slice(0, 19),
+    endDate: endDate.toISOString().slice(0, 19),
+  };
+}
+
 export async function GET(request: NextRequest) {
   try {
-    const url = makeUrl('/stats', request.nextUrl.searchParams);
+    const session = await getVerifiedSession(request);
+    const query = new URLSearchParams(request.nextUrl.searchParams);
+
+    if (session?.role === 'agent') {
+      const todayRange = getTodayRange();
+      query.set('startDate', todayRange.startDate);
+      query.set('endDate', todayRange.endDate);
+    }
+
+    query.set('actor_role', session?.role || '');
+    query.set('actor_sales_rep_id', session?.sales_rep_id || '');
+    if (session?.userId) {
+      query.set('actor_user_id', session.userId);
+    }
+    if (GAS_PROXY_KEY) {
+      query.set('proxy_key', GAS_PROXY_KEY);
+    }
+
+    const url = makeUrl('/stats', query);
     const response = await fetch(url, {
       method: 'GET',
     });
 
     const text = await response.text();
-    const contentType = response.headers.get('content-type');
-    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
-
-    if (diagnosticMode) {
-      return Response.json(
-        {
-          finalUrl: response.url,
-          responseUrl: response.url,
-          responseStatus: response.status,
-          responseHeaders: {
-            'content-type': response.headers.get('content-type'),
-            location: response.headers.get('location')
-          },
-          redirected: response.redirected,
-          gasApiUrl: process.env.GAS_API_URL,
-          gasApiKey: process.env.GAS_API_KEY,
-          constructedUrl: url,
-          status: response.status,
-          contentType,
-        },
-        { status: 200 }
-      );
-    }
-
     return new Response(text, {
       status: response.status,
       headers: {

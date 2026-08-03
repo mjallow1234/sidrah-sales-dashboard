@@ -1,13 +1,15 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getTransactionsByVendor, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
 import { DEFAULT_DASHBOARD_STATS, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 
 export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
     queryKey: ['vendors', filters],
     queryFn: () => getVendors(filters),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -48,7 +50,7 @@ export function useVendorInventoryQuery(vendorId: string) {
 }
 
 export function useVendorInventoryByVendorAndProductQuery(vendorId: string, productId: string) {
-  return useQuery<VendorInventory | undefined>({
+  return useQuery<VendorInventory | null>({
     queryKey: ['vendorInventory', vendorId, productId],
     queryFn: async () => {
       return getVendorInventoryByVendorAndProduct(vendorId, productId);
@@ -72,7 +74,7 @@ export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?:
   return useQuery<Transaction[]>({
     queryKey: ['transactions', filters],
     queryFn: async () => {
-      const logs = await getVisitLogs(filters);
+      const logs = await getTransactions(filters);
       return logs.map((log: any) => ({
         transaction_id: log.visit_id,
         date: log.date,
@@ -100,6 +102,8 @@ export function useProductsQuery() {
   return useQuery({
     queryKey: ['products'],
     queryFn: () => getProducts(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -108,6 +112,8 @@ export function useSalesRepsQuery(enabled = true) {
     queryKey: ['salesReps'],
     queryFn: () => getSalesReps(),
     enabled,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
@@ -127,19 +133,23 @@ export function useSalesRepQuery(salesRepId: string) {
   });
 }
 
-export function useStatsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string }) {
-  return useQuery<DashboardStats>({
+export function useStatsQuery(
+  filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string },
+  options?: { enabled?: boolean }
+): UseQueryResult<DashboardStats, Error> {
+  return useQuery<DashboardStats, Error, DashboardStats>({
     queryKey: ['stats', filters],
     queryFn: () => getStats(filters),
     initialData: DEFAULT_DASHBOARD_STATS,
+    enabled: options?.enabled,
   });
 }
 
 export function useTransactionsByVendorQuery(vendorId: string) {
   return useQuery<Transaction[]>({
-    queryKey: ['visitLogs', vendorId],
+    queryKey: ['transactions', vendorId],
     queryFn: async () => {
-      const logs = await getVisitLogs({ vendorId });
+      const logs = await getTransactionsByVendor(vendorId);
       return logs.map((log: any) => ({
         transaction_id: log.visit_id,
         date: log.date,

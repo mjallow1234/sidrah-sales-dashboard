@@ -167,9 +167,9 @@ export async function getVendorInventoryByVendor(vendorId: string) {
   return getVendorInventory({ vendorId });
 }
 
-export async function getVendorInventoryByVendorAndProduct(vendorId: string, productId: string) {
+export async function getVendorInventoryByVendorAndProduct(vendorId: string, productId: string): Promise<VendorInventory | null> {
   const result = await getVendorInventory({ vendorId, productId });
-  return result[0];
+  return result[0] ?? null;
 }
 
 export async function createSupply(payload: {

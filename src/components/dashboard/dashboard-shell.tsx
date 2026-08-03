@@ -8,12 +8,16 @@ import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
 import { useRouter } from 'next/navigation';
 
-export function DashboardShell() {
+export function DashboardShell({ initialRole }: { initialRole?: string }) {
   const router = useRouter();
   const { filters } = useDashboardFilters();
-  const [role, setRole] = useState<string | undefined>(undefined);
+  const [role, setRole] = useState<string | undefined>(initialRole);
 
   useEffect(() => {
+    if (initialRole !== undefined) {
+      return;
+    }
+
     let active = true;
 
     async function loadRole() {
@@ -34,7 +38,7 @@ export function DashboardShell() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [initialRole]);
 
   const today = useMemo(() => {
     const now = new Date();
@@ -49,7 +53,7 @@ export function DashboardShell() {
   );
   const dashboardTitle = isAgent ? "Today's Activity" : 'Field Agent Summary';
 
-  const { data: stats, isLoading, isError } = useStatsQuery(statsFilters);
+  const { data: stats, isLoading, isError } = useStatsQuery(statsFilters, { enabled: role !== undefined });
 
   const handleLogout = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
