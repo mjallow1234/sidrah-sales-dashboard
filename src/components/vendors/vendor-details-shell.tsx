@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransactionsByVendorQuery, useVendorBalanceQuery, useVendorInventoryQuery, useVendorQuery } from '@/lib/hooks/queries';
+import { useTransactionsByVendorQuery, useVendorBalanceQuery, useVendorInventoryQuery, useVendorQuery, useProductsQuery } from '@/lib/hooks/queries';
 import { TransactionTable } from '@/components/vendors/transaction-table';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 
@@ -29,6 +29,11 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     isLoading: transactionsLoading,
     isError: transactionsError,
   } = useTransactionsByVendorQuery(vendorId);
+  const {
+    data: products,
+    isLoading: productsLoading,
+    isError: productsError,
+  } = useProductsQuery();
 
   const hasVendorInventory = Array.isArray(vendorInventory) && vendorInventory.length > 0;
   const currentStock = hasVendorInventory
@@ -38,6 +43,9 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
   const isVendorError = vendorError || !vendor;
   const showInventoryError = !vendorInventoryLoading && !!vendorInventoryError;
   const showEmptyInventory = !vendorInventoryLoading && !vendorInventoryError && !hasVendorInventory;
+  const productNames = Array.isArray(products)
+    ? Object.fromEntries(products.map((product) => [product.product_id, product.product_name]))
+    : undefined;
 
   if (isLoading) {
     return (
@@ -131,7 +139,9 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                 {hasVendorInventory ? (
                   vendorInventory.map((record) => (
                     <tr key={record.vendor_inventory_id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.product_id}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                        {productNames?.[record.product_id] ?? record.product_id}
+                      </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.current_stock}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_sold}</td>
