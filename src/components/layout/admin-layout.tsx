@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { canViewLink } from '@/lib/authorization';
+import { useAuthQuery } from '@/lib/hooks/queries';
 
 const navSections = [
   {
@@ -89,43 +90,40 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [userName, setUserName] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
+  const authQuery = useAuthQuery();
 
   const showAdminShell = pathname !== '/' && pathname !== '/login';
 
   useEffect(() => {
     if (!showAdminShell) {
+      setUserName(null);
+      setUserRole(null);
       return;
     }
 
-    async function loadUser() {
-      try {
-        const authResponse = await fetch('/api/auth');
-        const authData = await authResponse.json();
-        if (!authData?.valid || !authData.userId) {
-          setUserName(null);
-          setUserRole(null);
-          return;
-        }
-
-        setUserRole(authData.role ?? null);
-        const userResponse = await fetch(`/api/appusers/${encodeURIComponent(authData.userId)}`);
-        if (!userResponse.ok) {
-          setUserName(authData.userId);
-          return;
-        }
-
-        const userJson = await userResponse.json();
-        setUserName(userJson?.data?.username ?? authData.userId);
-      } catch {
-        setUserName(null);
-        setUserRole(null);
-      }
+    if (authQuery.isLoading) {
+      return;
     }
 
-    loadUser();
-  }, [showAdminShell]);
+    const authData = authQuery.data;
+    if (!authData?.valid || !authData.userId) {
+      setUserName(null);
+      setUserRole(null);
+      return;
+    }
+
+    setUserRole(authData.role ?? null);
+    setUserName(authData.display_name || authData.full_name || authData.username || authData.userId);
+  }, [authQuery.data, authQuery.isLoading, showAdminShell]);
 
   const activePath = useMemo(() => pathname ?? '', [pathname]);
+
+  const dashboardTitle = useMemo(() => {
+    if (userRole === 'agent') return 'Agent dashboard';
+    if (userRole === 'supervisor') return 'Supervisor dashboard';
+    if (userRole === 'admin' || userRole === 'super_admin') return 'Admin dashboard';
+    return 'Sales dashboard';
+  }, [userRole]);
 
   const visibleNavSections = useMemo(
     () =>
@@ -221,7 +219,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           <div className="hidden items-center justify-between border-b border-slate-200 bg-white px-6 py-4 lg:flex">
             <div>
               <p className="text-xs uppercase tracking-[0.24em] text-sidrah-500">SIDRAH SALAAM Sales Platform</p>
-              <p className="mt-1 text-lg font-semibold text-slate-900">Admin dashboard</p>
+              <p className="mt-1 text-lg font-semibold text-slate-900">{dashboardTitle}</p>
             </div>
             <div className="flex items-center gap-3">
               {userName ? (

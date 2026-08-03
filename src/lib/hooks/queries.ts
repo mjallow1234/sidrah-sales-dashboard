@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getTransactionsByVendor, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
 import { DEFAULT_DASHBOARD_STATS, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
+import type { SessionVerificationResult } from '@/lib/session';
 
 export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
@@ -102,6 +103,21 @@ export function useProductsQuery() {
   return useQuery({
     queryKey: ['products'],
     queryFn: () => getProducts(),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useAuthQuery() {
+  return useQuery<SessionVerificationResult>({
+    queryKey: ['auth'],
+    queryFn: async () => {
+      const response = await fetch('/api/auth');
+      if (!response.ok) {
+        throw new Error('Unable to fetch auth session.');
+      }
+      return response.json() as Promise<SessionVerificationResult>;
+    },
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

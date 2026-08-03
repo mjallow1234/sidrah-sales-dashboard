@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/lib/store/useAppStore';
-import { useCreateVisitMutation, useProductsQuery, useSalesRepsQuery, useVendorInventoryByVendorAndProductQuery } from '@/lib/hooks/queries';
+import { useAuthQuery, useCreateVisitMutation, useProductsQuery, useSalesRepsQuery, useVendorInventoryByVendorAndProductQuery } from '@/lib/hooks/queries';
 import type { Vendor, Product, SalesRep } from '@/lib/types';
 
 const visitSchema = z.object({
@@ -36,6 +36,8 @@ export function VisitForm({ vendors }: VisitFormProps) {
     }
   }, [vendors, resetVisitDraft, visitDraft.vendor_id]);
 
+  const authQuery = useAuthQuery();
+  const authData = authQuery.data;
   const productQuery = useProductsQuery();
   const salesRepsQuery = useSalesRepsQuery();
   const vendorInventoryQuery = useVendorInventoryByVendorAndProductQuery(visitDraft.vendor_id, visitDraft.product_id);
@@ -65,10 +67,19 @@ export function VisitForm({ vendors }: VisitFormProps) {
   }, [products, setVisitDraft, visitDraft.product_id]);
 
   useEffect(() => {
+    if (authData?.valid && authData.role === 'agent' && authData.sales_rep_id && visitDraft.sales_rep_id !== authData.sales_rep_id) {
+      setVisitDraft({ sales_rep_id: authData.sales_rep_id });
+      return;
+    }
+
+    if (authData?.valid && authData.role === 'agent') {
+      return;
+    }
+
     if (!visitDraft.sales_rep_id && salesReps.length > 0) {
       setVisitDraft({ sales_rep_id: salesReps[0].sales_rep_id });
     }
-  }, [salesReps, setVisitDraft, visitDraft.sales_rep_id]);
+  }, [authData, salesReps, setVisitDraft, visitDraft.sales_rep_id]);
 
   useEffect(() => {
     if (isSuccess) {
@@ -89,11 +100,17 @@ export function VisitForm({ vendors }: VisitFormProps) {
 
     const clientTransactionId = `${visitDraft.vendor_id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
+    const salesRepIdToSubmit = authData?.valid && authData.role === 'agent' ? authData.sales_rep_id ?? '' : visitDraft.sales_rep_id;
+    if (authData?.valid && authData.role === 'agent' && !authData.sales_rep_id) {
+      setErrorMessage('Unable to determine your authenticated sales rep.');
+      return;
+    }
+
     mutate(
       {
         vendor_id: visitDraft.vendor_id,
         product_id: visitDraft.product_id,
-        sales_rep_id: visitDraft.sales_rep_id,
+        sales_rep_id: salesRepIdToSubmit,
         stock_sold: visitDraft.stock_sold,
         stock_added: visitDraft.stock_added,
         cash_collected: visitDraft.cash_collected,
