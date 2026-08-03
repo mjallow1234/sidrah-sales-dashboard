@@ -1,4 +1,6 @@
 import type { NextRequest } from 'next/server';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -23,6 +25,14 @@ function makeUrl(path: string, query?: URLSearchParams) {
 }
 
 export async function GET(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   try {
     const queryParams = new URLSearchParams(request.nextUrl.searchParams);
   const url = makeUrl('/salesreps', queryParams);
@@ -68,6 +78,14 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
+  const session = await getVerifiedSession(request as NextRequest);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   try {
     const payload = await request.json();
     const url = makeUrl('/salesrep');

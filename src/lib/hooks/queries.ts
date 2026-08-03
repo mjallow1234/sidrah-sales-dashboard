@@ -1,14 +1,37 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getTransactionsByVendor, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
+import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorsPage, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getTransactionsByVendor, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
 import { DEFAULT_DASHBOARD_STATS, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
+
+export interface PaginatedResult<T> {
+  status: string;
+  data: {
+    items: T[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
+}
 
 export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
     queryKey: ['vendors', filters],
     queryFn: () => getVendors(filters),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function usePaginatedVendorsQuery(
+  filters?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string },
+  page = 1,
+  pageSize = 50
+) {
+  return useQuery<PaginatedResult<Vendor>>({
+    queryKey: ['vendorsPage', filters, page, pageSize],
+    queryFn: () => getVendorsPage({ ...filters, page, pageSize }),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });

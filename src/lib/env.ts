@@ -1,5 +1,5 @@
 export function validateEnvironment() {
-  const requiredVariables = ['SESSION_SECRET', 'GAS_API_URL', 'GAS_API_KEY'];
+  const requiredVariables = ['SESSION_SECRET', 'GAS_API_URL', 'GAS_API_KEY', 'GAS_PROXY_KEY', 'GAS_DEPLOYMENT_ID'];
   const missingVariables = requiredVariables.filter((key) => {
     const value = process.env[key];
     return value === undefined || value === null || String(value).trim() === '';

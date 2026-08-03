@@ -1,4 +1,6 @@
 import type { NextRequest } from 'next/server';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -28,7 +30,15 @@ function getIdFromUrl(request: Request) {
   return pathSegments[pathSegments.length - 1] || '';
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   const id = getIdFromUrl(request);
   const url = buildGasUrl(`/salesreps/${id}`);
   const response = await fetch(url, { method: 'GET' });
@@ -36,7 +46,15 @@ export async function GET(request: Request) {
   return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
 }
 
-export async function PUT(request: Request) {
+export async function PUT(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   const id = getIdFromUrl(request);
   const payload = await request.json();
   const putPayload: Record<string, unknown> = {

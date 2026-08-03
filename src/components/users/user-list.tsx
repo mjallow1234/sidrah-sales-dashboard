@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { useAppUsersQuery } from '@/lib/hooks/userQueries';
+import { useSalesRepsQuery } from '@/lib/hooks/queries';
+import { getSalesRepDisplayName, getUserDisplayName } from '@/lib/displayNames';
 import type { AppUser } from '@/lib/types';
 
 export function UserList() {
   const { data, isLoading, isError } = useAppUsersQuery();
+  const { data: salesReps } = useSalesRepsQuery();
   const users: AppUser[] = Array.isArray(data)
     ? data
     : Array.isArray((data as any)?.items)
@@ -32,7 +35,9 @@ export function UserList() {
               <p className="mt-2 text-sm text-slate-500">Phone: {String(user.phone || '')}</p>
               <p className="mt-2 text-sm text-slate-500">Role: {user.role}</p>
               <p className="mt-1 text-sm text-slate-500">Status: {user.status}</p>
-              {user.sales_rep_id ? <p className="mt-1 text-sm text-slate-500">Sales rep: {user.sales_rep_id}</p> : null}
+              {user.sales_rep_id ? (
+                <p className="mt-1 text-sm text-slate-500">Sales rep: {getSalesRepDisplayName(user.sales_rep_id)}</p>
+              ) : null}
             </Link>
           ))}
         </div>

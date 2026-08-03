@@ -187,6 +187,12 @@ function validateVendorUpdatePayload(body) {
   if (body.phone !== undefined) validateStringField(body.phone, 'phone');
   if (body.location !== undefined) validateStringField(body.location, 'location');
   if (body.sales_rep_id !== undefined) validateStringField(body.sales_rep_id, 'sales_rep_id');
+  if (body.assigned_date !== undefined) {
+    validateStringField(body.assigned_date, 'assigned_date');
+    validateDateField(body.assigned_date, 'assigned_date');
+  }
+  if (body.assigned_by !== undefined) validateStringField(body.assigned_by, 'assigned_by');
+  if (body.reason !== undefined) validateStringField(body.reason, 'reason');
   if (body.status !== undefined) validateStringField(body.status, 'status');
 }
 

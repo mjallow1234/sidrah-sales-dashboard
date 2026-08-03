@@ -1,5 +1,6 @@
 var SPREADSHEET_ID = 'REPLACE_WITH_SPREADSHEET_ID';
 var SCRIPT_PROPERTY_API_KEY = 'GAS_API_KEY';
+var SCRIPT_PROPERTY_PROXY_KEY = 'GAS_PROXY_KEY';
 var DEFAULT_PAGE_SIZE = 50;
 var MAX_PAGE_SIZE = 200;
 var SETTINGS_CACHE = {};
@@ -13,6 +14,10 @@ function getSpreadsheet() {
 
 function getExpectedApiKey() {
   return PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPERTY_API_KEY);
+}
+
+function getExpectedProxyKey() {
+  return PropertiesService.getScriptProperties().getProperty(SCRIPT_PROPERTY_PROXY_KEY);
 }
 
 function resetSettingsCache() {

@@ -1,4 +1,6 @@
 import type { NextRequest } from 'next/server';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -43,6 +45,14 @@ function normalizeProxyResponse(text: string, response: Response) {
 }
 
 export async function GET(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   const queryParams = new URLSearchParams(request.nextUrl.searchParams);
   const url = makeUrl('/appusers', queryParams);
   const response = await fetch(url, {
@@ -53,7 +63,15 @@ export async function GET(request: NextRequest) {
   return normalizeProxyResponse(text, response);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) {
+    return unauthorizedResponse();
+  }
+  if (!isAdminOrSupervisorRole(session.role)) {
+    return forbiddenResponse();
+  }
+
   const payload = await request.json();
   const url = makeUrl('/appuser');
 

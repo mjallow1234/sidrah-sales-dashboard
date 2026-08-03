@@ -99,6 +99,7 @@ function getExpectedSheetSchemas() {
         'location',
         'sales_rep_id',
         'assigned_date',
+        'assigned_by',
         'date_created',
         'last_updated',
         'status'
@@ -241,6 +242,19 @@ function getExpectedSheetSchemas() {
         'actor',
         'outcome',
         'message'
+      ]
+    },
+    {
+      name: 'VendorAssignments',
+      headers: [
+        'assignment_id',
+        'vendor_id',
+        'previous_sales_rep_id',
+        'new_sales_rep_id',
+        'action',
+        'assigned_by',
+        'assigned_at',
+        'reason'
       ]
     }
   ];
@@ -794,6 +808,77 @@ function getSchemaMigrations() {
           failedPairs: failedPairs
         };
       }
+    },
+    {
+      version: 9,
+      description: 'Create VendorAssignments sheet and add assigned_by column to Vendors',
+      migrate: function() {
+        var sheetName = 'Vendors';
+        var sheet = getSpreadsheet().getSheetByName(sheetName);
+        if (!sheet) {
+          return { success: false, message: 'Missing sheet: ' + sheetName };
+        }
+
+        var headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+          return String(value).trim();
+        });
+
+        var salesRepIndex = headers.indexOf('sales_rep_id');
+        if (salesRepIndex === -1) {
+          return { success: false, message: 'Unable to find sales_rep_id header in Vendors' };
+        }
+
+        var assignedDateIndex = headers.indexOf('assigned_date');
+        if (assignedDateIndex === -1) {
+          sheet.insertColumnAfter(salesRepIndex + 1);
+          sheet.getRange(1, salesRepIndex + 2).setValue('assigned_date');
+          headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+            return String(value).trim();
+          });
+          assignedDateIndex = headers.indexOf('assigned_date');
+        }
+
+        var assignedByIndex = headers.indexOf('assigned_by');
+        if (assignedByIndex === -1) {
+          var insertAfter = assignedDateIndex !== -1 ? assignedDateIndex + 1 : salesRepIndex + 2;
+          sheet.insertColumnAfter(insertAfter);
+          sheet.getRange(1, insertAfter + 1).setValue('assigned_by');
+          headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map(function(value) {
+            return String(value).trim();
+          });
+          assignedByIndex = headers.indexOf('assigned_by');
+        }
+
+        var lastRow = sheet.getLastRow();
+        var lastColumn = sheet.getLastColumn();
+        var dataRowCount = Math.max(lastRow - 1, 0);
+        var values = dataRowCount > 0 ? sheet.getRange(2, 1, dataRowCount, lastColumn).getValues() : [];
+        var rowsUpdated = 0;
+        var dateCreatedIndex = headers.indexOf('date_created');
+        var assignedDateColumn = assignedDateIndex;
+        var assignedByColumn = assignedByIndex;
+
+        values.forEach(function(row) {
+          if (row[assignedDateColumn] === undefined || row[assignedDateColumn] === null || String(row[assignedDateColumn]).trim() === '') {
+            var salesRepId = String(row[salesRepIndex] || '').trim();
+            if (salesRepId) {
+              row[assignedDateColumn] = row[dateCreatedIndex] || getIsoDate(new Date());
+              rowsUpdated += 1;
+            }
+          }
+          if (row[assignedByColumn] === undefined || row[assignedByColumn] === null) {
+            row[assignedByColumn] = row[assignedByColumn] || '';
+          }
+        });
+
+        if (values.length > 0) {
+          sheet.getRange(2, 1, values.length, lastColumn).setValues(values);
+        }
+
+        ensureVendorAssignmentsSheet();
+
+        return { success: true, rowsUpdated: rowsUpdated };
+      }
     }
   ];
 }
@@ -818,6 +903,30 @@ function ensureVendorInventorySheet() {
     'total_stock_sold',
     'created_at',
     'updated_at'
+  ];
+  sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+}
+
+function ensureVendorAssignmentsSheet() {
+  var sheet = getSpreadsheet().getSheetByName('VendorAssignments');
+  if (sheet) {
+    return;
+  }
+
+  sheet = getSpreadsheet().insertSheet('VendorAssignments');
+  if (!sheet) {
+    throw new Error('Unable to create VendorAssignments sheet');
+  }
+
+  var headers = [
+    'assignment_id',
+    'vendor_id',
+    'previous_sales_rep_id',
+    'new_sales_rep_id',
+    'action',
+    'assigned_by',
+    'assigned_at',
+    'reason'
   ];
   sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
 }

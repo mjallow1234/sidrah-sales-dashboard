@@ -19,8 +19,7 @@ function makeUrl(path: string, query?: URLSearchParams) {
 
 export async function GET(request: NextRequest) {
   try {
-    const queryParams = new URLSearchParams(request.nextUrl.searchParams);
-    const url = makeUrl('/vendorinventory', queryParams);
+    const url = makeUrl('/vendorinventory', request.nextUrl.searchParams);
     const response = await fetch(url, { method: 'GET' });
     const text = await response.text();
     return new Response(text, {

@@ -13,6 +13,7 @@ function createGoogleSheetsFoundation() {
     'AuthAuditLog',
     'PasswordResetTokens',
     'AuditLogs',
+    'VendorAssignments',
     'TransactionJournal'
   ];
 
@@ -33,6 +34,7 @@ function createGoogleSheetsFoundation() {
       'location',
       'sales_rep_id',
       'assigned_date',
+      'assigned_by',
       'date_created',
       'last_updated',
       'status'
@@ -170,6 +172,16 @@ function createGoogleSheetsFoundation() {
       'outcome',
       'message'
     ],
+    'VendorAssignments': [
+      'assignment_id',
+      'vendor_id',
+      'previous_sales_rep_id',
+      'new_sales_rep_id',
+      'action',
+      'assigned_by',
+      'assigned_at',
+      'reason'
+    ],
     'TransactionJournal': [
       'transaction_id',
       'timestamp',
@@ -196,9 +208,9 @@ function seedGoogleSheetsFoundation() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
 
   var vendorRows = [
-    ['V001', 'Brikama Grocery', '740123456', 'Brikama', 'S001', '2026-07-01', '2026-07-01', '2026-07-01T08:00:00Z', 'active'],
-    ['V002', 'Bakau Market', '740234567', 'Bakau', 'S002', '2026-07-02', '2026-07-02', '2026-07-02T09:00:00Z', 'active'],
-    ['V003', 'Mandinka Store', '740345678', 'Serrekunda', 'S001', '2026-07-03', '2026-07-03', '2026-07-03T10:00:00Z', 'active']
+    ['V001', 'Brikama Grocery', '740123456', 'Brikama', 'S001', '2026-07-01', 'system', '2026-07-01', '2026-07-01T08:00:00Z', 'active'],
+    ['V002', 'Bakau Market', '740234567', 'Bakau', 'S002', '2026-07-02', 'system', '2026-07-02', '2026-07-02T09:00:00Z', 'active'],
+    ['V003', 'Mandinka Store', '740345678', 'Serrekunda', 'S001', '2026-07-03', 'system', '2026-07-03', '2026-07-03T10:00:00Z', 'active']
   ];
 
   var productRows = [

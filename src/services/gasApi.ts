@@ -65,6 +65,15 @@ export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: 
   return fetchJson<any>(path).then((result) => unwrapListResponse<Vendor>(result));
 }
 
+export async function getVendorsPage(params?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; page?: number; pageSize?: number }) {
+  const query = params ? Object.entries(params)
+    .filter(([, value]) => value !== undefined && value !== null && value !== '')
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
+    .join('&') : '';
+  const path = query ? `/api/vendors?${query}` : '/api/vendors';
+  return fetchJson<any>(path);
+}
+
 export async function getVendor(id: string) {
   return fetchJson<{ status: string; data: Vendor }>(`/api/vendors/${encodeURIComponent(id)}`).then((result) => result.data);
 }

@@ -431,6 +431,21 @@ function getVendors(params) {
     if ((params.salesRepId && row.sales_rep_id !== params.salesRepId) ||
         (params.sales_rep_id && row.sales_rep_id !== params.sales_rep_id)) return false;
     if (params.status && row.status !== params.status) return false;
+
+    if (params.search && String(params.search).trim() !== '') {
+      var normalizedSearch = String(params.search).trim().toLowerCase();
+      var vendorId = String(row.vendor_id || '').toLowerCase();
+      var vendorName = String(row.vendor_name || '').toLowerCase();
+      var phone = String(row.phone || '').toLowerCase();
+      var location = String(row.location || '').toLowerCase();
+      if (vendorId.indexOf(normalizedSearch) === -1 &&
+          vendorName.indexOf(normalizedSearch) === -1 &&
+          phone.indexOf(normalizedSearch) === -1 &&
+          location.indexOf(normalizedSearch) === -1) {
+        return false;
+      }
+    }
+
     return true;
   });
   var pagination = validatePagination(params);

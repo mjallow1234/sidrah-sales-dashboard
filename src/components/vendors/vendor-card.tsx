@@ -1,10 +1,12 @@
+import { getSalesRepDisplayName } from '@/lib/displayNames';
 import type { Vendor } from '@/lib/types';
 
 interface VendorCardProps {
   vendor: Vendor;
+  salesReps?: Array<{ sales_rep_id: string; name?: string }>;
 }
 
-export function VendorCard({ vendor }: VendorCardProps) {
+export function VendorCard({ vendor, salesReps }: VendorCardProps) {
   return (
     <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
       <div className="flex items-start justify-between gap-4">
@@ -17,7 +19,9 @@ export function VendorCard({ vendor }: VendorCardProps) {
           {vendor.status === 'active' ? 'Active' : 'Inactive'}
         </span>
       </div>
-      <p className="mt-4 text-sm text-slate-700">Sales rep: {vendor.sales_rep}</p>
+      <p className="mt-4 text-sm text-slate-700">
+        Sales rep: {getSalesRepDisplayName(vendor.sales_rep_id, salesReps)}
+      </p>
     </div>
   );
 }
