@@ -21,6 +21,7 @@ export interface SessionPayload {
   role: string;
   sales_rep_id?: string;
   passwordResetRequired?: boolean;
+  name?: string;
   display_name?: string;
   full_name?: string;
   username?: string;
@@ -42,6 +43,7 @@ export interface SessionVerificationResult {
   role?: string;
   sales_rep_id?: string;
   passwordResetRequired?: boolean;
+  name?: string;
   display_name?: string;
   full_name?: string;
   username?: string;
@@ -56,6 +58,7 @@ export async function verifySession(token: string): Promise<SessionVerificationR
       role: typeof payload.role === 'string' ? payload.role : undefined,
       sales_rep_id: typeof payload.sales_rep_id === 'string' ? payload.sales_rep_id : undefined,
       passwordResetRequired: typeof payload.passwordResetRequired === 'boolean' ? payload.passwordResetRequired : undefined,
+      name: typeof payload.name === 'string' ? payload.name : undefined,
       display_name: typeof payload.display_name === 'string' ? payload.display_name : undefined,
       full_name: typeof payload.full_name === 'string' ? payload.full_name : undefined,
       username: typeof payload.username === 'string' ? payload.username : undefined,

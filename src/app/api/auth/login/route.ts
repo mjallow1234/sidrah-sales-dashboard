@@ -29,11 +29,18 @@ export async function POST(request: NextRequest) {
     String(appUser.password_reset_required).toLowerCase() === 'true' ||
     appUser.password_reset_required === '1';
 
+  const displayName = (appUser as any).display_name || appUser.name || appUser.username;
+  const fullName = appUser.name || appUser.username;
+
   const token = await createSession({
     userId: appUser.user_id,
     role: appUser.role ?? 'agent',
     sales_rep_id: appUser.sales_rep_id ?? '',
     passwordResetRequired,
+    name: appUser.name ?? '',
+    display_name: displayName,
+    full_name: fullName,
+    username: appUser.username ?? '',
   });
 
   const response = NextResponse.json({

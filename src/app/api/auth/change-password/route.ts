@@ -80,6 +80,10 @@ export async function POST(request: NextRequest) {
     role: session.role ?? 'agent',
     sales_rep_id: session.sales_rep_id ?? '',
     passwordResetRequired: false,
+    name: updatedAppUser.name ?? '',
+    display_name: updatedAppUser.display_name || updatedAppUser.name || updatedAppUser.username || '',
+    full_name: updatedAppUser.name || updatedAppUser.username || '',
+    username: updatedAppUser.username ?? '',
   });
 
   const response = NextResponse.json({ success: true });
