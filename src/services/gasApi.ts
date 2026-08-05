@@ -56,11 +56,17 @@ function unwrapListResponse<T>(result: { status: string; data: T[] } | { status:
   return [] as T[];
 }
 
-export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string }): Promise<Vendor[]> {
-  const query = params ? Object.entries(params)
+export async function getVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; page?: number; pageSize?: number }): Promise<Vendor[]> {
+  const queryParams = {
+    ...params,
+    page: params?.page ?? 1,
+    pageSize: params?.pageSize ?? 200,
+  };
+
+  const query = Object.entries(queryParams)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
-    .join('&') : '';
+    .join('&');
   const path = query ? `/api/vendors?${query}` : '/api/vendors';
   return fetchJson<any>(path).then((result) => unwrapListResponse<Vendor>(result));
 }

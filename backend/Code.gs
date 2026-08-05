@@ -448,6 +448,14 @@ function getVendors(params) {
 
     return true;
   });
+
+  var hasPage = params.page !== undefined && params.page !== null && params.page !== '';
+  var hasPageSize = params.pageSize !== undefined && params.pageSize !== null && params.pageSize !== '';
+
+  if (!hasPage && !hasPageSize) {
+    return filtered;
+  }
+
   var pagination = validatePagination(params);
   return paginate(filtered, pagination.page, pagination.pageSize);
 }
