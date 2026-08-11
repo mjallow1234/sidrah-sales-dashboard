@@ -1,10 +1,13 @@
 import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAgentRole, isSupervisorRole, isAdminOrSupervisorRole } from '@/lib/authorization';
+import { createVisit as createVisitLocally } from '@/services/visitService';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
 const GAS_PROXY_KEY = process.env.GAS_PROXY_KEY;
+const USE_MYSQL_VISIT_WRITE = process.env.USE_MYSQL_VISIT_WRITE === 'true';
 
 function ensureBaseUrl() {
   if (!GAS_API_URL) {
@@ -40,6 +43,18 @@ export async function POST(request: NextRequest) {
       actor_role: session.role,
       actor_sales_rep_id: session.sales_rep_id || '',
     };
+
+    if (USE_MYSQL_VISIT_WRITE) {
+      try {
+        const result = await createVisitLocally(body);
+        return NextResponse.json({ status: 'success', data: result });
+      } catch (error) {
+        const status = error instanceof Error && 'status' in error ? (error as any).status ?? 500 : 500;
+        const message = error instanceof Error ? error.message : String(error);
+        return NextResponse.json({ status: 'error', message }, { status });
+      }
+    }
+
     const queryParams = new URLSearchParams();
     if (GAS_PROXY_KEY) {
       queryParams.set('proxy_key', GAS_PROXY_KEY);
