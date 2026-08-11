@@ -20,6 +20,8 @@ export interface Vendor {
   date_created: string;
   last_updated?: string;
   status: 'active' | 'inactive';
+  created_by?: string;
+  updated_by?: string;
 }
 
 export interface Product {
@@ -34,6 +36,8 @@ export interface Product {
   active: boolean;
   date_created: string;
   last_updated: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 export interface SalesRep {
@@ -47,6 +51,7 @@ export interface SalesRep {
 }
 
 export interface Inventory {
+  inventory_id: string;
   vendor_id: string;
   product_id?: string;
   total_stock_supplied: number;
@@ -81,7 +86,8 @@ export interface VendorBalance {
 
 export interface VisitResult {
   visitLog: Record<string, unknown>;
-  inventory: Inventory;
+  inventory: Inventory | null;
+  vendorInventory: VendorInventory | null;
   vendorBalance: VendorBalance;
 }
 
