@@ -1,10 +1,37 @@
 'use client';
 
-import { useTransactionsQuery } from '@/lib/hooks/queries';
+import { useQuery } from '@tanstack/react-query';
+import { useAuthQuery, useSalesRepsQuery, useTransactionsQuery } from '@/lib/hooks/queries';
 import { TransactionTable } from '@/components/vendors/transaction-table';
+import { getAppUsers } from '@/services/gasApi';
 
 export default function TransactionsPage() {
   const { data: transactions, isLoading, isError } = useTransactionsQuery();
+  const { data: salesReps = [] } = useSalesRepsQuery();
+  const { data: authData } = useAuthQuery();
+  const { data: appUsers = [] } = useQuery({
+    queryKey: ['appUsers'],
+    queryFn: () => getAppUsers(),
+  });
+
+  const salesRepNames = Object.fromEntries(
+    (salesReps ?? []).map((salesRep) => [salesRep.sales_rep_id, salesRep.name])
+  );
+
+  const adminActorEntries: Array<[string, string]> = [];
+
+  for (const user of appUsers ?? []) {
+    if (user.role === 'admin' || user.role === 'super_admin' || user.role === 'supervisor') {
+      const displayName = user.name || user.username || user.user_id;
+      adminActorEntries.push([user.user_id, displayName]);
+      if (user.sales_rep_id) {
+        adminActorEntries.push([user.sales_rep_id, displayName]);
+      }
+    }
+  }
+
+  const adminActorNames = Object.fromEntries(adminActorEntries);
+  const currentUserLabel = authData?.valid && authData.name ? authData.name : undefined;
 
   if (isLoading) {
     return (
@@ -37,7 +64,11 @@ export default function TransactionsPage() {
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
           <div className="mt-6">
-            <TransactionTable transactions={transactions ?? []} />
+            <TransactionTable
+              transactions={transactions ?? []}
+              salesRepNames={salesRepNames}
+              actorNames={adminActorNames}
+            />
           </div>
         </section>
       </div>

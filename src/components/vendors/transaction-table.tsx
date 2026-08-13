@@ -3,9 +3,30 @@ import type { Transaction } from '@/lib/types';
 interface TransactionTableProps {
   transactions: Transaction[];
   salesRepNames?: Record<string, string>;
+  actorNames?: Record<string, string>;
 }
 
-export function TransactionTable({ transactions, salesRepNames }: TransactionTableProps) {
+function resolveActorLabel(
+  rawActorId: string | undefined,
+  salesRepNames?: Record<string, string>,
+  actorNames?: Record<string, string>
+) {
+  if (!rawActorId) {
+    return 'Unknown actor';
+  }
+
+  if (salesRepNames?.[rawActorId]) {
+    return salesRepNames[rawActorId];
+  }
+
+  if (actorNames?.[rawActorId]) {
+    return actorNames[rawActorId];
+  }
+
+  return rawActorId;
+}
+
+export function TransactionTable({ transactions, salesRepNames, actorNames }: TransactionTableProps) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft">
       <div className="grid grid-cols-4 gap-4 border-b border-slate-200 px-4 py-3 text-xs uppercase tracking-[0.24em] text-slate-500 sm:grid-cols-6">
@@ -14,7 +35,7 @@ export function TransactionTable({ transactions, salesRepNames }: TransactionTab
         <div>Added</div>
         <div>Cash</div>
         <div className="hidden sm:block">Closing</div>
-        <div className="hidden sm:block">Sales Rep</div>
+        <div className="hidden sm:block">Actor</div>
       </div>
       <div className="divide-y divide-slate-200">
         {transactions.map((transaction) => (
@@ -25,7 +46,7 @@ export function TransactionTable({ transactions, salesRepNames }: TransactionTab
             <div>{transaction.cash_collected.toLocaleString()}</div>
             <div className="hidden sm:block">{transaction.closing_stock}</div>
             <div className="hidden sm:block">
-              {salesRepNames?.[transaction.sales_rep] || transaction.sales_rep}
+              {resolveActorLabel(transaction.sales_rep, salesRepNames, actorNames)}
             </div>
           </div>
         ))}

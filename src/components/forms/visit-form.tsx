@@ -61,12 +61,6 @@ export function VisitForm({ vendors }: VisitFormProps) {
   }, [vendors, resetVisitDraft, visitDraft.vendor_id]);
 
   useEffect(() => {
-    if (!visitDraft.product_id && products.length > 0) {
-      setVisitDraft({ product_id: products[0].product_id, unit_price: products[0].default_unit_price });
-    }
-  }, [products, setVisitDraft, visitDraft.product_id]);
-
-  useEffect(() => {
     if (authData?.valid && authData.role === 'agent' && authData.sales_rep_id && visitDraft.sales_rep_id !== authData.sales_rep_id) {
       setVisitDraft({ sales_rep_id: authData.sales_rep_id });
       return;
@@ -172,6 +166,41 @@ export function VisitForm({ vendors }: VisitFormProps) {
           </div>
         ) : null}
 
+        <div className="grid gap-4 sm:grid-cols-2">
+          <label className="block text-sm text-slate-700">
+            Product
+            <select
+              value={visitDraft.product_id}
+              onChange={(event) => {
+                const selectedProductId = event.target.value;
+                const selectedProduct = products.find((product) => product.product_id === selectedProductId);
+                setVisitDraft({
+                  product_id: selectedProductId,
+                  unit_price: selectedProduct?.default_unit_price ?? 0,
+                });
+              }}
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              required
+            >
+              <option value="">Select a product</option>
+              {products
+                .filter((product) => product.active)
+                .map((product) => (
+                  <option key={product.product_id} value={product.product_id}>
+                    {product.product_name} ({product.sku})
+                  </option>
+                ))}
+            </select>
+          </label>
+
+          <div className="rounded-3xl bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">Unit price</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-900">
+              {visitDraft.product_id ? `GMD ${Number(visitDraft.unit_price || 0).toLocaleString()}` : '—'}
+            </p>
+          </div>
+        </div>
+
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block text-sm text-slate-700">
             Stock Sold
@@ -181,7 +210,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
               value={visitDraft.stock_sold}
               onChange={(event) => setVisitDraft({ stock_sold: Number(event.target.value) })}
               className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-              disabled={!hasVendorInventory}
+              disabled={!hasVendorInventory || !visitDraft.product_id}
             />
           </label>
           <label className="block text-sm text-slate-700">
@@ -192,7 +221,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
               value={visitDraft.cash_collected}
               onChange={(event) => setVisitDraft({ cash_collected: Number(event.target.value) })}
               className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-              disabled={!hasVendorInventory}
+              disabled={!hasVendorInventory || !visitDraft.product_id}
             />
           </label>
           {hasVendorInventory ? (
@@ -204,6 +233,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
                 value={visitDraft.stock_added}
                 onChange={(event) => setVisitDraft({ stock_added: Number(event.target.value) })}
                 className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+                disabled={!visitDraft.product_id}
               />
             </label>
           ) : null}
@@ -230,7 +260,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
         <Button
           type="submit"
           className="w-full"
-          disabled={isPending || vendorInventoryQuery.isLoading || !visitDraft.vendor_id || !hasVendorInventory}
+          disabled={isPending || vendorInventoryQuery.isLoading || !visitDraft.vendor_id || !visitDraft.product_id || !hasVendorInventory}
         >
           {isPending ? 'Submitting…' : 'Submit Visit'}
         </Button>
