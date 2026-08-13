@@ -14,8 +14,26 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const query = request.nextUrl.searchParams;
     const dayString = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     const monthStart = `${dayString.slice(0, 7)}-01`;
+    const startDate = query.get('startDate') || query.get('start_date');
+    const endDate = query.get('endDate') || query.get('end_date');
+    const summaryFilters: string[] = [];
+    const summaryParams: Record<string, string> = {};
+
+    if (startDate) {
+      summaryFilters.push('vl.date >= :summaryStartDate');
+      summaryParams.summaryStartDate = startDate;
+    }
+    if (endDate) {
+      summaryFilters.push('vl.date <= :summaryEndDate');
+      summaryParams.summaryEndDate = endDate;
+    }
+    if (!startDate && !endDate) {
+      summaryFilters.push('vl.date = :summaryToday');
+      summaryParams.summaryToday = dayString;
+    }
 
     const summaryQuery = `
       SELECT
@@ -23,10 +41,10 @@ export async function GET(request: NextRequest) {
         COALESCE(SUM(vl.stock_sold), 0) AS bucketsSold,
         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
       FROM visit_logs vl
-      WHERE vl.date = :today
+      WHERE ${summaryFilters.join(' AND ')}
     `;
 
-    const [summaryRows] = await dbQuery<{ vendorsVisited: string | number; bucketsSold: string | number; cashCollected: string | number }[]>(summaryQuery, { today: dayString });
+    const [summaryRows] = await dbQuery<{ vendorsVisited: string | number; bucketsSold: string | number; cashCollected: string | number }[]>(summaryQuery, summaryParams);
     const summary = summaryRows[0] ?? { vendorsVisited: 0, bucketsSold: 0, cashCollected: 0 };
 
     const totalActiveVendorsQuery = `
