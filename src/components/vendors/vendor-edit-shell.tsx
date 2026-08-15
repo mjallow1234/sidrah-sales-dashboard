@@ -23,7 +23,11 @@ export function VendorEditShell({ vendorId }: VendorEditShellProps) {
         ) : isError || !vendor ? (
           <div className="rounded-3xl border border-rose-200 bg-rose-50 p-4 text-rose-700">Unable to load vendor.</div>
         ) : (
-          <VendorForm vendorId={vendorId} initialValues={vendor} onSuccess={() => window.history.back()} />
+          <VendorForm
+            vendorId={vendorId}
+            initialValues={{ ...vendor, phone: vendor.phone === undefined ? undefined : String(vendor.phone) }}
+            onSuccess={() => window.history.back()}
+          />
         )}
       </div>
       <Fab href={`/vendors/${vendorId}`} label="Back to vendor" />
