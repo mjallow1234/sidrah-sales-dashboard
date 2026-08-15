@@ -3,10 +3,8 @@ import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
 import { query as dbQuery } from '@/lib/db';
+import { updateProduct } from '@/services/productService';
 import type { Product } from '@/lib/types';
-
-const GAS_API_URL = process.env.GAS_API_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
 
 function formatDateValue(value: unknown): string {
   if (value instanceof Date) {
@@ -46,19 +44,6 @@ function getIdFromUrl(request: Request) {
   return pathSegments[pathSegments.length - 1] || '';
 }
 
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('GAS_API_URL is not configured.');
-  }
-  return GAS_API_URL.replace(/\/+$/, '');
-}
-
-function makeUrl(path: string) {
-  const base = ensureBaseUrl();
-  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/#]+/, ''))}${keyParam}`;
-}
-
 export async function GET(request: NextRequest) {
   const session = await getVerifiedSession(request);
   if (!session) {
@@ -96,13 +81,19 @@ export async function PUT(request: NextRequest) {
   }
 
   const id = getIdFromUrl(request);
-  const payload = await request.json();
-  const url = makeUrl(`/product/${encodeURIComponent(id)}`);
-  const response = await fetch(url, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const payload = await request.json();
+    const product = await updateProduct(id, {
+      ...payload,
+      updated_by: session.userId,
+    });
+
+    return NextResponse.json({ status: 'success', data: product });
+  } catch (error: unknown) {
+    const status = error instanceof Error && 'statusCode' in error
+      ? Number((error as { statusCode?: number }).statusCode) || 500
+      : 500;
+    const message = error instanceof Error ? error.message : String(error);
+    return NextResponse.json({ status: 'error', message }, { status });
+  }
 }
