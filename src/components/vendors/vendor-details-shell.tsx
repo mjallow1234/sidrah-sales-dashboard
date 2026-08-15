@@ -1,14 +1,18 @@
 'use client';
 
-import { useTransactionsByVendorQuery, useVendorBalanceQuery, useVendorInventoryQuery, useVendorQuery, useProductsQuery } from '@/lib/hooks/queries';
+import Link from 'next/link';
+import { useAuthQuery, useTransactionsByVendorQuery, useVendorBalanceQuery, useVendorInventoryQuery, useVendorQuery, useProductsQuery } from '@/lib/hooks/queries';
 import { TransactionTable } from '@/components/vendors/transaction-table';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 interface VendorDetailsShellProps {
   vendorId: string;
 }
 
 export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
+  const { data: session } = useAuthQuery();
+  const canEditVendor = isAdminOrSupervisorRole(session?.role);
   const {
     data: vendor,
     isLoading: vendorLoading,
@@ -82,6 +86,14 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             <span className="rounded-3xl bg-sidrah-50 px-3 py-1 text-sm font-semibold text-sidrah-700">
               {vendor.vendor_id}
             </span>
+            {canEditVendor ? (
+              <Link
+                href={`/vendors/${vendor.vendor_id}/edit`}
+                className="inline-flex rounded-3xl border border-sidrah-300 px-4 py-2 text-sm font-semibold text-sidrah-700 hover:bg-sidrah-50"
+              >
+                Edit Vendor
+              </Link>
+            ) : null}
           </div>
 
           <div className="mt-6 grid gap-4 sm:grid-cols-2">
