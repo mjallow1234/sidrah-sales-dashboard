@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useCreateSupplyMutation, useProductsQuery, useVendorsQuery } from '@/lib/hooks/queries';
@@ -23,6 +23,7 @@ export function SupplyForm({ defaultVendorId }: SupplyFormProps) {
   const [notes, setNotes] = useState<string>('');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const clientTransactionIdRef = useRef<string | null>(null);
 
   const { data: vendors, isLoading: vendorsLoading, isError: vendorsError } = vendorQuery;
   const { data: products, isLoading: productsLoading, isError: productsError } = productQuery;
@@ -62,6 +63,10 @@ export function SupplyForm({ defaultVendorId }: SupplyFormProps) {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    if (isSubmitting) {
+      return;
+    }
+
     if (!vendorId) {
       setErrorMessage('Vendor is required.');
       return;
@@ -79,12 +84,17 @@ export function SupplyForm({ defaultVendorId }: SupplyFormProps) {
       return;
     }
 
+    if (!clientTransactionIdRef.current) {
+      clientTransactionIdRef.current = `${vendorId}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
+
     mutate({
       vendor_id: vendorId,
       product_id: productId,
       quantity: Number(quantity),
       date,
       notes: notes.trim() || undefined,
+      client_transaction_id: clientTransactionIdRef.current,
     });
   }
 

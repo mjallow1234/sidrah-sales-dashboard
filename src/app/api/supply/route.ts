@@ -1,25 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAgentRole, isSupervisorRole, isAdminOrSupervisorRole } from '@/lib/authorization';
-
-const GAS_API_URL = process.env.GAS_API_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
-const GAS_PROXY_KEY = process.env.GAS_PROXY_KEY;
-
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('GAS_API_URL is not configured.');
-  }
-  return GAS_API_URL.replace(/\/+$/, '');
-}
-
-function makeUrl(path: string, query?: URLSearchParams) {
-  const base = ensureBaseUrl();
-  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  const queryString = query?.toString() ?? '';
-  const queryParamString = queryString ? `&${queryString}` : '';
-  return `${base}?path=${encodeURIComponent(path.replace(/^[\/\#]+/, ''))}${queryParamString}${keyParam}`;
-}
+import { createSupply } from '@/services/supplyService';
 
 export async function POST(request: NextRequest) {
   const session = await getVerifiedSession(request);
@@ -32,63 +14,19 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json();
-    const body = {
+    const result = await createSupply({
       ...payload,
       actor_role: session.role,
       actor_sales_rep_id: session.sales_rep_id || '',
-    };
-    const queryParams = new URLSearchParams();
-    if (GAS_PROXY_KEY) {
-      queryParams.set('proxy_key', GAS_PROXY_KEY);
-    }
-    const url = makeUrl('/supply', queryParams);
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
     });
-
-    const text = await response.text();
-    let json;
-    try {
-      json = JSON.parse(text);
-    } catch {
-      json = null;
-    }
-
-    const successResponse = response.ok && json && typeof json === 'object' && json.status === 'success';
-    if (!successResponse) {
-      const message = json?.message || json?.error || `GAS API returned ${response.status}`;
-      return new Response(
-        JSON.stringify({ status: 'error', message }),
-        {
-          status: 502,
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        },
-      );
-    }
-
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
+    return Response.json({ status: 'success', data: result });
   } catch (error) {
-    return Response.json(
-      {
-        status: 'error',
-        message: String(error),
-        gasUrlExists: !!process.env.GAS_API_URL,
-        gasKeyExists: !!process.env.GAS_API_KEY,
-        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
-        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
-      },
-      { status: 500 }
-    );
+    const status = error instanceof Error && 'statusCode' in error
+      ? Number((error as { statusCode?: number }).statusCode) || 500
+      : 500;
+    return Response.json({
+      status: 'error',
+      message: error instanceof Error ? error.message : String(error),
+    }, { status });
   }
 }

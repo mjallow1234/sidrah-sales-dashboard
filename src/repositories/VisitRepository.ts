@@ -8,7 +8,7 @@ export interface VisitLogRecord {
   date: string;
   vendor_id: string;
   product_id: string;
-  sales_rep_id: string;
+  sales_rep_id: string | null;
   opening_stock: number;
   stock_sold: number;
   stock_added: number;
@@ -34,7 +34,7 @@ export interface CreateVisitPayload {
   date: string;
   vendor_id: string;
   product_id: string;
-  sales_rep_id: string;
+  sales_rep_id: string | null;
   opening_stock: number;
   stock_sold: number;
   stock_added: number;
@@ -160,7 +160,8 @@ export class VisitRepository extends BaseRepository {
         last_updated,
         created_by,
         updated_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ,
       [
         payload.visit_id,
         payload.timestamp,

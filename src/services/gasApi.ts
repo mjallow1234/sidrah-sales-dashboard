@@ -193,6 +193,7 @@ export async function createSupply(payload: {
   quantity: number;
   date: string;
   notes?: string;
+  client_transaction_id: string;
 }) {
   return fetchJson<{ status: string; data: any }>('/api/supply', {
     method: 'POST',
