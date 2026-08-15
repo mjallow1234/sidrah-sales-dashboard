@@ -131,3 +131,34 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
     return vendorRepository.findById(vendorId);
   });
 }
+
+export async function updateVendor(vendorId: string, payload: Record<string, unknown>): Promise<Vendor> {
+  const updates: Record<string, unknown> = {};
+
+  if (payload.vendor_name !== undefined) updates.vendor_name = String(payload.vendor_name);
+  if (payload.phone !== undefined) updates.phone = String(payload.phone);
+  if (payload.location !== undefined) updates.location = String(payload.location);
+  if (payload.sales_rep_id !== undefined) {
+    updates.sales_rep_id = payload.sales_rep_id === null || payload.sales_rep_id === ''
+      ? null
+      : String(payload.sales_rep_id);
+  }
+  if (payload.status !== undefined) updates.status = String(payload.status);
+
+  if (updates.sales_rep_id !== undefined && updates.sales_rep_id !== null) {
+    const [salesRepRows] = await getPool().query(
+      'SELECT sales_rep_id FROM sales_reps WHERE sales_rep_id = ? LIMIT 1',
+      [updates.sales_rep_id],
+    );
+    if ((salesRepRows as unknown[]).length === 0) {
+      throw new ValidationError('Invalid sales_rep_id.');
+    }
+  }
+
+  updates.last_updated = new Date().toISOString();
+  if (payload.updated_by !== undefined) {
+    updates.updated_by = payload.updated_by === null ? null : String(payload.updated_by);
+  }
+
+  return new VendorRepository(getPool()).update(vendorId, updates as any);
+}

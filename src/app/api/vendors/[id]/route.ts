@@ -1,6 +1,7 @@
-import type { NextRequest } from 'next/server';
+﻿import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
+import { updateVendor } from '@/services/vendorService';
 
 const GAS_API_URL = process.env.GAS_API_URL;
 const GAS_API_KEY = process.env.GAS_API_KEY;
@@ -58,29 +59,18 @@ export async function PUT(request: NextRequest) {
     return forbiddenResponse();
   }
 
-  const id = getIdFromUrl(request);
-  const payload = await request.json();
-  const body = {
-    ...payload,
-    actor_role: session.role,
-    actor_sales_rep_id: session.sales_rep_id || '',
-    assigned_by: payload.assigned_by || session.userId || 'system',
-  };
-  const putPayload: Record<string, unknown> = {
-    _method: 'PUT',
-    ...body,
-  };
-
-  const queryParams = new URLSearchParams();
-  if (GAS_PROXY_KEY) {
-    queryParams.set('proxy_key', GAS_PROXY_KEY);
+  try {
+    const id = getIdFromUrl(request);
+    const payload = await request.json();
+    const vendor = await updateVendor(id, {
+      ...payload,
+      updated_by: session.userId,
+    });
+    return Response.json({ status: 'success', data: vendor });
+  } catch (error: unknown) {
+    const status = error instanceof Error && 'statusCode' in error
+      ? Number((error as { statusCode?: number }).statusCode) || 500
+      : 500;
+    return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status });
   }
-  const url = makeUrl(`/vendor/${id}`, queryParams);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(putPayload),
-  });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
 }
