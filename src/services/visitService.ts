@@ -6,6 +6,7 @@ import { VendorInventoryRepository } from '@/repositories/VendorInventoryReposit
 import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository';
 import { VisitRepository } from '@/repositories/VisitRepository';
 import { TransactionJournalRepository } from '@/repositories/TransactionJournalRepository';
+import { OperationIdempotencyRepository } from '@/repositories/OperationIdempotencyRepository';
 
 export interface CreateVisitPayload {
   vendor_id: string;
@@ -17,7 +18,7 @@ export interface CreateVisitPayload {
   unit_price: number;
   payment_method: string;
   payment_reference?: string;
-  client_transaction_id?: string;
+  client_transaction_id: string;
   latitude?: number | null;
   longitude?: number | null;
   notes?: string;
@@ -56,7 +57,7 @@ function getDateString(date: Date): string {
 }
 
 function getDateTimeString(date: Date): string {
-  return date.toISOString();
+  return date.toISOString().slice(0, 19).replace('T', ' ');
 }
 
 function generateId(prefix: string): string {
@@ -71,6 +72,45 @@ function validateRequiredString(value: unknown, fieldName: string): string {
   return value.trim();
 }
 
+function validateClientTransactionId(value: unknown): string {
+  return validateRequiredString(value, 'client_transaction_id');
+}
+
+function isDuplicateEntry(error: unknown): boolean {
+  return Boolean(error && typeof error === 'object' && (error as { code?: string }).code === 'ER_DUP_ENTRY');
+}
+
+async function getExistingVisitResult(clientTransactionId: string): Promise<VisitResult> {
+  const [visitRows] = await getPool().query<any[]>(
+    'SELECT * FROM visit_logs WHERE client_transaction_id = ? LIMIT 1',
+    [clientTransactionId],
+  );
+  const existingVisit = visitRows[0];
+  if (!existingVisit) {
+    throw new HttpError(409, 'A visit with this client_transaction_id is already being processed.');
+  }
+
+  const [inventoryRows] = await getPool().query<any[]>(
+    'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1',
+    [existingVisit.vendor_id, existingVisit.product_id],
+  );
+  const [vendorInventoryRows] = await getPool().query<any[]>(
+    'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1',
+    [existingVisit.vendor_id, existingVisit.product_id],
+  );
+  const [balanceRows] = await getPool().query<any[]>(
+    'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1',
+    [existingVisit.vendor_id],
+  );
+
+  return {
+    visitLog: existingVisit as Record<string, unknown>,
+    inventory: inventoryRows[0] ?? null,
+    vendorInventory: vendorInventoryRows[0] ?? null,
+    vendorBalance: balanceRows[0] ?? null,
+  } as VisitResult;
+}
+
 export async function createVisit(payload: CreateVisitPayload): Promise<VisitResult> {
   const vendorId = String(payload.vendor_id ?? '');
   const productId = String(payload.product_id ?? '');
@@ -82,7 +122,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
   const cashCollected = Number(payload.cash_collected);
   const unitPrice = Number(payload.unit_price);
 
-  const clientTransactionId = payload.client_transaction_id ? String(payload.client_transaction_id).trim() : undefined;
+  const clientTransactionId = validateClientTransactionId(payload.client_transaction_id);
   const paymentReference = payload.payment_reference ? String(payload.payment_reference) : '';
   const notes = payload.notes ? String(payload.notes) : '';
   const latitude = payload.latitude ?? null;
@@ -137,6 +177,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     const vendorBalanceRepo = new VendorBalanceRepository(connection);
     const visitRepo = new VisitRepository(connection);
     const journalRepo = new TransactionJournalRepository(connection);
+    const idempotencyRepo = new OperationIdempotencyRepository(connection);
 
     const createJournalEntry = async (stage: string, status: 'pending' | 'success' | 'failure', completed: boolean) => {
       await journalRepo.create({
@@ -153,9 +194,18 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       });
     };
 
-    if (clientTransactionId) {
-      const existingVisits = await visitRepo.search({ client_transaction_id: clientTransactionId });
-      if (existingVisits.length > 0) {
+    await createJournalEntry('reservation', 'pending', false);
+    const ownsReservation = await idempotencyRepo.claim(clientTransactionId, '/visit', transactionId);
+    if (!ownsReservation) {
+      const reservation = await idempotencyRepo.findByIdForUpdate(clientTransactionId);
+      if (!reservation || reservation.endpoint !== '/visit') {
+        throw new HttpError(409, 'A request with this client_transaction_id is already being processed.');
+      }
+      if (reservation.status !== 'completed' || !reservation.result_visit_id) {
+        throw new HttpError(409, 'A visit with this client_transaction_id is still processing.');
+      }
+
+        await createJournalEntry('reservation', 'success', false);
         await journalRepo.create({
           transaction_id: transactionId,
           timestamp: nowDateTime,
@@ -169,17 +219,26 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
           duration_ms: 0,
         });
 
-        const existingVisit = existingVisits[0];
-        const inventoryRows = await inventoryRepo.search({ vendor_id: vendorId, product_id: productId });
-        const vendorBalance = await vendorBalanceRepo.findById(vendorId);
+        const freshVisitRepo = new VisitRepository(getPool());
+        const freshInventoryRepo = new InventoryRepository(getPool());
+        const freshVendorBalanceRepo = new VendorBalanceRepository(getPool());
+
+        const existingVisit = await freshVisitRepo.findById(reservation.result_visit_id);
+        const inventoryRows = await freshInventoryRepo.search({ vendor_id: vendorId, product_id: productId });
+        const [vendorInventoryRows] = await getPool().execute<any[]>(
+          'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1',
+          [existingVisit.vendor_id, existingVisit.product_id],
+        );
+        const vendorBalance = await freshVendorBalanceRepo.findById(existingVisit.vendor_id);
 
         return {
           visitLog: existingVisit as unknown as Record<string, unknown>,
           inventory: inventoryRows[0] ?? null,
+          vendorInventory: vendorInventoryRows[0] ?? null,
           vendorBalance,
         } as unknown as VisitResult;
-      }
     }
+    await createJournalEntry('reservation', 'success', false);
 
     const [vendorRows] = (await connection.execute(
       'SELECT COUNT(1) AS count FROM vendors WHERE vendor_id = ?',
@@ -251,7 +310,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     }
 
     const [inventoryRows] = (await connection.execute(
-      'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1',
+      'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
       [vendorId, productId]
     )) as [Inventory[], unknown];
     let inventoryRow = inventoryRows.length > 0 ? inventoryRows[0] : null;
@@ -259,7 +318,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     let inventoryExisted = Boolean(inventoryRow);
 
     const [vendorInventoryRows] = (await connection.execute(
-      'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1',
+      'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
       [vendorId, productId]
     )) as [VendorInventory[], unknown];
     const vendorInventoryRow = vendorInventoryRows.length > 0 ? vendorInventoryRows[0] : null;
@@ -345,7 +404,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     const closingStock = openingStock - stockSold + stockAdded;
 
     const [balanceRows] = (await connection.execute(
-      'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1',
+      'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1 FOR UPDATE',
       [vendorId]
     )) as [VendorBalance[], unknown];
     const balanceRow = balanceRows.length > 0 ? balanceRows[0] : null;
@@ -455,6 +514,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       date_created: nowDateTime,
       last_updated: nowDateTime,
     }) as unknown as Record<string, unknown>;
+    await idempotencyRepo.markCompleted(clientTransactionId, visitId, nowDateTime);
     await journalRepo.create({
       transaction_id: transactionId,
       timestamp: nowDateTime,
@@ -476,6 +536,9 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     };
   });
   } catch (error) {
+    if (clientTransactionId && isDuplicateEntry(error)) {
+      return getExistingVisitResult(clientTransactionId);
+    }
     await createFailureJournalEntry(error);
     throw error;
   }

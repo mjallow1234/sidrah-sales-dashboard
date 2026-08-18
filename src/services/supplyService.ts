@@ -4,6 +4,7 @@ import type { Inventory, VendorInventory } from '@/lib/types';
 import { InventoryRepository } from '@/repositories/InventoryRepository';
 import { VendorInventoryRepository } from '@/repositories/VendorInventoryRepository';
 import { TransactionJournalRepository } from '@/repositories/TransactionJournalRepository';
+import { OperationIdempotencyRepository } from '@/repositories/OperationIdempotencyRepository';
 import { VisitRepository, type VisitLogRecord } from '@/repositories/VisitRepository';
 import { ConflictError, NotFoundError, ServiceError, ValidationError } from './errors';
 
@@ -72,8 +73,40 @@ function validateClientTransactionId(value: unknown): string {
   return value.trim();
 }
 
+function formatSqlDateTime(date: Date): string {
+  return date.toISOString().slice(0, 19).replace('T', ' ');
+}
+
 function isDuplicateEntry(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && (error as { code?: string }).code === 'ER_DUP_ENTRY');
+}
+
+function isDeadlock(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const err = error as { code?: string; message?: string };
+  return err.code === 'ER_LOCK_DEADLOCK' || typeof err.message === 'string' && err.message.includes('Deadlock found when trying to get lock');
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function executeWithRetry<T>(operation: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  let attempt = 0;
+  while (attempt < maxAttempts) {
+    attempt += 1;
+    try {
+      return await operation();
+    } catch (error) {
+      if (!isDeadlock(error) || attempt >= maxAttempts) {
+        throw error;
+      }
+      await delay(100 * attempt);
+    }
+  }
+  throw new Error('Failed after retrying due to deadlock.');
 }
 
 async function getExistingSupplyResult(clientTransactionId: string): Promise<SupplyResult> {
@@ -83,6 +116,13 @@ async function getExistingSupplyResult(clientTransactionId: string): Promise<Sup
   );
   const existing = rows[0];
   if (!existing) {
+    const [opRows] = await getPool().query<any[]>(
+      'SELECT status FROM operation_idempotency WHERE client_transaction_id = ? LIMIT 1',
+      [clientTransactionId],
+    );
+    if (opRows[0]?.status === 'processing') {
+      throw new ConflictError('A supply request with this client_transaction_id is still processing.');
+    }
     throw new ConflictError('A supply request with this client_transaction_id is already being processed.');
   }
   if (existing.payment_method !== 'supply') {
@@ -114,20 +154,21 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
   const clientTransactionId = validateClientTransactionId(payload.client_transaction_id);
   const actor = payload.actor_role ? String(payload.actor_role) : undefined;
   const transactionId = generateId('T');
-  const now = new Date().toISOString();
+  const now = formatSqlDateTime(new Date());
   const journalPayload = { ...payload, client_transaction_id: clientTransactionId };
 
   try {
-    return await transaction(async (connection) => {
+    return await executeWithRetry(() => transaction(async (connection) => {
       const journalRepo = new TransactionJournalRepository(connection);
       const inventoryRepo = new InventoryRepository(connection);
       const vendorInventoryRepo = new VendorInventoryRepository(connection);
       const visitRepo = new VisitRepository(connection);
+      const idempotencyRepo = new OperationIdempotencyRepository(connection);
 
       const journal = async (stage: string, status: 'pending' | 'success' | 'failure', completed = false, errorMessage: string | null = null) => {
         await journalRepo.create({
           transaction_id: transactionId,
-          timestamp: new Date().toISOString(),
+          timestamp: formatSqlDateTime(new Date()),
           endpoint: '/supply',
           stage,
           status,
@@ -141,23 +182,25 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
 
       await journal('begin', 'pending');
 
-      if (clientTransactionId) {
-        const [existingRows] = await connection.execute<any[]>(
-          'SELECT * FROM visit_logs WHERE client_transaction_id = ? LIMIT 1 FOR UPDATE',
-          [clientTransactionId],
-        );
-        if (existingRows[0]) {
-          if (existingRows[0].payment_method !== 'supply') {
-            throw new ConflictError('client_transaction_id is already used by another operation.');
-          }
-          const inventoryRows = await inventoryRepo.search({ vendor_id: existingRows[0].vendor_id, product_id: existingRows[0].product_id });
-          const vendorInventoryRows = await vendorInventoryRepo.search({ vendor_id: existingRows[0].vendor_id, product_id: existingRows[0].product_id });
-          if (!inventoryRows[0] || !vendorInventoryRows[0]) {
-            throw new ServiceError('Existing Supply VisitLog is missing related inventory state.');
-          }
-          await journal('duplicate_return', 'success', true);
-          return { supplyLog: existingRows[0], inventory: inventoryRows[0], vendorInventory: vendorInventoryRows[0] };
+      let ownsReservation = await idempotencyRepo.claim(clientTransactionId, '/supply', transactionId);
+      while (!ownsReservation) {
+        const reservation = await idempotencyRepo.findByIdForUpdate(clientTransactionId);
+        if (!reservation) {
+          ownsReservation = await idempotencyRepo.claim(clientTransactionId, '/supply', transactionId);
+          continue;
         }
+        if (reservation.endpoint !== '/supply') {
+          throw new ConflictError('client_transaction_id is already used by another operation.');
+        }
+        if (reservation.status === 'completed' && reservation.result_visit_id) {
+          await journal('duplicate_return', 'success', true);
+          return getExistingSupplyResult(clientTransactionId);
+        }
+        if (reservation.status === 'processing') {
+          // The SELECT ... FOR UPDATE clause will wait for the owner transaction to commit or rollback.
+          continue;
+        }
+        throw new ServiceError('Operation idempotency row is in an unexpected state.');
       }
 
       const [vendorRows] = await connection.execute<any[]>(
@@ -239,19 +282,17 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
         date_created: now,
         last_updated: now,
       });
+      await idempotencyRepo.markCompleted(clientTransactionId, supplyLog.visit_id, now);
       await journal('visit_append', 'success');
       await journal('complete', 'success', true);
 
       return { supplyLog, inventory: updatedInventory, vendorInventory: updatedVendorInventory };
-    });
+    }));
   } catch (error) {
-    if (clientTransactionId && isDuplicateEntry(error)) {
-      return getExistingSupplyResult(clientTransactionId);
-    }
     try {
       await new TransactionJournalRepository(getPool()).create({
         transaction_id: transactionId,
-        timestamp: new Date().toISOString(),
+        timestamp: formatSqlDateTime(new Date()),
         endpoint: '/supply',
         stage: 'failure',
         status: 'failure',

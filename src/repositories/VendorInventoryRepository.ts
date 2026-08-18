@@ -73,7 +73,7 @@ export class VendorInventoryRepository extends BaseRepository {
   }
 
   public async create(payload: CreateVendorInventoryPayload): Promise<VendorInventory> {
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await this.execute(
       `INSERT INTO vendor_inventory (
         vendor_inventory_id,
@@ -126,7 +126,7 @@ export class VendorInventoryRepository extends BaseRepository {
     }
 
     parts.push('updated_at = ?');
-    params.push(new Date().toISOString());
+    params.push(new Date().toISOString().slice(0, 19).replace('T', ' '));
 
     const sql = `UPDATE vendor_inventory SET ${parts.join(', ')} WHERE vendor_inventory_id = ?`;
     await this.execute(sql, [...params, vendorInventoryId]);

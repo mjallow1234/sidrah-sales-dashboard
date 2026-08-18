@@ -73,7 +73,7 @@ export class InventoryRepository extends BaseRepository {
   }
 
   public async create(payload: CreateInventoryPayload): Promise<Inventory> {
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await this.execute(
       `INSERT INTO inventory (
         inventory_id,
@@ -126,7 +126,7 @@ export class InventoryRepository extends BaseRepository {
     }
 
     parts.push('last_updated = ?');
-    params.push(new Date().toISOString());
+    params.push(new Date().toISOString().slice(0, 19).replace('T', ' '));
 
     const sql = `UPDATE inventory SET ${parts.join(', ')} WHERE inventory_id = ?`;
     await this.execute(sql, [...params, inventoryId]);

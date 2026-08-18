@@ -108,7 +108,7 @@ export class TransactionJournalRepository extends BaseRepository {
         payload.actor ?? null,
         payload.error_message ?? null,
         payload.duration_ms ?? 0,
-        new Date().toISOString(),
+        new Date().toISOString().slice(0, 19).replace('T', ' '),
       ]
     );
 

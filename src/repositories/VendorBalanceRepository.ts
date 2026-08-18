@@ -61,7 +61,7 @@ export class VendorBalanceRepository extends BaseRepository {
   }
 
   public async create(payload: CreateVendorBalancePayload): Promise<VendorBalance> {
-    const now = new Date().toISOString();
+    const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
     await this.execute(
       `INSERT INTO vendor_balances (
         vendor_id,
@@ -110,7 +110,7 @@ export class VendorBalanceRepository extends BaseRepository {
     }
 
     parts.push('last_updated = ?');
-    params.push(new Date().toISOString());
+    params.push(new Date().toISOString().slice(0, 19).replace('T', ' '));
 
     const sql = `UPDATE vendor_balances SET ${parts.join(', ')} WHERE vendor_id = ?`;
     await this.execute(sql, [...params, vendorId]);

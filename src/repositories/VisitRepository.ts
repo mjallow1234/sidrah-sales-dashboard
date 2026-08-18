@@ -250,7 +250,7 @@ export class VisitRepository extends BaseRepository {
     }
 
     parts.push('last_updated = ?');
-    params.push(new Date().toISOString());
+    params.push(new Date().toISOString().slice(0, 19).replace('T', ' '));
 
     const sql = `UPDATE visit_logs SET ${parts.join(', ')} WHERE visit_id = ?`;
     await this.execute(sql, [...params, visitId]);
