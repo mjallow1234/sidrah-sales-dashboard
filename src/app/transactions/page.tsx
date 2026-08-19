@@ -2,17 +2,14 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useAuthQuery, useSalesRepsQuery, useTransactionsQuery } from '@/lib/hooks/queries';
+import { useAppUsersQuery } from '@/lib/hooks/userQueries';
 import { TransactionTable } from '@/components/vendors/transaction-table';
-import { getAppUsers } from '@/services/gasApi';
 
 export default function TransactionsPage() {
   const { data: transactions, isLoading, isError } = useTransactionsQuery();
   const { data: salesReps = [] } = useSalesRepsQuery();
   const { data: authData } = useAuthQuery();
-  const { data: appUsers = [] } = useQuery({
-    queryKey: ['appUsers'],
-    queryFn: () => getAppUsers(),
-  });
+  const { data: appUsers = [] } = useAppUsersQuery();
 
   const salesRepNames = Object.fromEntries(
     (salesReps ?? []).map((salesRep) => [salesRep.sales_rep_id, salesRep.name])

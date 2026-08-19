@@ -1,48 +1,9 @@
 import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
-
-const GAS_API_URL = process.env.GAS_API_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
-
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('GAS_API_URL is not configured.');
-  }
-  return GAS_API_URL.replace(/\/+$/, '');
-}
-
-function makeUrl(path: string, query?: URLSearchParams) {
-  const base = ensureBaseUrl();
-  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  const normalizedPath = encodeURIComponent(path.replace(/^[\/\#]+/, ''));
-  const queryString = query?.toString() ?? '';
-  const queryParamString = queryString ? `&${queryString}` : '';
-  return `${base}?path=${normalizedPath}${queryParamString}${keyParam}`;
-}
-
-function normalizeProxyResponse(text: string, response: Response) {
-  try {
-    var payload = JSON.parse(text);
-    var statusCode = payload && typeof payload.statusCode === 'number' ? payload.statusCode : response.status;
-    if (payload && payload.status === 'error' && !payload.statusCode) {
-      statusCode = 400;
-    }
-    return new Response(JSON.stringify(payload), {
-      status: statusCode,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (e) {
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  }
-}
+import { AppUserRepository } from '@/repositories/AppUserRepository';
+import { createAppUser } from '@/services/appUserService';
+import { getPool } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
   const session = await getVerifiedSession(request);
@@ -53,14 +14,25 @@ export async function GET(request: NextRequest) {
     return forbiddenResponse();
   }
 
-  const queryParams = new URLSearchParams(request.nextUrl.searchParams);
-  const url = makeUrl('/appusers', queryParams);
-  const response = await fetch(url, {
-    method: 'GET',
-  });
+  try {
+    const query = request.nextUrl.searchParams;
+    const criteria: Record<string, unknown> = {};
 
-  const text = await response.text();
-  return normalizeProxyResponse(text, response);
+    const role = query.get('role');
+    const status = query.get('status');
+    const phone = query.get('phone');
+
+    if (role) criteria.role = role;
+    if (status) criteria.status = status;
+    if (phone) criteria.phone = phone;
+
+const repository = new AppUserRepository(getPool());
+    const users = await repository.search(criteria);
+
+    return Response.json({ status: 'success', data: users });
+  } catch (error: unknown) {
+    return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
@@ -72,17 +44,15 @@ export async function POST(request: NextRequest) {
     return forbiddenResponse();
   }
 
-  const payload = await request.json();
-  const url = makeUrl('/appuser');
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  });
-
-  const text = await response.text();
-  return normalizeProxyResponse(text, response);
+  try {
+    const payload = await request.json();
+    const result = await createAppUser({
+      ...payload,
+      created_by: session.userId,
+      updated_by: session.userId,
+    });
+    return new Response(result.text, { status: result.status, headers: { 'Content-Type': 'application/json' } });
+  } catch (error: unknown) {
+    return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
 }

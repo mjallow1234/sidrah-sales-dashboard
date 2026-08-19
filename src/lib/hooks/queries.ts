@@ -1,7 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { createProduct, createSalesRep, createVendor, createVisit, createSupply, getInventory, getProducts, getProduct, getSalesReps, getSalesRep, getStats, getVendor, getVendors, getVendorsPage, getVendorBalances, getVendorInventory, getVendorInventoryByVendorAndProduct, getTransactions, getTransactionsByVendor, getVisitLogs, updateProduct, updateSalesRep, updateVendor } from '@/services/gasApi';
+import { createProduct, getProducts, getProduct, updateProduct } from '@/lib/api/products';
+import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib/api/salesreps';
+import { getStats } from '@/lib/api/stats';
+import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
+import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
+import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances } from '@/lib/api/inventory';
 import { DEFAULT_DASHBOARD_STATS, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
@@ -18,7 +23,7 @@ export interface PaginatedResult<T> {
 export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: string; status?: string }) {
   return useQuery({
     queryKey: ['vendors', filters],
-    queryFn: () => getVendors(filters),
+    queryFn: () => fetchVendors(filters),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -31,7 +36,7 @@ export function usePaginatedVendorsQuery(
 ) {
   return useQuery<PaginatedResult<Vendor>>({
     queryKey: ['vendorsPage', filters, page, pageSize],
-    queryFn: () => getVendorsPage({ ...filters, page, pageSize }),
+    queryFn: () => fetchPaginatedVendors({ ...filters, page, pageSize }),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -40,7 +45,7 @@ export function usePaginatedVendorsQuery(
 export function useVendorQuery(vendorId: string) {
   return useQuery({
     queryKey: ['vendor', vendorId],
-    queryFn: () => getVendor(vendorId),
+    queryFn: () => fetchVendorById(vendorId),
     enabled: !!vendorId,
   });
 }
@@ -48,17 +53,14 @@ export function useVendorQuery(vendorId: string) {
 export function useInventoryRecordsQuery() {
   return useQuery({
     queryKey: ['inventory'],
-    queryFn: () => getInventory(),
+    queryFn: () => getInventoryRecords(),
   });
 }
 
 export function useInventoryByVendorQuery(vendorId: string) {
   return useQuery({
     queryKey: ['inventory', vendorId],
-    queryFn: async () => {
-      const items = await getInventory({ vendorId });
-      return items[0];
-    },
+    queryFn: () => getInventoryByVendor(vendorId),
     enabled: !!vendorId,
   });
 }
@@ -66,9 +68,7 @@ export function useInventoryByVendorQuery(vendorId: string) {
 export function useVendorInventoryQuery(vendorId: string) {
   return useQuery({
     queryKey: ['vendorInventory', vendorId],
-    queryFn: async () => {
-      return getVendorInventory({ vendorId });
-    },
+    queryFn: () => getVendorInventory(vendorId),
     enabled: !!vendorId,
   });
 }
@@ -76,19 +76,17 @@ export function useVendorInventoryQuery(vendorId: string) {
 export function useVendorInventoryByVendorAndProductQuery(vendorId: string, productId: string) {
   return useQuery<VendorInventory | null>({
     queryKey: ['vendorInventory', vendorId, productId],
-    queryFn: async () => {
-      return getVendorInventoryByVendorAndProduct(vendorId, productId);
-    },
+    queryFn: () => getVendorInventoryByVendorAndProduct(vendorId, productId),
     enabled: !!vendorId && !!productId,
   });
 }
 
 export function useVendorBalanceQuery(vendorId: string) {
-  return useQuery({
+  return useQuery<VendorBalance | null>({
     queryKey: ['vendorBalance', vendorId],
     queryFn: async () => {
-      const balances = await getVendorBalances({ vendorId });
-      return balances[0];
+      const balances = await getVendorBalances(vendorId);
+      return balances.length > 0 ? balances[0] : null;
     },
     enabled: !!vendorId,
   });

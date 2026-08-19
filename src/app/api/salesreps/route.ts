@@ -1,27 +1,45 @@
 import type { NextRequest } from 'next/server';
+import { query as dbQuery } from '@/lib/db';
+import type { SalesRep } from '@/lib/types';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
+import { createSalesRep } from '@/services/salesRepService';
 
-const GAS_API_URL = process.env.GAS_API_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
-
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('GAS_API_URL is not configured.');
+function parsePositiveInt(value: string | null, fallback?: number): number | undefined {
+  if (!value) {
+    return fallback;
   }
-  return GAS_API_URL.replace(/\/+$/, '');
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return fallback;
+  }
+  return parsed;
 }
 
-function makeUrl(path: string, query?: URLSearchParams) {
-  const base = ensureBaseUrl();
-  const normalizedPath = path
-    .replace(/^\/+/, '')
-    .split('/')
-    .map(encodeURIComponent)
-    .join('/');
-  const queryString = query?.toString() ?? '';
-  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${normalizedPath}${queryString ? `&${queryString}` : ''}${keyParam}`;
+function formatDateValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0];
+  }
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function formatDateTimeValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function mapSalesRepRow(row: any): SalesRep {
+  return {
+    sales_rep_id: String(row.sales_rep_id),
+    name: String(row.name),
+    phone: String(row.phone),
+    role: String(row.role),
+    status: String(row.status) as SalesRep['status'],
+    date_created: formatDateValue(row.date_created),
+    last_updated: formatDateTimeValue(row.last_updated),
+  };
 }
 
 export async function GET(request: NextRequest) {
@@ -34,43 +52,34 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const queryParams = new URLSearchParams(request.nextUrl.searchParams);
-  const url = makeUrl('/salesreps', queryParams);
-    const response = await fetch(url, {
-      method: 'GET',
-    });
-
-    const text = await response.text();
-    const diagnosticMode = request.nextUrl.searchParams.get('diagnose') === 'true';
-
-    if (diagnosticMode) {
-      return Response.json(
-        {
-          gasApiUrl: process.env.GAS_API_URL,
-          gasApiKey: process.env.GAS_API_KEY,
-          constructedUrl: url,
-          responseStatus: response.status,
-          responseHeaders: Object.fromEntries(response.headers.entries()),
-          body: text,
-        },
-        { status: 200 }
-      );
+    const query = request.nextUrl.searchParams;
+    const status = query.get('status');
+    const page = parsePositiveInt(query.get('page'));
+    const pageSize = parsePositiveInt(query.get('pageSize'));
+    const whereClause = status ? 'WHERE status = :status' : '';
+    const params: Record<string, unknown> = {};
+    if (status) {
+      params.status = status;
     }
 
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
+    const baseSql = `SELECT sales_rep_id, name, phone, role, status, date_created, last_updated FROM sales_reps ${whereClause} ORDER BY name ASC`;
+    if (page !== undefined && pageSize !== undefined) {
+      params.limit = pageSize;
+      params.offset = (page - 1) * pageSize;
+      const countSql = `SELECT COUNT(*) AS total FROM sales_reps ${whereClause}`;
+      const [countRows] = await dbQuery<{ total: number }[]>(countSql, params);
+      const total = countRows.length > 0 ? Number(countRows[0].total) : 0;
+      const [rows] = await dbQuery<any[]>(`${baseSql} LIMIT :limit OFFSET :offset`, params);
+      return Response.json({ status: 'success', data: { items: rows.map(mapSalesRepRow), totalCount: total, page, pageSize } });
+    }
+
+    const [rows] = await dbQuery<any[]>(baseSql, params);
+    return Response.json({ status: 'success', data: rows.map(mapSalesRepRow) });
+  } catch (error: unknown) {
     return Response.json(
       {
-        error: String(error),
-        gasUrlExists: !!process.env.GAS_API_URL,
-        gasKeyExists: !!process.env.GAS_API_KEY,
-        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
-        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );
@@ -88,31 +97,17 @@ export async function POST(request: Request) {
 
   try {
     const payload = await request.json();
-    const url = makeUrl('/salesrep');
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
+    const result = await createSalesRep({
+      ...payload,
+      created_by: session.userId,
+      updated_by: session.userId,
     });
-
-    const text = await response.text();
-    return new Response(text, {
-      status: response.status,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-  } catch (error) {
+    return Response.json({ status: 'success', data: result }, { status: 201 });
+  } catch (error: unknown) {
     return Response.json(
       {
-        error: String(error),
-        gasUrlExists: !!process.env.GAS_API_URL,
-        gasKeyExists: !!process.env.GAS_API_KEY,
-        gasUrlLength: process.env.GAS_API_URL?.length ?? 0,
-        gasKeyLength: process.env.GAS_API_KEY?.length ?? 0,
+        status: 'error',
+        message: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
     );

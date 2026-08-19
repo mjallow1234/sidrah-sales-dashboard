@@ -1,27 +1,34 @@
 import type { NextRequest } from 'next/server';
+import { getPool } from '@/lib/db';
+import type { SalesRep } from '@/lib/types';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
+import { updateSalesRep } from '@/services/salesRepService';
 
-const GAS_API_URL = process.env.GAS_API_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
-
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('GAS_API_URL is not configured.');
+function formatDateValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0];
   }
-  return GAS_API_URL.replace(/\/+$/, '');
+  return value === null || value === undefined ? '' : String(value);
 }
 
-function buildGasUrl(path: string, query?: URLSearchParams) {
-  const base = ensureBaseUrl();
-  const normalizedPath = path
-    .replace(/^\/+/, '')
-    .split('/')
-    .map(encodeURIComponent)
-    .join('/');
-  const queryString = query?.toString() ?? '';
-  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  return `${base}?path=${normalizedPath}${queryString ? `&${queryString}` : ''}${keyParam}`;
+function formatDateTimeValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function mapSalesRepRow(row: any): SalesRep {
+  return {
+    sales_rep_id: String(row.sales_rep_id),
+    name: String(row.name),
+    phone: String(row.phone),
+    role: String(row.role),
+    status: String(row.status) as SalesRep['status'],
+    date_created: formatDateValue(row.date_created),
+    last_updated: formatDateTimeValue(row.last_updated),
+  };
 }
 
 function getIdFromUrl(request: Request) {
@@ -39,11 +46,16 @@ export async function GET(request: NextRequest) {
     return forbiddenResponse();
   }
 
-  const id = getIdFromUrl(request);
-  const url = buildGasUrl(`/salesreps/${id}`);
-  const response = await fetch(url, { method: 'GET' });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const id = getIdFromUrl(request);
+    const [rows] = await getPool().query<any[]>('SELECT sales_rep_id, name, phone, role, status, date_created, last_updated FROM sales_reps WHERE sales_rep_id = ? LIMIT 1', [id]);
+    if (rows.length === 0) {
+      return Response.json({ status: 'error', message: 'SalesRep not found.' }, { status: 404 });
+    }
+    return Response.json({ status: 'success', data: mapSalesRepRow(rows[0]) });
+  } catch (error: unknown) {
+    return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
 }
 
 export async function PUT(request: NextRequest) {
@@ -57,17 +69,14 @@ export async function PUT(request: NextRequest) {
 
   const id = getIdFromUrl(request);
   const payload = await request.json();
-  const putPayload: Record<string, unknown> = {
-    _method: 'PUT',
-    ...payload,
-  };
 
-  const url = buildGasUrl(`/salesrep/${id}`);
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(putPayload),
-  });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
+  try {
+    const updated = await updateSalesRep(id, payload);
+    return Response.json({ status: 'success', data: updated });
+  } catch (error: unknown) {
+    if (error instanceof Error) {
+      return Response.json({ status: 'error', message: error.message }, { status: 500 });
+    }
+    return Response.json({ status: 'error', message: String(error) }, { status: 500 });
+  }
 }

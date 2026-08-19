@@ -1,27 +1,9 @@
-﻿import type { NextRequest } from 'next/server';
-import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
-import { isAdminOrSupervisorRole } from '@/lib/authorization';
+import type { NextRequest } from 'next/server';
+import { getPool } from '@/lib/db';
 import { updateVendor } from '@/services/vendorService';
-
-const GAS_API_URL = process.env.GAS_API_URL;
-const GAS_API_KEY = process.env.GAS_API_KEY;
-const GAS_PROXY_KEY = process.env.GAS_PROXY_KEY;
-
-function ensureBaseUrl() {
-  if (!GAS_API_URL) {
-    throw new Error('GAS_API_URL is not configured.');
-  }
-  return GAS_API_URL.replace(/\/+$/, '');
-}
-
-function makeUrl(path: string, query?: URLSearchParams) {
-  const base = ensureBaseUrl();
-  const keyParam = GAS_API_KEY ? `&api_key=${encodeURIComponent(GAS_API_KEY)}` : '';
-  const normalizedPath = encodeURIComponent(path.replace(/^[\/\#]+/, ''));
-  const queryString = query?.toString() ?? '';
-  const queryParamString = queryString ? `&${queryString}` : '';
-  return `${base}?path=${normalizedPath}${queryParamString}${keyParam}`;
-}
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAgentRole, isAdminOrSupervisorRole } from '@/lib/authorization';
+import type { Vendor } from '@/lib/types';
 
 function getIdFromUrl(request: NextRequest) {
   const url = new URL(request.url);
@@ -29,25 +11,66 @@ function getIdFromUrl(request: NextRequest) {
   return pathSegments[pathSegments.length - 1] || '';
 }
 
+function formatDateValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString().split('T')[0];
+  }
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function formatDateTimeValue(value: unknown): string {
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+  return value === null || value === undefined ? '' : String(value);
+}
+
+function mapVendorRow(row: any): Vendor {
+  return {
+    vendor_id: String(row.vendor_id),
+    vendor_name: String(row.vendor_name),
+    phone: String(row.phone),
+    location: String(row.location),
+    sales_rep: undefined,
+    sales_rep_id: row.sales_rep_id === null ? undefined : String(row.sales_rep_id),
+    assigned_date: row.assigned_date === null ? undefined : formatDateValue(row.assigned_date),
+    assigned_by: row.assigned_by === null ? undefined : String(row.assigned_by),
+    date_created: formatDateValue(row.date_created),
+    last_updated: formatDateTimeValue(row.last_updated),
+    status: String(row.status) as Vendor['status'],
+    created_by: row.created_by === null ? undefined : String(row.created_by),
+    updated_by: row.updated_by === null ? undefined : String(row.updated_by),
+  };
+}
+
 export async function GET(request: NextRequest) {
   const session = await getVerifiedSession(request);
   if (!session) {
     return unauthorizedResponse();
   }
-  const id = getIdFromUrl(request);
-  const queryParams = new URLSearchParams();
-  queryParams.set('actor_role', session.role || '');
-  queryParams.set('actor_sales_rep_id', session.sales_rep_id || '');
-  if (session.userId) {
-    queryParams.set('actor_user_id', session.userId);
+
+  try {
+    const id = getIdFromUrl(request);
+    const [rows] = await getPool().query<any[]>('SELECT vendor_id, vendor_name, phone, location, sales_rep_id, assigned_date, assigned_by, date_created, last_updated, status, created_by, updated_by FROM vendors WHERE vendor_id = ? LIMIT 1', [id]);
+    if (rows.length === 0) {
+      return Response.json({ status: 'error', message: 'Vendor not found.' }, { status: 404 });
+    }
+
+    const vendor = rows[0];
+    if (!isAdminOrSupervisorRole(session.role)) {
+      if (isAgentRole(session.role)) {
+        if (vendor.sales_rep_id !== null && vendor.sales_rep_id !== session.sales_rep_id) {
+          return forbiddenResponse();
+        }
+      } else {
+        return forbiddenResponse();
+      }
+    }
+
+    return Response.json({ status: 'success', data: mapVendorRow(vendor) });
+  } catch (error: unknown) {
+    return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
-  if (GAS_PROXY_KEY) {
-    queryParams.set('proxy_key', GAS_PROXY_KEY);
-  }
-  const url = makeUrl(`/vendors/${id}`, queryParams);
-  const response = await fetch(url, { method: 'GET' });
-  const text = await response.text();
-  return new Response(text, { status: response.status, headers: { 'Content-Type': 'application/json' } });
 }
 
 export async function PUT(request: NextRequest) {

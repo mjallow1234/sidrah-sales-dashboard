@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/lib/store/useAppStore';
@@ -29,6 +29,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
   const resetVisitDraft = useAppStore((state) => state.resetVisitDraft);
   const errorMessage = useAppStore((state) => state.errorMessage);
   const setErrorMessage = useAppStore((state) => state.setErrorMessage);
+  const clientTransactionIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!visitDraft.vendor_id && vendors.length > 0) {
@@ -86,13 +87,19 @@ export function VisitForm({ vendors }: VisitFormProps) {
     setErrorMessage(null);
     setSuccessMessage(null);
 
+    if (isPending) {
+      return;
+    }
+
     const result = visitSchema.safeParse(visitDraft);
     if (!result.success) {
       setErrorMessage(result.error.errors.map((item) => item.message).join(', '));
       return;
     }
 
-    const clientTransactionId = `${visitDraft.vendor_id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    if (!clientTransactionIdRef.current) {
+      clientTransactionIdRef.current = `${visitDraft.vendor_id}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    }
 
     const salesRepIdToSubmit = authData?.valid && authData.role === 'agent' ? authData.sales_rep_id ?? '' : visitDraft.sales_rep_id;
     if (authData?.valid && authData.role === 'agent' && !authData.sales_rep_id) {
@@ -111,11 +118,12 @@ export function VisitForm({ vendors }: VisitFormProps) {
         unit_price: visitDraft.unit_price,
         payment_method: visitDraft.payment_method,
         payment_reference: visitDraft.payment_reference,
-        client_transaction_id: clientTransactionId,
+        client_transaction_id: clientTransactionIdRef.current,
         notes: visitDraft.notes,
       },
       {
         onSuccess: () => {
+          clientTransactionIdRef.current = null;
           resetVisitDraft(visitDraft.vendor_id);
           setErrorMessage(null);
         },

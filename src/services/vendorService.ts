@@ -6,8 +6,7 @@ import { InventoryRepository } from '@/repositories/InventoryRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository';
 import { VendorRepository } from '@/repositories/VendorRepository';
-import { ValidationError } from './errors';
-import { getInventory, getVendor, getVendors as fetchVendors } from '@/services/gasApi';
+import { ValidationError, NotFoundError } from './errors';
 
 function validateVendorPayload(payload: Record<string, unknown>): void {
   const required = ['vendor_name', 'phone', 'location'];
@@ -40,16 +39,53 @@ function generateInventoryId(): string {
 }
 
 export async function getVendorList(): Promise<Vendor[]> {
-  return fetchVendors();
+  return new VendorRepository(getPool()).findAll();
 }
 
 export async function getVendorById(vendorId: string): Promise<Vendor | undefined> {
-  return getVendor(vendorId);
+  try {
+    return await new VendorRepository(getPool()).findById(vendorId);
+  } catch (error: unknown) {
+    if (error instanceof NotFoundError) {
+      return undefined;
+    }
+    throw error;
+  }
 }
 
 export async function getVendorInventory(vendorId: string): Promise<Inventory | undefined> {
-  const results = await getInventory({ vendorId });
-  return results[0];
+  const [inventoryRows] = await getPool().query<any[]>(
+    `SELECT
+       COALESCE(SUM(current_stock), 0) AS current_stock,
+       COALESCE(SUM(total_stock_supplied), 0) AS total_stock_supplied,
+       COALESCE(SUM(total_stock_sold), 0) AS total_stock_sold
+     FROM vendor_inventory
+     WHERE vendor_id = ?`,
+    [vendorId]
+  );
+
+  const [balanceRows] = await getPool().query<any[]>(
+    `SELECT total_expected_cash AS expected_cash, cash_collected, balance_owed FROM vendor_balances WHERE vendor_id = ? LIMIT 1`,
+    [vendorId]
+  );
+
+  if (!inventoryRows || inventoryRows.length === 0) {
+    return undefined;
+  }
+
+  const inventory = inventoryRows[0];
+  const balance = balanceRows?.[0] ?? { expected_cash: 0, cash_collected: 0, balance_owed: 0 };
+
+  return {
+    inventory_id: `summary_${vendorId}`,
+    vendor_id: vendorId,
+    current_stock: Number(inventory.current_stock) || 0,
+    total_stock_supplied: Number(inventory.total_stock_supplied) || 0,
+    total_stock_sold: Number(inventory.total_stock_sold) || 0,
+    expected_cash: Number(balance.expected_cash) || 0,
+    cash_collected: Number(balance.cash_collected) || 0,
+    balance_owed: Number(balance.balance_owed) || 0,
+  };
 }
 
 export async function createVendor(payload: Record<string, unknown>): Promise<Vendor> {
@@ -58,7 +94,7 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
   return transaction(async (connection) => {
     const now = new Date();
     const nowDate = now.toISOString().slice(0, 10);
-    const nowDateTime = now.toISOString();
+    const nowDateTime = now.toISOString().slice(0, 19).replace('T', ' ');
     const vendorRepository = new VendorRepository(connection);
     const productRepository = new ProductRepository(connection);
     const inventoryRepository = new InventoryRepository(connection);
@@ -155,7 +191,7 @@ export async function updateVendor(vendorId: string, payload: Record<string, unk
     }
   }
 
-  updates.last_updated = new Date().toISOString();
+  updates.last_updated = new Date().toISOString().slice(0, 19).replace('T', ' ');
   if (payload.updated_by !== undefined) {
     updates.updated_by = payload.updated_by === null ? null : String(payload.updated_by);
   }

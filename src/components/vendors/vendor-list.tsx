@@ -7,6 +7,16 @@ import { useAppStore } from '@/lib/store/useAppStore';
 import { usePaginatedVendorsQuery } from '@/lib/hooks/queries';
 import type { Vendor } from '@/lib/types';
 
+interface PaginatedResult<T> {
+  status: string;
+  data: {
+    items: T[];
+    totalCount: number;
+    page: number;
+    pageSize: number;
+  };
+}
+
 const PAGE_SIZE = 50;
 
 export function VendorList() {
