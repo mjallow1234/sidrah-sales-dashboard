@@ -38,6 +38,7 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
     latitude: row.latitude === null ? undefined : Number(row.latitude),
     longitude: row.longitude === null ? undefined : Number(row.longitude),
     notes: row.notes === null ? undefined : String(row.notes),
+    actor: row.actor_name === null ? '' : String(row.actor_name),
     created_by: row.created_by === null ? undefined : String(row.created_by),
     updated_by: row.updated_by === null ? undefined : String(row.updated_by),
   };
@@ -124,9 +125,15 @@ export async function GET(request: NextRequest) {
       params.market = market;
     }
 
-    const joinClause = market ? 'INNER JOIN vendors v ON v.vendor_id = vl.vendor_id' : '';
+    const joinClause = [
+      'LEFT JOIN app_users au ON au.user_id = vl.created_by',
+      'LEFT JOIN sales_reps sr ON sr.sales_rep_id = vl.sales_rep_id',
+      market ? 'INNER JOIN vendors v ON v.vendor_id = vl.vendor_id' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const sql = `SELECT vl.* FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY vl.date DESC, vl.timestamp DESC`;
+    const sql = `SELECT vl.*, COALESCE(au.name, au.username, sr.name) AS actor_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY vl.date DESC, vl.timestamp DESC`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
     return Response.json({ status: 'success', data: rows.map(mapVisitLogRow) });

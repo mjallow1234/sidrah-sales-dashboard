@@ -38,15 +38,18 @@ export function TransactionTable({ transactions, salesRepNames, actorNames }: Tr
         <div className="hidden sm:block">Actor</div>
       </div>
       <div className="divide-y divide-slate-200">
-        {transactions.map((transaction) => (
-          <div key={transaction.transaction_id} className="grid grid-cols-4 gap-4 px-4 py-4 text-sm text-slate-700 sm:grid-cols-6">
+        {transactions.map((transaction, index) => (
+          <div
+            key={`${transaction.transaction_id || 'transaction'}-${transaction.vendor_id}-${transaction.date}-${index}`}
+            className="grid grid-cols-4 gap-4 px-4 py-4 text-sm text-slate-700 sm:grid-cols-6"
+          >
             <div>{transaction.date}</div>
             <div>{transaction.stock_sold}</div>
             <div>{transaction.stock_added}</div>
             <div>{transaction.cash_collected.toLocaleString()}</div>
             <div className="hidden sm:block">{transaction.closing_stock}</div>
             <div className="hidden sm:block">
-              {resolveActorLabel(transaction.sales_rep, salesRepNames, actorNames)}
+              {resolveActorLabel(transaction.actor, salesRepNames, actorNames)}
             </div>
           </div>
         ))}

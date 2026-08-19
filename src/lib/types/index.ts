@@ -160,6 +160,7 @@ export interface Transaction {
   cash_collected: number;
   closing_stock: number;
   sales_rep: string;
+  actor: string;
   notes: string;
 }
 

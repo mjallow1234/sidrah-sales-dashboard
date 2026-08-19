@@ -11,6 +11,7 @@ function mapVisitLogToTransaction(log: any): Transaction {
     cash_collected: Number(log.cash_collected) || 0,
     closing_stock: Number(log.closing_stock) || 0,
     sales_rep: log.sales_rep_id || '',
+    actor: log.actor || '',
     notes: log.notes || '',
   };
 }
