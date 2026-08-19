@@ -147,7 +147,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
             >
               {vendors.map((vendor) => (
                 <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                  {vendor.vendor_name}
+                  {`${vendor.vendor_name} — ${vendor.vendor_id} — ${vendor.phone}`}
                 </option>
               ))}
             </select>

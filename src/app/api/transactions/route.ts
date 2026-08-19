@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { query as dbQuery } from '@/lib/db';
-import { getVerifiedSession, unauthorizedResponse } from '@/lib/session';
-import { isAgentRole } from '@/lib/authorization';
+import { getVerifiedSession, unauthorizedResponse, forbiddenResponse } from '@/lib/session';
+import { isAgentRole, isAdminOrSupervisorRole } from '@/lib/authorization';
 
 function formatDateValue(value: unknown): string {
   if (value instanceof Date) {
@@ -62,7 +62,32 @@ export async function GET(request: NextRequest) {
     const paymentMethod = query.get('paymentMethod') || query.get('payment_method');
     const market = query.get('market');
 
-    if (isAgentRole(session.role)) {
+    if (vendorId) {
+      const [[vendorRow]] = await dbQuery<any[]>(
+        'SELECT sales_rep_id FROM vendors WHERE vendor_id = ? LIMIT 1',
+        [vendorId],
+      );
+
+      if (!vendorRow) {
+        return Response.json({ status: 'success', data: [] });
+      }
+
+      const assignedSalesRepId = vendorRow.sales_rep_id as string | null;
+      if (assignedSalesRepId) {
+        if (!session) {
+          return unauthorizedResponse();
+        }
+
+        if (!isAdminOrSupervisorRole(session.role) && !(isAgentRole(session.role) && session.sales_rep_id === assignedSalesRepId)) {
+          return forbiddenResponse();
+        }
+      }
+
+      filters.push('vl.vendor_id = :vendor_id');
+      params.vendor_id = vendorId;
+    }
+
+    if (isAgentRole(session.role) && !vendorId) {
       const now = new Date();
       const today = now.toISOString().slice(0, 10);
       if (!startDate && !endDate) {
@@ -73,11 +98,6 @@ export async function GET(request: NextRequest) {
         filters.push('vl.sales_rep_id = :session_sales_rep_id');
         params.session_sales_rep_id = session.sales_rep_id;
       }
-    }
-
-    if (vendorId) {
-      filters.push('vl.vendor_id = :vendor_id');
-      params.vendor_id = vendorId;
     }
     if (salesRepId) {
       filters.push('vl.sales_rep_id = :sales_rep_id');

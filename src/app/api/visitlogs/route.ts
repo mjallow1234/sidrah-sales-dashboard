@@ -1,5 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { query as dbQuery } from '@/lib/db';
+import { getVerifiedSession, unauthorizedResponse, forbiddenResponse } from '@/lib/session';
+import { isAgentRole, isAdminOrSupervisorRole } from '@/lib/authorization';
 
 function formatDateValue(value: unknown): string {
   if (value instanceof Date) {
@@ -43,6 +45,7 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getVerifiedSession(request);
     const query = request.nextUrl.searchParams;
     const filters: string[] = [];
     const params: Record<string, unknown> = {};
@@ -54,6 +57,38 @@ export async function GET(request: NextRequest) {
     const startDate = query.get('startDate');
     const endDate = query.get('endDate');
     const market = query.get('market');
+
+    if (vendorId) {
+      const [[vendorRow]] = await dbQuery<any[]>(
+        'SELECT sales_rep_id FROM vendors WHERE vendor_id = ? LIMIT 1',
+        [vendorId],
+      );
+
+      if (!vendorRow) {
+        return Response.json({ status: 'success', data: [] });
+      }
+
+      const assignedSalesRepId = vendorRow.sales_rep_id as string | null;
+      if (assignedSalesRepId) {
+        if (!session) {
+          return unauthorizedResponse();
+        }
+
+        if (!isAdminOrSupervisorRole(session.role) && !(isAgentRole(session.role) && session.sales_rep_id === assignedSalesRepId)) {
+          return forbiddenResponse();
+        }
+      }
+
+      filters.push('vl.vendor_id = :vendor_id');
+      params.vendor_id = vendorId;
+    }
+
+    if (session && isAgentRole(session.role) && !vendorId) {
+      if (session.sales_rep_id) {
+        filters.push('vl.sales_rep_id = :session_sales_rep_id');
+        params.session_sales_rep_id = session.sales_rep_id;
+      }
+    }
 
     if (vendorId) {
       filters.push('vl.vendor_id = :vendor_id');
