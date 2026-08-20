@@ -247,6 +247,20 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
       [now, adminId, reason, operationId, visitId]
     );
 
+    const adminStockRepo = new AdminStockMovementRepository(connection);
+    await adminStockRepo.create({
+      admin_stock_movement_id: generateId('ASM'),
+      operation_id: operationId,
+      movement_type: 'retrieval',
+      product_id: visit.product_id,
+      source_vendor_id: visit.vendor_id,
+      destination_vendor_id: null,
+      quantity: Number(visit.stock_added ?? 0),
+      admin_id: adminId,
+      timestamp: now,
+      notes: reason ?? null,
+    });
+
     await journalRepo.create({
       transaction_id: transactionId,
       timestamp: now,
