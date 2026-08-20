@@ -22,7 +22,7 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     return false;
   }
 
-  if (pathname === '/dashboard' || pathname.startsWith('/visits')) {
+  if (pathname === '/dashboard' || pathname.startsWith('/visits') || pathname === '/visit/reverse' || pathname === '/admin-stock') {
     return true;
   }
 
@@ -62,6 +62,10 @@ export function canViewLink(role: string | undefined, href: string): boolean {
     return false;
   }
 
+  if (href === '/admin-activity') {
+    return isAdminOrSupervisorRole(role);
+  }
+
   if (href.startsWith('/users')) {
     return isAdminRole(role);
   }
@@ -79,6 +83,10 @@ export function canViewLink(role: string | undefined, href: string): boolean {
   }
 
   if (href.startsWith('/products')) {
+    return isAdminRole(role) || isSupervisorRole(role);
+  }
+
+  if (href === '/visit/reverse' || href === '/admin-stock') {
     return isAdminRole(role) || isSupervisorRole(role);
   }
 

@@ -91,6 +91,13 @@ export interface VisitResult {
   vendorBalance: VendorBalance;
 }
 
+export interface ReverseVisitResult {
+  visitLog: Record<string, unknown>;
+  inventory: Inventory;
+  vendorInventory: VendorInventory;
+  vendorBalance: VendorBalance;
+}
+
 export interface AppUser {
   user_id: string;
   username: string;
@@ -162,6 +169,59 @@ export interface Transaction {
   sales_rep: string;
   actor: string;
   notes: string;
+  is_reversed?: boolean;
+  reversed_at?: string;
+  reversed_by?: string;
+  reversal_reason?: string;
+  reversal_operation_id?: string;
+}
+
+export interface AdminStockMovement {
+  admin_stock_movement_id: string;
+  operation_id: string;
+  movement_type: 'transfer' | 'retrieval';
+  product_id: string;
+  source_vendor_id?: string | null;
+  destination_vendor_id?: string | null;
+  quantity: number;
+  admin_id: string;
+  timestamp: string;
+  notes?: string | null;
+  created_at: string;
+}
+
+export interface AdminActivityRecord {
+  operation_id: string;
+  action_type: 'transfer' | 'retrieval' | 'reversal';
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  admin_id: string;
+  admin_name: string;
+  source_vendor_id?: string | null;
+  source_vendor_name?: string | null;
+  destination_vendor_id?: string | null;
+  destination_vendor_name?: string | null;
+  vendor_id?: string | null;
+  vendor_name?: string | null;
+  notes?: string | null;
+  timestamp: string;
+  created_at: string;
+  reversal_visit_id?: string | null;
+  original_visit_timestamp?: string | null;
+  original_visit_date?: string | null;
+  original_sales_rep_id?: string | null;
+  original_sales_rep_name?: string | null;
+  original_actor?: string | null;
+  reversal_reason?: string | null;
+  status?: string | null;
+}
+
+export interface ReverseVisitResult {
+  visitLog: Record<string, unknown>;
+  inventory: Inventory;
+  vendorInventory: VendorInventory;
+  vendorBalance: VendorBalance;
 }
 
 export interface DashboardFilters {

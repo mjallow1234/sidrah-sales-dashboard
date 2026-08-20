@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  ArrowRightLeft,
   BarChart3,
   Box,
   CalendarCheck,
@@ -33,6 +34,7 @@ const navSections = [
     links: [
       { label: 'Vendor list', href: '/vendors', icon: Truck },
       { label: 'New vendor', href: '/vendors/new', icon: PlusCircle },
+      { label: 'Admin stock', href: '/admin-stock', icon: Truck },
     ],
   },
   {
@@ -60,6 +62,7 @@ const navSections = [
     title: 'Visits',
     links: [
       { label: 'Visits', href: '/visits', icon: CalendarCheck },
+      { label: 'Reverse visit', href: '/visit/reverse', icon: ArrowRightLeft },
     ],
   },
   {
@@ -67,6 +70,7 @@ const navSections = [
     links: [
       { label: 'Reports', href: '/reports', icon: BarChart3 },
       { label: 'Transactions', href: '/transactions', icon: CalendarCheck },
+      { label: 'Admin activity', href: '/admin-activity', icon: ArrowRightLeft },
     ],
   },
 ];

@@ -6,8 +6,10 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
+import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
+import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances } from '@/lib/api/inventory';
-import { DEFAULT_DASHBOARD_STATS, type DashboardStats, type Inventory, type Product, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
+import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
 export interface PaginatedResult<T> {
@@ -287,6 +289,24 @@ export function useCreateVisitMutation() {
   });
 }
 
+export function useReverseVisitMutation() {
+  return useMutation<ReverseVisitResult, Error, Parameters<typeof reverseVisit>[0]>({
+    mutationFn: reverseVisit,
+  });
+}
+
+export function useTransferStockMutation() {
+  return useMutation<any, Error, Parameters<typeof transferStock>[0]>({
+    mutationFn: transferStock,
+  });
+}
+
+export function useRetrieveStockMutation() {
+  return useMutation<any, Error, Parameters<typeof retrieveStock>[0]>({
+    mutationFn: retrieveStock,
+  });
+}
+
 export function useCreateSupplyMutation() {
   const queryClient = useQueryClient();
 
@@ -296,6 +316,16 @@ export function useCreateSupplyMutation() {
       queryClient.invalidateQueries({ queryKey: ['vendorInventory', variables.vendor_id] });
       queryClient.invalidateQueries({ queryKey: ['vendor', variables.vendor_id] });
       queryClient.invalidateQueries({ queryKey: ['visitLogs', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['adminActivity'] });
     },
+  });
+}
+
+export function useAdminActivityQuery(filters?: { startDate?: string; endDate?: string; actionType?: string; adminId?: string; vendorId?: string; productId?: string; search?: string }) {
+  return useQuery<AdminActivityRecord[]>({
+    queryKey: ['adminActivity', filters],
+    queryFn: () => getAdminActivity(filters),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }

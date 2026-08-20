@@ -52,14 +52,14 @@ async function updateAppUser(userId: string, payload: Record<string, unknown>) {
 }
 
 export function useAppUsersQuery() {
-  return useQuery({
+  return useQuery<AppUser[]>({
     queryKey: ['appUsers'],
     queryFn: () => fetchAppUsers(),
   });
 }
 
 export function useAppUserQuery(userId: string) {
-  return useQuery({
+  return useQuery<AppUser>({
     queryKey: ['appUser', userId],
     queryFn: () => fetchAppUser(userId),
     enabled: !!userId,
