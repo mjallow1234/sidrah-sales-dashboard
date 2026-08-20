@@ -22,6 +22,11 @@ export interface VisitLogRecord {
   latitude?: number | null;
   longitude?: number | null;
   notes?: string;
+  is_reversed?: boolean;
+  reversed_at?: string | null;
+  reversed_by?: string | null;
+  reversal_reason?: string | null;
+  reversal_operation_id?: string | null;
   date_created: string;
   last_updated: string;
   created_by?: string | null;
