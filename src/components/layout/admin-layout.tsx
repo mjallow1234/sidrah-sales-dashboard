@@ -162,7 +162,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <nav className="space-y-1">
+        <nav className="flex-1 overflow-y-auto space-y-1">
           {visibleNavSections.map((section) => (
             <div key={section.title}>
               <p className={sectionTitleClasses()}>{section.title}</p>
@@ -252,7 +252,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
       {drawerOpen ? (
         <div className="fixed inset-0 z-50 flex bg-slate-900/40 lg:hidden">
-          <div className="w-full max-w-xs border-r border-slate-200 bg-white p-6 shadow-xl">
+          <div className="w-full max-w-xs max-h-screen border-r border-slate-200 bg-white p-6 shadow-xl flex flex-col">
             <div className="mb-8 flex items-center justify-between gap-3">
               <div>
                 <p className="text-xs uppercase tracking-[0.24em] text-sidrah-500">Menu</p>
@@ -267,7 +267,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               </button>
             </div>
 
-            <nav className="space-y-1">
+            <nav className="flex-1 min-h-0 overflow-y-auto space-y-1">
               {visibleNavSections.map((section) => (
                 <div key={section.title}>
                   <p className={sectionTitleClasses()}>{section.title}</p>
