@@ -5,6 +5,7 @@ import { IdSequenceRepository } from '@/repositories/IdSequenceRepository';
 import { InventoryRepository } from '@/repositories/InventoryRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository';
+import { VendorInventoryRepository } from '@/repositories/VendorInventoryRepository';
 import { VendorRepository } from '@/repositories/VendorRepository';
 import { ValidationError, NotFoundError } from './errors';
 
@@ -36,6 +37,10 @@ function validateVendorPayload(payload: Record<string, unknown>): void {
 
 function generateInventoryId(): string {
   return `I_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+}
+
+function generateVendorInventoryId(): string {
+  return `VI_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
 
 export async function getVendorList(): Promise<Vendor[]> {
@@ -98,6 +103,7 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
     const vendorRepository = new VendorRepository(connection);
     const productRepository = new ProductRepository(connection);
     const inventoryRepository = new InventoryRepository(connection);
+    const vendorInventoryRepository = new VendorInventoryRepository(connection);
     const balanceRepository = new VendorBalanceRepository(connection);
     const sequenceRepository = new IdSequenceRepository(connection);
     const salesRepId = typeof payload.sales_rep_id === 'string' && payload.sales_rep_id !== ''
@@ -150,6 +156,18 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
         current_stock: 0,
         date_created: nowDate,
         last_updated: nowDateTime,
+        created_by: createdBy ?? undefined,
+      });
+
+      await vendorInventoryRepository.create({
+        vendor_inventory_id: generateVendorInventoryId(),
+        vendor_id: vendorId,
+        product_id: product.product_id,
+        current_stock: 0,
+        total_stock_received: 0,
+        total_stock_sold: 0,
+        created_at: nowDate,
+        updated_at: nowDateTime,
         created_by: createdBy ?? undefined,
       });
     }

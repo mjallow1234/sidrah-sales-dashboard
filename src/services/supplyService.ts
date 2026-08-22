@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto';
+import type { PoolConnection } from 'mysql2/promise';
 import { getPool, transaction } from '@/lib/db';
 import type { Inventory, VendorInventory } from '@/lib/types';
 import { InventoryRepository } from '@/repositories/InventoryRepository';
@@ -93,6 +94,86 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+async function createInventoryIfMissing(
+  connection: PoolConnection,
+  inventoryRepo: InventoryRepository,
+  vendorId: string,
+  productId: string,
+  nowDate: string,
+  now: string,
+): Promise<any> {
+  const [inventoryRows] = await connection.execute<any[]>(
+    'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+    [vendorId, productId],
+  );
+  let inventory = inventoryRows[0];
+  if (!inventory) {
+    try {
+      inventory = await inventoryRepo.create({
+        inventory_id: generateId('I'),
+        vendor_id: vendorId,
+        product_id: productId,
+        total_stock_supplied: 0,
+        total_stock_sold: 0,
+        current_stock: 0,
+        date_created: nowDate,
+        last_updated: now,
+      });
+    } catch (error) {
+      if (isDuplicateEntry(error)) {
+        const [retryRows] = await connection.execute<any[]>(
+          'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+          [vendorId, productId],
+        );
+        inventory = retryRows[0];
+      } else {
+        throw error;
+      }
+    }
+  }
+  return inventory;
+}
+
+async function createVendorInventoryIfMissing(
+  connection: PoolConnection,
+  vendorInventoryRepo: VendorInventoryRepository,
+  vendorId: string,
+  productId: string,
+  nowDate: string,
+  now: string,
+): Promise<any> {
+  const [vendorInventoryRows] = await connection.execute<any[]>(
+    'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+    [vendorId, productId],
+  );
+  let vendorInventory = vendorInventoryRows[0];
+  if (!vendorInventory) {
+    try {
+      vendorInventory = await vendorInventoryRepo.create({
+        vendor_inventory_id: generateId('VI'),
+        vendor_id: vendorId,
+        product_id: productId,
+        current_stock: 0,
+        total_stock_received: 0,
+        total_stock_sold: 0,
+        created_at: nowDate,
+        updated_at: now,
+      });
+    } catch (error) {
+      if (isDuplicateEntry(error)) {
+        const [retryRows] = await connection.execute<any[]>(
+          'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+          [vendorId, productId],
+        );
+        vendorInventory = retryRows[0];
+      } else {
+        throw error;
+      }
+    }
+  }
+  return vendorInventory;
+}
+
 async function executeWithRetry<T>(operation: () => Promise<T>, maxAttempts = 3): Promise<T> {
   let attempt = 0;
   while (attempt < maxAttempts) {
@@ -155,6 +236,7 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
   const actor = payload.actor_role ? String(payload.actor_role) : undefined;
   const transactionId = generateId('T');
   const now = formatSqlDateTime(new Date());
+  const nowDate = new Date().toISOString().slice(0, 10);
   const journalPayload = { ...payload, client_transaction_id: clientTransactionId };
 
   try {
@@ -229,23 +311,8 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
         }
       }
 
-      const [inventoryRows] = await connection.execute<any[]>(
-        'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
-        [vendorId, productId],
-      );
-      const inventory = inventoryRows[0];
-      if (!inventory) {
-        throw new ServiceError('Inventory row missing for vendor/product.', 500, 'INVENTORY_MISSING');
-      }
-
-      const [vendorInventoryRows] = await connection.execute<any[]>(
-        'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
-        [vendorId, productId],
-      );
-      const vendorInventory = vendorInventoryRows[0];
-      if (!vendorInventory) {
-        throw new ServiceError('VendorInventory row missing after migration. Data integrity error.', 500, 'VENDOR_INVENTORY_MISSING');
-      }
+      const inventory = await createInventoryIfMissing(connection, inventoryRepo, vendorId, productId, nowDate, now);
+      const vendorInventory = await createVendorInventoryIfMissing(connection, vendorInventoryRepo, vendorId, productId, nowDate, now);
 
       await journal('inventory', 'pending');
       const updatedInventory = await inventoryRepo.update(inventory.inventory_id, {

@@ -317,32 +317,42 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     let inventoryId = inventoryRow?.inventory_id;
     let inventoryExisted = Boolean(inventoryRow);
 
+    const openingStock = inventoryRow ? Number(inventoryRow.current_stock) || 0 : 0;
+
     const [vendorInventoryRows] = (await connection.execute(
       'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
       [vendorId, productId]
     )) as [VendorInventory[], unknown];
-    const vendorInventoryRow = vendorInventoryRows.length > 0 ? vendorInventoryRows[0] : null;
+    let vendorInventoryRow = vendorInventoryRows.length > 0 ? vendorInventoryRows[0] : null;
 
     if (!vendorInventoryRow) {
-      await journalRepo.create({
-        transaction_id: transactionId,
-        timestamp: nowDateTime,
-        endpoint: '/visit',
-        stage: 'vendor_inventory_missing_after_migration',
-        status: 'failure',
-        payload: {
-          ...payload,
-          client_transaction_id: clientTransactionId,
-        },
-        completed: false,
-        actor,
-        error_message: 'VendorInventory row missing after migration. Data integrity error.',
-        duration_ms: 0,
-      });
-      throw new HttpError(500, 'VendorInventory row missing after migration. Data integrity error.');
+      try {
+        vendorInventoryRow = await vendorInventoryRepo.create({
+          vendor_inventory_id: generateId('VI'),
+          vendor_id: vendorId,
+          product_id: productId,
+          current_stock: openingStock,
+          total_stock_received: 0,
+          total_stock_sold: 0,
+          created_at: nowDate,
+          updated_at: nowDateTime,
+        });
+      } catch (error) {
+        if (isDuplicateEntry(error)) {
+          const [retryRows] = (await connection.execute(
+            'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+            [vendorId, productId]
+          )) as [VendorInventory[], unknown];
+          vendorInventoryRow = retryRows.length > 0 ? retryRows[0] : null;
+          if (!vendorInventoryRow) {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
     }
 
-    const openingStock = inventoryRow ? Number(inventoryRow.current_stock) || 0 : 0;
     const vendorOpeningStock = Number(vendorInventoryRow.current_stock) || openingStock;
     const availableVendorStock = vendorOpeningStock + stockAdded;
 
