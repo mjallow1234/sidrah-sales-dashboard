@@ -239,6 +239,8 @@ export interface DashboardStats {
   cashCollected: number;
   lowStockVendors: number;
   outstandingBalances: number;
+  totalVendorReceivables: number;
+  vendorCredits: number;
   averageSalesPerVendor: number;
   totalActiveVendors: number;
   newVendorsInRange: number;
@@ -253,6 +255,8 @@ export const DEFAULT_DASHBOARD_STATS: DashboardStats = {
   cashCollected: 0,
   lowStockVendors: 0,
   outstandingBalances: 0,
+  totalVendorReceivables: 0,
+  vendorCredits: 0,
   averageSalesPerVendor: 0,
   totalActiveVendors: 0,
   newVendorsInRange: 0,

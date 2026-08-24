@@ -19,32 +19,57 @@ export async function GET(request: NextRequest) {
     const monthStart = `${dayString.slice(0, 7)}-01`;
     const startDate = query.get('startDate') || query.get('start_date');
     const endDate = query.get('endDate') || query.get('end_date');
-    const summaryFilters: string[] = [];
-    const summaryParams: Record<string, string> = {};
+    const vendorId = query.get('vendorId') || query.get('vendor_id');
+    const salesRepId = query.get('salesRepId') || query.get('sales_rep_id');
+    const productId = query.get('productId') || query.get('product_id');
+    const market = query.get('market');
 
+    const visitFilters: string[] = [];
+    const visitParams: Record<string, unknown> = {};
+
+    if (vendorId) {
+      visitFilters.push('vl.vendor_id = :vendor_id');
+      visitParams.vendor_id = vendorId;
+    }
+    if (salesRepId) {
+      visitFilters.push('vl.sales_rep_id = :sales_rep_id');
+      visitParams.sales_rep_id = salesRepId;
+    }
+    if (productId) {
+      visitFilters.push('vl.product_id = :product_id');
+      visitParams.product_id = productId;
+    }
     if (startDate) {
-      summaryFilters.push('vl.date >= :summaryStartDate');
-      summaryParams.summaryStartDate = startDate;
+      visitFilters.push('vl.date >= :startDate');
+      visitParams.startDate = startDate;
     }
     if (endDate) {
-      summaryFilters.push('vl.date <= :summaryEndDate');
-      summaryParams.summaryEndDate = endDate;
+      visitFilters.push('vl.date <= :endDate');
+      visitParams.endDate = endDate;
     }
-    if (!startDate && !endDate) {
-      summaryFilters.push('vl.date = :summaryToday');
-      summaryParams.summaryToday = dayString;
+    const visitJoinClause = market ? 'INNER JOIN vendors v ON v.vendor_id = vl.vendor_id' : '';
+    if (market) {
+      visitFilters.push('v.location = :market');
+      visitParams.market = market;
     }
 
+    if (!startDate && !endDate) {
+      visitFilters.push('vl.date = :summaryToday');
+      visitParams.summaryToday = dayString;
+    }
+
+    const visitWhereClause = visitFilters.length > 0 ? `WHERE ${visitFilters.join(' AND ')}` : '';
     const summaryQuery = `
       SELECT
         COUNT(DISTINCT vl.vendor_id) AS vendorsVisited,
         COALESCE(SUM(vl.stock_sold), 0) AS bucketsSold,
         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
       FROM visit_logs vl
-      WHERE ${summaryFilters.join(' AND ')}
+      ${visitJoinClause}
+      ${visitWhereClause}
     `;
 
-    const [summaryRows] = await dbQuery<{ vendorsVisited: string | number; bucketsSold: string | number; cashCollected: string | number }[]>(summaryQuery, summaryParams);
+    const [summaryRows] = await dbQuery<{ vendorsVisited: string | number; bucketsSold: string | number; cashCollected: string | number }[]>(summaryQuery, visitParams);
     const summary = summaryRows[0] ?? { vendorsVisited: 0, bucketsSold: 0, cashCollected: 0 };
 
     const totalActiveVendorsQuery = `
@@ -70,20 +95,60 @@ export async function GET(request: NextRequest) {
     );
     const lowStockThreshold = toNumber(thresholdRow[0]?.[0]?.setting_value ?? 5, 5);
 
+    const lowStockFilters: string[] = ['i.current_stock <= :lowStockThreshold'];
+    const lowStockParams: Record<string, unknown> = { lowStockThreshold };
+    const lowStockJoinClause = market ? 'INNER JOIN vendors v ON v.vendor_id = i.vendor_id' : '';
+
+    if (vendorId) {
+      lowStockFilters.push('i.vendor_id = :vendor_id');
+      lowStockParams.vendor_id = vendorId;
+    }
+    if (productId) {
+      lowStockFilters.push('i.product_id = :product_id');
+      lowStockParams.product_id = productId;
+    }
+    if (market) {
+      lowStockFilters.push('v.location = :market');
+      lowStockParams.market = market;
+    }
+
+    const lowStockWhereClause = lowStockFilters.length > 0 ? `WHERE ${lowStockFilters.join(' AND ')}` : '';
     const lowStockQuery = `
       SELECT COUNT(DISTINCT i.vendor_id) AS lowStockVendors
       FROM inventory i
-      WHERE i.current_stock <= :lowStockThreshold
+      ${lowStockJoinClause}
+      ${lowStockWhereClause}
     `;
-    const [lowStockRows] = await dbQuery<{ lowStockVendors: string | number }[]>(lowStockQuery, { lowStockThreshold });
+    const [lowStockRows] = await dbQuery<{ lowStockVendors: string | number }[]>(lowStockQuery, lowStockParams);
     const lowStockVendors = toNumber(lowStockRows[0]?.lowStockVendors ?? 0);
 
-    const outstandingBalancesQuery = `
-      SELECT COALESCE(SUM(vb.balance_owed), 0) AS outstandingBalances
+    const balanceFilters: string[] = [];
+    const balanceParams: Record<string, unknown> = {};
+    const balanceJoinClause = market ? 'INNER JOIN vendors v ON v.vendor_id = vb.vendor_id' : '';
+
+    if (vendorId) {
+      balanceFilters.push('vb.vendor_id = :vendor_id');
+      balanceParams.vendor_id = vendorId;
+    }
+    if (market) {
+      balanceFilters.push('v.location = :market');
+      balanceParams.market = market;
+    }
+
+    const balanceWhereClause = balanceFilters.length > 0 ? `WHERE ${balanceFilters.join(' AND ')}` : '';
+    const balanceSummaryQuery = `
+      SELECT
+        COALESCE(SUM(vb.balance_owed), 0) AS outstandingBalances,
+        COALESCE(SUM(CASE WHEN vb.balance_owed > 0 THEN vb.balance_owed ELSE 0 END), 0) AS totalVendorReceivables,
+        COALESCE(SUM(CASE WHEN vb.balance_owed < 0 THEN ABS(vb.balance_owed) ELSE 0 END), 0) AS vendorCredits
       FROM vendor_balances vb
+      ${balanceJoinClause}
+      ${balanceWhereClause}
     `;
-    const [balanceRows] = await dbQuery<{ outstandingBalances: string | number }[]>(outstandingBalancesQuery);
+    const [balanceRows] = await dbQuery<Array<{ outstandingBalances: string | number; totalVendorReceivables: string | number; vendorCredits: string | number }>>(balanceSummaryQuery, balanceParams);
     const outstandingBalances = toNumber(balanceRows[0]?.outstandingBalances ?? 0);
+    const totalVendorReceivables = toNumber(balanceRows[0]?.totalVendorReceivables ?? 0);
+    const vendorCredits = toNumber(balanceRows[0]?.vendorCredits ?? 0);
 
     const vendorsVisited = toNumber(summary.vendorsVisited);
     const bucketsSold = toNumber(summary.bucketsSold);
@@ -93,27 +158,33 @@ export async function GET(request: NextRequest) {
     const salesByRepQuery = `
       SELECT vl.sales_rep_id, COALESCE(SUM(vl.cash_collected), 0) AS cash_collected, COALESCE(SUM(vl.stock_sold), 0) AS stock_sold
       FROM visit_logs vl
+      ${visitJoinClause}
+      ${visitWhereClause}
       GROUP BY vl.sales_rep_id
       ORDER BY cash_collected DESC
     `;
-    const [salesByRepRows] = await dbQuery<Array<{ sales_rep_id: string; cash_collected: string | number; stock_sold: string | number }>>(salesByRepQuery);
+    const [salesByRepRows] = await dbQuery<Array<{ sales_rep_id: string; cash_collected: string | number; stock_sold: string | number }>>(salesByRepQuery, visitParams);
 
     const collectionsByRepQuery = `
       SELECT vl.sales_rep_id, COALESCE(SUM(vl.cash_collected), 0) AS cash_collected
       FROM visit_logs vl
+      ${visitJoinClause}
+      ${visitWhereClause}
       GROUP BY vl.sales_rep_id
       ORDER BY cash_collected DESC
     `;
-    const [collectionsByRepRows] = await dbQuery<Array<{ sales_rep_id: string; cash_collected: string | number }>>(collectionsByRepQuery);
+    const [collectionsByRepRows] = await dbQuery<Array<{ sales_rep_id: string; cash_collected: string | number }>>(collectionsByRepQuery, visitParams);
 
     const topVendorsQuery = `
       SELECT vl.vendor_id, COALESCE(SUM(vl.cash_collected), 0) AS cash_collected
       FROM visit_logs vl
+      ${visitJoinClause}
+      ${visitWhereClause}
       GROUP BY vl.vendor_id
       ORDER BY cash_collected DESC
       LIMIT 10
     `;
-    const [topVendorRows] = await dbQuery<Array<{ vendor_id: string; cash_collected: string | number }>>(topVendorsQuery);
+    const [topVendorRows] = await dbQuery<Array<{ vendor_id: string; cash_collected: string | number }>>(topVendorsQuery, visitParams);
 
     const stats = {
       totalActiveVendors,
@@ -126,6 +197,8 @@ export async function GET(request: NextRequest) {
       cashCollectedToday: cashCollected,
       cashCollected,
       outstandingBalances,
+      totalVendorReceivables,
+      vendorCredits,
       lowStockVendors,
       averageSalesPerVendor,
       salesBySalesRep: salesByRepRows.map((row) => ({

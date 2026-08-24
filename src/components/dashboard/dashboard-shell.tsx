@@ -104,8 +104,9 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
                 <StatsCard label="Vendors visited" value={isLoading ? '...' : stats?.vendorsVisited ?? 0} description={isAgent ? "Vendors visited today." : "Vendors visited in the selected period."} />
                 <StatsCard label="Buckets sold" value={isLoading ? '...' : stats?.bucketsSold ?? 0} description={isAgent ? "Buckets sold today." : "Total stock sold in the selected period."} />
                 <StatsCard label="Cash collected" value={isLoading ? '...' : `GMD ${(stats?.cashCollected ?? 0).toLocaleString()}`} description={isAgent ? "Cash collected today." : "Cash collected in the selected period."} />
-                <StatsCard label="Low stock" value={isLoading ? '...' : stats?.lowStockVendors ?? 0} description={isAgent ? "Vendors with low inventory today." : "Vendors with low inventory in the selected period."} />
-                <StatsCard label="Outstanding balances" value={isLoading ? '...' : stats?.outstandingBalances ?? 0} description={isAgent ? "Outstanding balance today." : "Vendors owing cash."} />
+                <StatsCard label="Total vendor receivables" value={isLoading ? '...' : `GMD ${(stats?.totalVendorReceivables ?? 0).toLocaleString()}`} description={isAgent ? "Total vendor receivables today." : "Sum of positive outstanding vendor balances."} />
+                <StatsCard label="Vendor credits" value={isLoading ? '...' : `GMD ${(stats?.vendorCredits ?? 0).toLocaleString()}`} description={isAgent ? "Vendor credits today." : "Sum of vendor credit balances."} />
+                <StatsCard label="Net outstanding balance" value={isLoading ? '...' : `GMD ${(stats?.outstandingBalances ?? 0).toLocaleString()}`} description={isAgent ? "Outstanding balance today." : "Receivables minus vendor credits."} />
               </section>
             )}
           </div>

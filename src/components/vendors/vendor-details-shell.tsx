@@ -102,8 +102,18 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               <p className="mt-2 text-2xl font-semibold text-slate-900">{currentStock}</p>
             </div>
             <div className="rounded-3xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Balance owed</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">GMD {(vendorBalance?.balance_owed ?? 0).toLocaleString()}</p>
+              <p className="text-sm text-slate-500">Vendor balance</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                {vendorBalance?.balance_owed === undefined || vendorBalance?.balance_owed === null ? (
+                  'GMD 0'
+                ) : vendorBalance.balance_owed > 0 ? (
+                  `GMD ${vendorBalance.balance_owed.toLocaleString()} owed`
+                ) : vendorBalance.balance_owed < 0 ? (
+                  `GMD ${Math.abs(vendorBalance.balance_owed).toLocaleString()} credit`
+                ) : (
+                  'GMD 0'
+                )}
+              </p>
             </div>
           </div>
         </section>
