@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { StatsCard } from '@/components/dashboard/stats-card';
-import { useStatsQuery } from '@/lib/hooks/queries';
+import { VendorsOwingModal } from '@/components/dashboard/vendors-owing-modal';
+import { useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-provider';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
@@ -60,6 +61,62 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
     router.push('/login');
   };
 
+  const [isVendorsOwingOpen, setIsVendorsOwingOpen] = useState(false);
+
+  const { data: vendorsOwing, isLoading: vendorsOwingLoading } = useVendorsOwingQuery();
+
+  const cardRows = useMemo(() => {
+    if (isAgent) {
+      return [
+        {
+          label: 'Vendors visited',
+          value: isLoading ? '...' : stats?.vendorsVisited ?? 0,
+          description: 'Vendors visited today.',
+        },
+        {
+          label: 'Buckets sold',
+          value: isLoading ? '...' : stats?.bucketsSold ?? 0,
+          description: 'Buckets sold today.',
+        },
+        {
+          label: 'Cash collected',
+          value: isLoading ? '...' : `GMD ${(stats?.cashCollected ?? 0).toLocaleString()}`,
+          description: 'Cash collected today.',
+        },
+        {
+          label: 'Balance owed',
+          value: isLoading ? '...' : `GMD ${(stats?.totalVendorReceivables ?? 0).toLocaleString()}`,
+          description: 'Total outstanding balance from your vendors.',
+          action: () => setIsVendorsOwingOpen(true),
+          isClickable: true,
+        },
+      ];
+    }
+
+    return [
+      {
+        label: 'Total vendors',
+        value: isLoading ? '...' : stats?.totalActiveVendors ?? 0,
+        description: 'Total number of active vendors.',
+      },
+      {
+        label: 'Buckets sold',
+        value: isLoading ? '...' : stats?.bucketsSold ?? 0,
+        description: 'Total stock sold in the selected period.',
+      },
+      {
+        label: 'Cash collected',
+        value: isLoading ? '...' : `GMD ${(stats?.cashCollected ?? 0).toLocaleString()}`,
+        description: 'Cash collected in the selected period.',
+      },
+      {
+        label: 'Total amount owed',
+        value: isLoading ? '...' : `GMD ${(stats?.totalAmountOwed ?? 0).toLocaleString()}`,
+        description: 'Current cumulative outstanding product value minus cash received.',
+      },
+    ];
+  }, [isAgent, isLoading, stats]);
+
   return (
     <div className="px-4 pb-24 pt-8 sm:px-6 sm:pb-8 lg:px-8">
       <div className="mx-auto max-w-5xl space-y-8">
@@ -100,13 +157,17 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
                 Unable to load dashboard stats. Please refresh the page.
               </div>
             ) : (
-              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                <StatsCard label="Vendors visited" value={isLoading ? '...' : stats?.vendorsVisited ?? 0} description={isAgent ? "Vendors visited today." : "Vendors visited in the selected period."} />
-                <StatsCard label="Buckets sold" value={isLoading ? '...' : stats?.bucketsSold ?? 0} description={isAgent ? "Buckets sold today." : "Total stock sold in the selected period."} />
-                <StatsCard label="Cash collected" value={isLoading ? '...' : `GMD ${(stats?.cashCollected ?? 0).toLocaleString()}`} description={isAgent ? "Cash collected today." : "Cash collected in the selected period."} />
-                <StatsCard label="Total vendor receivables" value={isLoading ? '...' : `GMD ${(stats?.totalVendorReceivables ?? 0).toLocaleString()}`} description={isAgent ? "Total vendor receivables today." : "Sum of positive outstanding vendor balances."} />
-                <StatsCard label="Vendor credits" value={isLoading ? '...' : `GMD ${(stats?.vendorCredits ?? 0).toLocaleString()}`} description={isAgent ? "Vendor credits today." : "Sum of vendor credit balances."} />
-                <StatsCard label="Net outstanding balance" value={isLoading ? '...' : `GMD ${(stats?.outstandingBalances ?? 0).toLocaleString()}`} description={isAgent ? "Outstanding balance today." : "Receivables minus vendor credits."} />
+              <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2">
+                {cardRows.map((card) => (
+                  <StatsCard
+                    key={card.label}
+                    label={card.label}
+                    value={card.value}
+                    description={card.description}
+                    onClick={card.action}
+                    isClickable={card.isClickable}
+                  />
+                ))}
               </section>
             )}
           </div>
@@ -123,6 +184,14 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
             </div>
           ) : null}
         </section>
+
+        {isAgent && isVendorsOwingOpen ? (
+          <VendorsOwingModal
+            vendors={vendorsOwing ?? []}
+            totalOwed={stats?.totalVendorReceivables ?? 0}
+            onClose={() => setIsVendorsOwingOpen(false)}
+          />
+        ) : null}
 
         <section className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
           <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">

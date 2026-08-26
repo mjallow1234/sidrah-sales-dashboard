@@ -1,4 +1,4 @@
-import type { Inventory, VendorBalance, VendorInventory } from '@/lib/types';
+import type { Inventory, VendorBalance, VendorInventory, VendorOwing } from '@/lib/types';
 
 function buildQueryString(params: Record<string, unknown | undefined>) {
   const searchParams = new URLSearchParams();
@@ -50,6 +50,15 @@ export async function getVendorBalances(vendorId?: string): Promise<VendorBalanc
   const response = await fetch(`/api/vendorbalances${buildQueryString({ vendorId })}`);
   if (!response.ok) {
     throw new Error('Unable to fetch vendor balances');
+  }
+  const json = await response.json();
+  return json.data;
+}
+
+export async function getVendorsOwing(): Promise<VendorOwing[]> {
+  const response = await fetch('/api/vendorbalances/owing');
+  if (!response.ok) {
+    throw new Error('Unable to fetch vendors owing');
   }
   const json = await response.json();
   return json.data;

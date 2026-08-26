@@ -8,7 +8,7 @@ import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, upd
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
 import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
-import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances } from '@/lib/api/inventory';
+import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
 import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
@@ -120,6 +120,13 @@ export function useVendorBalancesQuery() {
   return useQuery({
     queryKey: ['vendorBalances'],
     queryFn: () => getVendorBalances(),
+  });
+}
+
+export function useVendorsOwingQuery() {
+  return useQuery({
+    queryKey: ['vendorsOwing'],
+    queryFn: () => getVendorsOwing(),
   });
 }
 

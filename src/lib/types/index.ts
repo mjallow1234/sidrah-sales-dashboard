@@ -84,6 +84,107 @@ export interface VendorBalance {
   last_updated: string;
 }
 
+export interface VendorOwing {
+  vendor_id: string;
+  vendor_name: string;
+  balance_owed: number;
+  last_visit_date: string;
+}
+
+export type SignalStatus = 'no_history' | 'insufficient_data' | 'sparse_data' | 'sufficient_data';
+
+export interface Evidence {
+  sourceTable: string;
+  sourceColumns: string[];
+  filterDescription: string;
+  rowCount: number;
+  dateRange?: { start: string; end: string };
+  note?: string;
+}
+
+export interface Signal<T> {
+  name: string;
+  value: T;
+  status: SignalStatus;
+  evidence: Evidence[];
+}
+
+export interface VendorIntelligenceOptions {
+  startDate?: string;
+  endDate?: string;
+  productId?: string;
+  salesRepId?: string;
+  market?: string;
+}
+
+export interface ProductPerformanceOptions {
+  startDate?: string;
+  endDate?: string;
+  salesRepId?: string;
+  market?: string;
+  minSalesDays?: number;
+}
+
+export interface ProductPerformance {
+  productId: string;
+  productName?: string;
+  category?: string;
+  unit?: string;
+  unitsSold: number;
+  salesValue: number;
+  expectedValue: number;
+  averageUnitPrice?: number;
+  currentStock: number;
+  stockRemainingDays?: number;
+  visitCount: number;
+  firstSaleDate?: string;
+  lastSaleDate?: string;
+}
+
+export interface VendorIntelligence {
+  vendorId: string;
+  vendorName?: string;
+  salesVolume: Signal<{
+    totalUnitsSold: number;
+    totalSalesValue: number;
+    totalCashCollected: number;
+  }>;
+  salesVelocity: Signal<{
+    averageDailyUnits?: number;
+    averageDailyValue?: number;
+    visitCount: number;
+    windowDays: number;
+  }>;
+  currentInventory: Signal<{
+    totalStockUnits: number;
+    totalProducts: number;
+  }>;
+  stockRemaining: Signal<{
+    daysRemaining?: number;
+    method: 'averageDailySales' | 'none';
+  }>;
+  lastVisit: Signal<{ lastVisitDate?: string }>;
+  visitFrequency: Signal<{
+    visitCount: number;
+    distinctVisitDays: number;
+    averageDaysBetweenVisits?: number;
+  }>;
+  outstandingBalance: Signal<{
+    balanceOwed: number;
+    positiveReceivables: number;
+    vendorCredits: number;
+    totalExpectedCash: number;
+    totalCashCollected: number;
+  }>;
+  paymentMetrics: Signal<{
+    totalCashCollected: number;
+    totalExpectedCash: number;
+    collectionRate?: number;
+    paymentMethodBreakdown: Record<string, number>;
+  }>;
+  productPerformance: Signal<ProductPerformance[]>;
+}
+
 export interface VisitResult {
   visitLog: Record<string, unknown>;
   inventory: Inventory | null;
@@ -239,6 +340,7 @@ export interface DashboardStats {
   cashCollected: number;
   lowStockVendors: number;
   outstandingBalances: number;
+  totalAmountOwed: number;
   totalVendorReceivables: number;
   vendorCredits: number;
   averageSalesPerVendor: number;
@@ -255,6 +357,7 @@ export const DEFAULT_DASHBOARD_STATS: DashboardStats = {
   cashCollected: 0,
   lowStockVendors: 0,
   outstandingBalances: 0,
+  totalAmountOwed: 0,
   totalVendorReceivables: 0,
   vendorCredits: 0,
   averageSalesPerVendor: 0,
