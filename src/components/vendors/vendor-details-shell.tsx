@@ -190,7 +190,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
           </div>
 
           <div className="mt-6">
-            <TransactionTable transactions={transactions ?? []} />
+            <TransactionTable transactions={transactions?.slice(0, 10) ?? []} />
           </div>
         </section>
       </div>
