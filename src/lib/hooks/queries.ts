@@ -9,7 +9,8 @@ import { createVisit, createSupply, getTransactions, getTransactionsByVendor } f
 import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
-import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VisitResult } from '@/lib/types';
+import { getVendorIntelligence } from '@/lib/api/intelligence';
+import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
 export interface PaginatedResult<T> {
@@ -48,6 +49,14 @@ export function useVendorQuery(vendorId: string) {
   return useQuery({
     queryKey: ['vendor', vendorId],
     queryFn: () => fetchVendorById(vendorId),
+    enabled: !!vendorId,
+  });
+}
+
+export function useVendorIntelligenceQuery(vendorId?: string, market?: string) {
+  return useQuery<VendorIntelligence>({
+    queryKey: ['vendorIntelligence', vendorId, market],
+    queryFn: () => getVendorIntelligence(vendorId ?? '', market),
     enabled: !!vendorId,
   });
 }

@@ -91,7 +91,7 @@ export interface VendorOwing {
   last_visit_date: string;
 }
 
-export type SignalStatus = 'no_history' | 'insufficient_data' | 'sparse_data' | 'sufficient_data';
+export type SignalStatus = 'ok' | 'no_history' | 'insufficient_data' | 'sparse_data';
 
 export interface Evidence {
   sourceTable: string;
@@ -100,6 +100,69 @@ export interface Evidence {
   rowCount: number;
   dateRange?: { start: string; end: string };
   note?: string;
+}
+
+export type IntelligenceConfidence = 'strong' | 'moderate' | 'limited';
+
+export interface IntelligenceSummary {
+  headline: string;
+  explanation: string;
+  whatIsHappening: string;
+  whyItMatters: string;
+  whatToDo: string;
+  confidence: IntelligenceConfidence;
+  evidence: Evidence[];
+}
+
+export type OverallAssessment = 'Healthy' | 'Watch' | 'At Risk' | 'Insufficient Data';
+
+export type TrendDirection = 'up' | 'down' | 'flat' | 'insufficient_data';
+
+export interface TrendSignal {
+  name: string;
+  label: string;
+  currentValue?: number;
+  previousValue?: number;
+  direction: TrendDirection;
+  note: string;
+  evidence: Evidence[];
+}
+
+export type IntelligenceSignalLevel = 'critical' | 'high' | 'watch' | 'opportunity' | 'healthy';
+
+export interface IntelligenceSignal {
+  title: string;
+  level: IntelligenceSignalLevel;
+  summary: string;
+  detail: string;
+  action?: string;
+  evidence: Evidence[];
+}
+
+export interface IntelligenceAction {
+  title: string;
+  description: string;
+  evidence?: Evidence[];
+}
+
+export interface ProductIntelligence {
+  productId: string;
+  productName?: string;
+  category?: string;
+  unit?: string;
+  currentStock: number;
+  unitsSold: number;
+  salesValue: number;
+  expectedValue: number;
+  salesShare?: number;
+  averageUnitPrice?: number;
+  coverageDays?: number;
+  movementClassification?: 'fast' | 'normal' | 'slow' | 'not_moving';
+  trendDirection: TrendDirection;
+  trendLabel: string;
+  coverageNote?: string;
+  recommendedAction?: string;
+  evidence: Evidence[];
 }
 
 export interface Signal<T> {
@@ -133,9 +196,11 @@ export interface ProductPerformance {
   unitsSold: number;
   salesValue: number;
   expectedValue: number;
+  salesShare?: number;
   averageUnitPrice?: number;
   currentStock: number;
   stockRemainingDays?: number;
+  movementClassification?: 'fast' | 'normal' | 'slow' | 'not_moving';
   visitCount: number;
   firstSaleDate?: string;
   lastSaleDate?: string;
@@ -144,6 +209,17 @@ export interface ProductPerformance {
 export interface VendorIntelligence {
   vendorId: string;
   vendorName?: string;
+  summary: IntelligenceSummary;
+  assessment: OverallAssessment;
+  topSignals: IntelligenceSignal[];
+  trendSignals: TrendSignal[];
+  statusSummary: {
+    currentStock: number;
+    recentSales: number;
+    balanceOwed: number;
+    collectionRate?: number;
+    stockCoverageDays?: number;
+  };
   salesVolume: Signal<{
     totalUnitsSold: number;
     totalSalesValue: number;
@@ -161,7 +237,8 @@ export interface VendorIntelligence {
   }>;
   stockRemaining: Signal<{
     daysRemaining?: number;
-    method: 'averageDailySales' | 'none';
+    method?: 'averageDailySales';
+    coverageNote?: string;
   }>;
   lastVisit: Signal<{ lastVisitDate?: string }>;
   visitFrequency: Signal<{
@@ -183,6 +260,10 @@ export interface VendorIntelligence {
     paymentMethodBreakdown: Record<string, number>;
   }>;
   productPerformance: Signal<ProductPerformance[]>;
+  risks: IntelligenceSignal[];
+  opportunities: IntelligenceSignal[];
+  productIntelligence: ProductIntelligence[];
+  dataQualitySignals?: IntelligenceSignal[];
 }
 
 export interface VisitResult {
