@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { VendorsOwingModal } from '@/components/dashboard/vendors-owing-modal';
 import { useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
@@ -66,7 +66,46 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
 
   const { data: vendorsOwing, isLoading: vendorsOwingLoading } = useVendorsOwingQuery();
 
-  const cardRows = useMemo(() => {
+  const bucketsOutThereDescription = useMemo(() => {
+    const productBreakdown = stats?.totalBucketsOutThereByProduct ?? [];
+    if (productBreakdown.length === 0) {
+      return 'Current live vendor stock total across the selected filters.';
+    }
+
+    const topProducts = productBreakdown.slice(0, 3);
+    const remainingProducts = productBreakdown.length - topProducts.length;
+    const remainingTotal = productBreakdown.slice(3).reduce((sum, product) => sum + product.quantity, 0);
+
+    return (
+      <div className="space-y-2">
+        <div>Current live stock by product.</div>
+        <div className="space-y-1 pt-2">
+          {topProducts.map((item) => (
+            <div key={item.productName} className="flex items-center justify-between gap-4 text-sm text-slate-600">
+              <span className="truncate">{item.productName}</span>
+              <span>{item.quantity.toLocaleString()}</span>
+            </div>
+          ))}
+          {remainingProducts > 0 ? (
+            <div className="flex items-center justify-between gap-4 text-sm text-slate-500">
+              <span>{`+${remainingProducts} more`}</span>
+              <span>{remainingTotal.toLocaleString()}</span>
+            </div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }, [stats?.totalBucketsOutThereByProduct]);
+
+  type DashboardCardRow = {
+    label: string;
+    value: string | number;
+    description: ReactNode;
+    action?: () => void;
+    isClickable?: boolean;
+  };
+
+  const cardRows = useMemo<DashboardCardRow[]>(() => {
     if (isAgent) {
       return [
         {
@@ -96,6 +135,11 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
 
     return [
       {
+        label: 'Total buckets out there',
+        value: isLoading ? '...' : stats?.totalBucketsOutThere ?? 0,
+        description: bucketsOutThereDescription,
+      },
+      {
         label: 'Total vendors',
         value: isLoading ? '...' : stats?.totalActiveVendors ?? 0,
         description: 'Total number of active vendors.',
@@ -116,7 +160,7 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
         description: 'Current cumulative outstanding product value minus cash received.',
       },
     ];
-  }, [isAgent, isLoading, stats]);
+  }, [isAgent, isLoading, stats, bucketsOutThereDescription]);
 
   return (
     <div className="px-4 pb-24 pt-8 sm:px-6 sm:pb-8 lg:px-8">

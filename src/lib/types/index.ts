@@ -427,6 +427,8 @@ export interface DashboardStats {
   averageSalesPerVendor: number;
   totalActiveVendors: number;
   newVendorsInRange: number;
+  totalBucketsOutThere: number;
+  totalBucketsOutThereByProduct?: Array<{ productName: string; quantity: number }>;
   salesBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number; stock_sold: number }>;
   collectionsBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number }>;
   top10VendorsBySales?: Array<{ vendor_id: string; cash_collected: number }>;
@@ -444,6 +446,7 @@ export const DEFAULT_DASHBOARD_STATS: DashboardStats = {
   averageSalesPerVendor: 0,
   totalActiveVendors: 0,
   newVendorsInRange: 0,
+  totalBucketsOutThere: 0,
 };
 
 export function normalizeDashboardStats(stats?: Partial<DashboardStats>): DashboardStats {

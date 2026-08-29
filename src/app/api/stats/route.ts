@@ -124,6 +124,53 @@ export async function GET(request: NextRequest) {
     const [lowStockRows] = await dbQuery<{ lowStockVendors: string | number }[]>(lowStockQuery, lowStockParams);
     const lowStockVendors = toNumber(lowStockRows[0]?.lowStockVendors ?? 0);
 
+    const stockFilters: string[] = [];
+    const stockParams: Record<string, unknown> = {};
+    const stockJoinClause = market || salesRepId ? 'INNER JOIN vendors v ON v.vendor_id = vi.vendor_id' : '';
+
+    if (vendorId) {
+      stockFilters.push('vi.vendor_id = :vendor_id');
+      stockParams.vendor_id = vendorId;
+    }
+    if (productId) {
+      stockFilters.push('vi.product_id = :product_id');
+      stockParams.product_id = productId;
+    }
+    if (market) {
+      stockFilters.push('v.location = :market');
+      stockParams.market = market;
+    }
+    if (salesRepId) {
+      stockFilters.push('v.sales_rep_id = :sales_rep_id');
+      stockParams.sales_rep_id = salesRepId;
+    }
+
+    const stockWhereClause = stockFilters.length > 0 ? `WHERE ${stockFilters.join(' AND ')}` : '';
+    const totalBucketsOutThereQuery = `
+      SELECT COALESCE(SUM(vi.current_stock), 0) AS totalBucketsOutThere
+      FROM vendor_inventory vi
+      ${stockJoinClause}
+      ${stockWhereClause}
+    `;
+    const [stockRows] = await dbQuery<Array<{ totalBucketsOutThere: string | number }>>(totalBucketsOutThereQuery, stockParams);
+    const totalBucketsOutThere = toNumber(stockRows[0]?.totalBucketsOutThere ?? 0);
+
+    const productBreakdownQuery = `
+      SELECT p.product_name AS productName, COALESCE(SUM(vi.current_stock), 0) AS quantity
+      FROM vendor_inventory vi
+      JOIN products p ON p.product_id = vi.product_id
+      ${stockJoinClause}
+      ${stockWhereClause}
+      GROUP BY p.product_id, p.product_name
+      HAVING COALESCE(SUM(vi.current_stock), 0) > 0
+      ORDER BY quantity DESC, p.product_name ASC
+    `;
+    const [productBreakdownRows] = await dbQuery<Array<{ productName: string; quantity: string | number }>>(productBreakdownQuery, stockParams);
+    const totalBucketsOutThereByProduct = productBreakdownRows.map((row) => ({
+      productName: String(row.productName),
+      quantity: toNumber(row.quantity),
+    }));
+
     const balanceFilters: string[] = [];
     const balanceParams: Record<string, unknown> = {};
     const balanceJoinClause = market ? 'INNER JOIN vendors v ON v.vendor_id = vb.vendor_id' : '';
@@ -272,6 +319,8 @@ export async function GET(request: NextRequest) {
       bucketsSold,
       cashCollectedToday: cashCollected,
       cashCollected,
+      totalBucketsOutThere,
+      totalBucketsOutThereByProduct,
       outstandingBalances,
       totalAmountOwed,
       totalVendorReceivables,

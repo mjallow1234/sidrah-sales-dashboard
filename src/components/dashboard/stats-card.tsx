@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react';
+
 interface StatsCardProps {
   label: string;
   value: string | number;
-  description: string;
+  description: ReactNode;
   onClick?: () => void;
   isClickable?: boolean;
 }
@@ -33,7 +35,7 @@ export function StatsCard({ label, value, description, onClick, isClickable }: S
     >
       <p className="text-sm font-medium uppercase tracking-[0.22em] text-sidrah-500">{label}</p>
       <p className="mt-4 text-3xl font-semibold text-slate-900">{value}</p>
-      <p className="mt-2 text-sm text-slate-600">{description}</p>
+      <div className="mt-2 text-sm text-slate-600">{description}</div>
     </div>
   );
 }
