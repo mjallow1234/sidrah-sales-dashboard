@@ -7,6 +7,7 @@ import { useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-provider';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
+import { VendorIntelligenceSection } from '@/components/dashboard/vendor-intelligence-section';
 import { useRouter } from 'next/navigation';
 
 export function DashboardShell({ initialRole }: { initialRole?: string }) {
@@ -149,6 +150,8 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
         </section>
 
         {showFilters ? <DashboardFilters /> : null}
+
+        <VendorIntelligenceSection />
 
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4">
