@@ -2,6 +2,7 @@
 
 import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { StatsCard } from '@/components/dashboard/stats-card';
+import { TotalBucketsOutThereModal } from '@/components/dashboard/total-buckets-out-there-modal';
 import { VendorsOwingModal } from '@/components/dashboard/vendors-owing-modal';
 import { useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-provider';
@@ -63,36 +64,36 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
   };
 
   const [isVendorsOwingOpen, setIsVendorsOwingOpen] = useState(false);
+  const [isTotalBucketsModalOpen, setIsTotalBucketsModalOpen] = useState(false);
 
   const { data: vendorsOwing, isLoading: vendorsOwingLoading } = useVendorsOwingQuery();
 
   const bucketsOutThereDescription = useMemo(() => {
     const productBreakdown = stats?.totalBucketsOutThereByProduct ?? [];
-    if (productBreakdown.length === 0) {
-      return 'Current live vendor stock total across the selected filters.';
-    }
-
     const topProducts = productBreakdown.slice(0, 3);
     const remainingProducts = productBreakdown.length - topProducts.length;
     const remainingTotal = productBreakdown.slice(3).reduce((sum, product) => sum + product.quantity, 0);
 
     return (
-      <div className="space-y-2">
+      <div className="space-y-3">
         <div>Current live stock by product.</div>
-        <div className="space-y-1 pt-2">
-          {topProducts.map((item) => (
-            <div key={item.productName} className="flex items-center justify-between gap-4 text-sm text-slate-600">
-              <span className="truncate">{item.productName}</span>
-              <span>{item.quantity.toLocaleString()}</span>
-            </div>
-          ))}
-          {remainingProducts > 0 ? (
-            <div className="flex items-center justify-between gap-4 text-sm text-slate-500">
-              <span>{`+${remainingProducts} more`}</span>
-              <span>{remainingTotal.toLocaleString()}</span>
-            </div>
-          ) : null}
-        </div>
+        {productBreakdown.length > 0 ? (
+          <div className="space-y-1 pt-2">
+            {topProducts.map((item) => (
+              <div key={item.productName} className="flex items-center justify-between gap-4 text-sm text-slate-600">
+                <span className="truncate">{item.productName}</span>
+                <span>{item.quantity.toLocaleString()}</span>
+              </div>
+            ))}
+            {remainingProducts > 0 ? (
+              <div className="flex items-center justify-between gap-4 text-sm text-slate-500">
+                <span>{`+${remainingProducts} more`}</span>
+                <span>{remainingTotal.toLocaleString()}</span>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        <div className="mt-3 text-sm font-semibold text-sidrah-700">View all products →</div>
       </div>
     );
   }, [stats?.totalBucketsOutThereByProduct]);
@@ -138,6 +139,8 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
         label: 'Total buckets out there',
         value: isLoading ? '...' : stats?.totalBucketsOutThere ?? 0,
         description: bucketsOutThereDescription,
+        action: () => setIsTotalBucketsModalOpen(true),
+        isClickable: true,
       },
       {
         label: 'Total vendors',
@@ -237,6 +240,14 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
             vendors={vendorsOwing ?? []}
             totalOwed={stats?.totalVendorReceivables ?? 0}
             onClose={() => setIsVendorsOwingOpen(false)}
+          />
+        ) : null}
+
+        {isTotalBucketsModalOpen ? (
+          <TotalBucketsOutThereModal
+            total={stats?.totalBucketsOutThere ?? 0}
+            products={stats?.totalBucketsOutThereByProduct ?? []}
+            onClose={() => setIsTotalBucketsModalOpen(false)}
           />
         ) : null}
 
