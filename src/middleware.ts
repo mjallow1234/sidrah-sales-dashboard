@@ -3,18 +3,39 @@ import type { NextRequest } from 'next/server';
 import { getSessionFromRequest } from '@/lib/session';
 import { canAccessPath } from '@/lib/authorization';
 
+const PUBLIC_ORIGIN = (() => {
+  const appUrl = process.env.APP_URL?.trim();
+  if (!appUrl) return null;
+
+  try {
+    return new URL(appUrl).origin;
+  } catch {
+    return null;
+  }
+})();
+
+function buildPublicRedirectUrl(request: NextRequest, pathname: string) {
+  if (PUBLIC_ORIGIN) {
+    return `${PUBLIC_ORIGIN}${pathname}`;
+  }
+
+  const fallbackOrigin = `${request.nextUrl.protocol}//${request.nextUrl.host}`;
+  return `${fallbackOrigin}${pathname}`;
+}
+
 export async function middleware(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   const isAuthenticated = session.valid;
 
-  const loginUrl = new URL('/login', request.url);
-  const dashboardUrl = new URL('/dashboard', request.url);
+  const loginUrl = buildPublicRedirectUrl(request, '/login');
+  const dashboardUrl = buildPublicRedirectUrl(request, '/dashboard');
+  const changePasswordUrl = buildPublicRedirectUrl(request, '/change-password');
   const pathname = request.nextUrl.pathname;
 
   if (pathname === '/login') {
     if (isAuthenticated) {
       if (session.passwordResetRequired) {
-        return NextResponse.redirect(new URL('/change-password', request.url));
+        return NextResponse.redirect(changePasswordUrl);
       }
       return NextResponse.redirect(dashboardUrl);
     }
@@ -26,7 +47,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (session.passwordResetRequired && pathname !== '/change-password') {
-    return NextResponse.redirect(new URL('/change-password', request.url));
+    return NextResponse.redirect(changePasswordUrl);
   }
 
   if (pathname === '/change-password' && !session.passwordResetRequired) {
