@@ -24,7 +24,7 @@ function normalizeRole(value: unknown): AppUser['role'] | undefined {
     return undefined;
   }
 
-  if (['super_admin', 'admin', 'supervisor', 'agent'].includes(normalized)) {
+  if (['super_admin', 'admin', 'supervisor', 'agent', 'delivery'].includes(normalized)) {
     return normalized as AppUser['role'];
   }
 

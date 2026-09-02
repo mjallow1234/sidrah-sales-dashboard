@@ -66,6 +66,13 @@ const navSections = [
     ],
   },
   {
+    title: 'Deliveries',
+    links: [
+      { label: 'Deliveries', href: '/deliveries', icon: Truck },
+      { label: 'New delivery request', href: '/deliveries/new', icon: PlusCircle },
+    ],
+  },
+  {
     title: 'Reports',
     links: [
       { label: 'Reports', href: '/reports', icon: BarChart3 },

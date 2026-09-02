@@ -32,7 +32,7 @@ export default function ChangePasswordPage() {
 
       const result = await response.json();
       if (response.ok && result.success) {
-        router.push('/dashboard');
+        router.push(result.role === 'delivery' ? '/deliveries' : '/dashboard');
         return;
       }
 

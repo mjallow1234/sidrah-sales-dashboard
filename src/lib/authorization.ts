@@ -1,4 +1,4 @@
-export type AppUserRole = 'super_admin' | 'admin' | 'supervisor' | 'agent';
+export type AppUserRole = 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery';
 export const adminRoles = ['admin', 'super_admin'] as const;
 
 export function isAdminRole(role?: string): role is AppUserRole {
@@ -7,6 +7,10 @@ export function isAdminRole(role?: string): role is AppUserRole {
 
 export function isSupervisorRole(role?: string): role is AppUserRole {
   return role === 'supervisor';
+}
+
+export function isDeliveryRole(role?: string): role is AppUserRole {
+  return role === 'delivery';
 }
 
 export function isAdminOrSupervisorRole(role?: string): role is AppUserRole {
@@ -20,6 +24,14 @@ export function isAgentRole(role?: string): role is AppUserRole {
 export function canAccessPath(role: string | undefined, pathname: string): boolean {
   if (!role) {
     return false;
+  }
+
+  if (role === 'delivery') {
+    return pathname === '/deliveries' || (pathname.startsWith('/deliveries/') && pathname !== '/deliveries/new');
+  }
+
+  if (pathname.startsWith('/deliveries')) {
+    return true;
   }
 
   if (pathname === '/dashboard' || pathname.startsWith('/visits') || pathname === '/visit/reverse' || pathname === '/admin-stock') {
@@ -62,6 +74,10 @@ export function canViewLink(role: string | undefined, href: string): boolean {
     return false;
   }
 
+  if (role === 'delivery') {
+    return href === '/deliveries' || (href.startsWith('/deliveries/') && href !== '/deliveries/new');
+  }
+
   if (href === '/admin-activity') {
     return isAdminOrSupervisorRole(role);
   }
@@ -92,6 +108,10 @@ export function canViewLink(role: string | undefined, href: string): boolean {
 
   if (href.startsWith('/reports')) {
     return isAdminRole(role) || isSupervisorRole(role);
+  }
+
+  if (href.startsWith('/deliveries')) {
+    return role === 'delivery' || role === 'agent' || role === 'supervisor' || role === 'admin' || role === 'super_admin';
   }
 
   return true;

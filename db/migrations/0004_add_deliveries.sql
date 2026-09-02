@@ -1,0 +1,21 @@
+CREATE TABLE IF NOT EXISTS deliveries (
+  delivery_id VARCHAR(32) NOT NULL,
+  customer_name VARCHAR(255) NOT NULL,
+  customer_phone VARCHAR(64) NOT NULL,
+  delivery_address VARCHAR(512) NOT NULL,
+  order_reference VARCHAR(128) NULL,
+  items JSON NOT NULL,
+  notes TEXT NULL,
+  status ENUM('pending','ongoing','delivered') NOT NULL DEFAULT 'pending',
+  created_by VARCHAR(32) NOT NULL,
+  claimed_by VARCHAR(32) NULL,
+  claimed_at DATETIME NULL,
+  delivered_at DATETIME NULL,
+  date_created DATETIME NOT NULL,
+  last_updated DATETIME NOT NULL,
+  updated_by VARCHAR(32) NULL,
+  PRIMARY KEY (delivery_id),
+  KEY idx_deliveries_status (status),
+  KEY idx_deliveries_created_by (created_by),
+  KEY idx_deliveries_claimed_by (claimed_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

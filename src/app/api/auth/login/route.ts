@@ -46,6 +46,7 @@ export async function POST(request: NextRequest) {
   const response = NextResponse.json({
     success: true,
     passwordResetRequired,
+    role: appUser.role ?? 'agent',
   });
 
   response.cookies.set('sidrah_session', token, {

@@ -1,4 +1,4 @@
-export type UserRole = 'agent' | 'supervisor' | 'admin';
+export type UserRole = 'agent' | 'supervisor' | 'admin' | 'delivery';
 
 export interface User {
   id: string;
@@ -117,6 +117,38 @@ export interface IntelligenceSummary {
 export type OverallAssessment = 'Healthy' | 'Watch' | 'At Risk' | 'Insufficient Data';
 
 export type TrendDirection = 'up' | 'down' | 'flat' | 'insufficient_data';
+
+export type DeliveryStatus = 'pending' | 'ongoing' | 'delivered' | 'cancelled';
+
+export interface DeliveryItem {
+  product_id?: string;
+  product_name?: string;
+  sku?: string;
+  description?: string;
+  quantity: number;
+}
+
+export interface DeliveryRecord {
+  delivery_id: string;
+  customer_name: string;
+  customer_phone: string;
+  delivery_address: string;
+  items: DeliveryItem[];
+  notes?: string;
+  status: DeliveryStatus;
+  created_by: string;
+  created_by_name?: string;
+  date_created: string;
+  updated_by?: string;
+  last_updated: string;
+  claimed_by?: string;
+  claimed_by_name?: string;
+  claimed_at?: string;
+  delivered_at?: string;
+  cancelled_at?: string;
+  cancelled_by?: string;
+  cancelled_by_name?: string;
+}
 
 export interface TrendSignal {
   name: string;
@@ -286,7 +318,7 @@ export interface AppUser {
   email: string;
   phone: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'supervisor' | 'agent';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery';
   status: 'active' | 'inactive' | 'suspended';
   sales_rep_id?: string;
   password_hash: string;

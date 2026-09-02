@@ -26,18 +26,37 @@ function buildPublicRedirectUrl(request: NextRequest, pathname: string) {
 export async function middleware(request: NextRequest) {
   const session = await getSessionFromRequest(request);
   const isAuthenticated = session.valid;
+  const pathname = request.nextUrl.pathname;
+  const isApiRequest = pathname.startsWith('/api/');
 
   const loginUrl = buildPublicRedirectUrl(request, '/login');
   const dashboardUrl = buildPublicRedirectUrl(request, '/dashboard');
   const changePasswordUrl = buildPublicRedirectUrl(request, '/change-password');
-  const pathname = request.nextUrl.pathname;
+  const deliveriesUrl = buildPublicRedirectUrl(request, '/deliveries');
+  const homeUrl = session.role === 'delivery' ? deliveriesUrl : dashboardUrl;
+
+  if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) {
+    return NextResponse.next();
+  }
+
+  if (isApiRequest && !isAuthenticated) {
+    return NextResponse.json({ status: 'error', message: 'Not authenticated.' }, { status: 401 });
+  }
+
+  if (isApiRequest && session.role === 'delivery' && !pathname.startsWith('/api/deliveries')) {
+    return NextResponse.json({ status: 'error', message: 'Forbidden.' }, { status: 403 });
+  }
+
+  if (isApiRequest) {
+    return NextResponse.next();
+  }
 
   if (pathname === '/login') {
     if (isAuthenticated) {
       if (session.passwordResetRequired) {
         return NextResponse.redirect(changePasswordUrl);
       }
-      return NextResponse.redirect(dashboardUrl);
+      return NextResponse.redirect(homeUrl);
     }
     return NextResponse.next();
   }
@@ -51,11 +70,11 @@ export async function middleware(request: NextRequest) {
   }
 
   if (pathname === '/change-password' && !session.passwordResetRequired) {
-    return NextResponse.redirect(dashboardUrl);
+    return NextResponse.redirect(homeUrl);
   }
 
   if (!canAccessPath(session.role, pathname)) {
-    return NextResponse.redirect(dashboardUrl);
+    return NextResponse.redirect(homeUrl);
   }
 
   return NextResponse.next();
@@ -72,5 +91,7 @@ export const config = {
     '/users/:path*',
     '/salesreps/:path*',
     '/reports/:path*',
+    '/deliveries/:path*',
+    '/api/:path*',
   ],
 };

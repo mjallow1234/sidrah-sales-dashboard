@@ -1,11 +1,13 @@
 'use client';
 
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 import { Button } from '@/components/ui/button';
 
 export default function LoginPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,8 +27,11 @@ export default function LoginPage() {
 
       const result = await response.json();
       if (response.ok && result.success) {
+        await queryClient.invalidateQueries({ queryKey: ['auth'] });
         if (result.passwordResetRequired) {
           router.push('/change-password');
+        } else if (result.role === 'delivery') {
+          router.push('/deliveries');
         } else {
           router.push('/dashboard');
         }

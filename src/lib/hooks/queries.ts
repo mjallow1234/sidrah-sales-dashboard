@@ -6,11 +6,12 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
+import { claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
 import { getVendorIntelligence } from '@/lib/api/intelligence';
-import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
+import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryItem, type DeliveryRecord, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
 export interface PaginatedResult<T> {
@@ -173,6 +174,31 @@ export function useSalesRepsQuery(enabled = true) {
   });
 }
 
+export function useDeliveriesQuery(filters?: { status?: string }) {
+  return useQuery<DeliveryRecord[]>({
+    queryKey: ['deliveries', filters],
+    queryFn: () => getDeliveries(filters),
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useDeliveryQuery(deliveryId?: string) {
+  return useQuery<DeliveryRecord | null>({
+    queryKey: ['delivery', deliveryId],
+    queryFn: () => getDelivery(deliveryId ?? ''),
+    enabled: !!deliveryId,
+  });
+}
+
+export function useDeliveryUsersQuery(enabled = true) {
+  return useQuery<DeliveryUserOption[]>({
+    queryKey: ['deliveryUsers'],
+    queryFn: () => getDeliveryUsers(),
+    enabled,
+  });
+}
+
 export function useProductQuery(productId: string) {
   return useQuery({
     queryKey: ['product', productId],
@@ -245,6 +271,68 @@ export function useUpdateVendorMutation() {
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
+}
+
+export function useCreateDeliveryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryRecord, Error, Parameters<typeof createDelivery>[0]>({
+    mutationFn: createDelivery,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+    },
+  });
+}
+
+export function useClaimDeliveryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryRecord, Error, { deliveryId: string }>(
+    {
+      mutationFn: ({ deliveryId }: { deliveryId: string }) => claimDelivery(deliveryId),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+        queryClient.invalidateQueries({ queryKey: ['delivery'] });
+      },
+    }
+  );
+}
+
+export function useMarkDeliveryDeliveredMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryRecord, Error, { deliveryId: string }>(
+    {
+      mutationFn: ({ deliveryId }: { deliveryId: string }) => markDeliveryDelivered(deliveryId),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+        queryClient.invalidateQueries({ queryKey: ['delivery'] });
+      },
+    }
+  );
+}
+
+export function useReassignDeliveryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; deliveryUserId: string }>(
+    {
+      mutationFn: ({ deliveryId, deliveryUserId }) => reassignDelivery(deliveryId, deliveryUserId),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+        queryClient.invalidateQueries({ queryKey: ['delivery'] });
+      },
+    }
+  );
+}
+
+export function useCancelDeliveryMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryRecord, Error, { deliveryId: string }>(
+    {
+      mutationFn: ({ deliveryId }: { deliveryId: string }) => cancelDelivery(deliveryId),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+        queryClient.invalidateQueries({ queryKey: ['delivery'] });
+      },
+    }
+  );
 }
 
 export function useCreateProductMutation() {

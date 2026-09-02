@@ -4,6 +4,7 @@ import { canViewLink } from '@/lib/authorization';
 const navItems = [
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Vendors', href: '/vendors' },
+  { label: 'Deliveries', href: '/deliveries' },
   { label: 'Visits', href: '/visits' },
 ];
 

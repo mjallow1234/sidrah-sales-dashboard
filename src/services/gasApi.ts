@@ -333,7 +333,7 @@ export async function createAppUser(payload: {
   email: string;
   phone: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'supervisor' | 'agent';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery';
   status: 'active' | 'inactive' | 'suspended';
   sales_rep_id?: string;
   password_hash: string;
@@ -353,7 +353,7 @@ export async function updateAppUser(id: string, payload: Partial<{
   email: string;
   phone: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'supervisor' | 'agent';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery';
   status: 'active' | 'inactive' | 'suspended';
   sales_rep_id: string;
   password_hash: string;

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     username: updatedAppUser.username ?? '',
   });
 
-  const response = NextResponse.json({ success: true });
+  const response = NextResponse.json({ success: true, role: session.role ?? 'agent' });
   response.cookies.set('sidrah_session', updatedToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
