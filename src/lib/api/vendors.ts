@@ -22,7 +22,8 @@ export async function fetchVendors(params?: { salesRepId?: string; sales_rep_id?
     throw new Error('Unable to fetch vendors');
   }
   const json = await response.json();
-  return json.data?.items ? json.data.items : json.data;
+  const vendors: Vendor[] = json.data?.items ? json.data.items : json.data;
+  return [...vendors].sort((a, b) => a.vendor_name.localeCompare(b.vendor_name, undefined, { sensitivity: 'base' }));
 }
 
 export async function fetchPaginatedVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; page?: number; pageSize?: number }): Promise<{ status: string; data: { items: Vendor[]; totalCount: number; page: number; pageSize: number } }> {
