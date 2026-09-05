@@ -29,10 +29,9 @@ function resolveActorLabel(
 export function TransactionTable({ transactions, salesRepNames, actorNames }: TransactionTableProps) {
   return (
     <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft">
-      <div className="grid grid-cols-4 gap-4 border-b border-slate-200 px-4 py-3 text-xs uppercase tracking-[0.24em] text-slate-500 sm:grid-cols-6">
+      <div className="grid grid-cols-3 gap-4 border-b border-slate-200 px-4 py-3 text-xs uppercase tracking-[0.24em] text-slate-500 sm:grid-cols-5">
         <div>Date</div>
-        <div>Sold</div>
-        <div>Added</div>
+        <div>Supplied</div>
         <div>Cash</div>
         <div className="hidden sm:block">Closing</div>
         <div className="hidden sm:block">Actor</div>
@@ -41,10 +40,9 @@ export function TransactionTable({ transactions, salesRepNames, actorNames }: Tr
         {transactions.map((transaction, index) => (
           <div
             key={`${transaction.transaction_id || 'transaction'}-${transaction.vendor_id}-${transaction.date}-${index}`}
-            className="grid grid-cols-4 gap-4 px-4 py-4 text-sm text-slate-700 sm:grid-cols-6"
+            className="grid grid-cols-3 gap-4 px-4 py-4 text-sm text-slate-700 sm:grid-cols-5"
           >
             <div>{transaction.date}</div>
-            <div>{transaction.stock_sold}</div>
             <div>{transaction.stock_added}</div>
             <div>{transaction.cash_collected.toLocaleString()}</div>
             <div className="hidden sm:block">{transaction.closing_stock}</div>

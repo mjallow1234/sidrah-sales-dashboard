@@ -10,6 +10,7 @@ export interface CreateVendorInventoryPayload {
   current_stock: number;
   total_stock_received: number;
   total_stock_sold: number;
+  average_unit_value?: number;
   created_at?: string;
   updated_at?: string;
   created_by?: string;
@@ -20,6 +21,7 @@ export interface UpdateVendorInventoryPayload {
   current_stock?: number;
   total_stock_received?: number;
   total_stock_sold?: number;
+  average_unit_value?: number;
   updated_by?: string;
 }
 
@@ -82,11 +84,12 @@ export class VendorInventoryRepository extends BaseRepository {
         current_stock,
         total_stock_received,
         total_stock_sold,
+        average_unit_value,
         created_at,
         updated_at,
         created_by,
         updated_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.vendor_inventory_id,
         payload.vendor_id,
@@ -94,6 +97,7 @@ export class VendorInventoryRepository extends BaseRepository {
         payload.current_stock,
         payload.total_stock_received,
         payload.total_stock_sold,
+        payload.average_unit_value ?? 0,
         payload.created_at ?? now,
         payload.updated_at ?? now,
         payload.created_by ?? null,
@@ -119,6 +123,10 @@ export class VendorInventoryRepository extends BaseRepository {
     if (updates.total_stock_sold !== undefined) {
       parts.push('total_stock_sold = ?');
       params.push(updates.total_stock_sold);
+    }
+    if (updates.average_unit_value !== undefined) {
+      parts.push('average_unit_value = ?');
+      params.push(updates.average_unit_value);
     }
     if (updates.updated_by !== undefined) {
       parts.push('updated_by = ?');

@@ -8,7 +8,6 @@ interface VisitDraft {
   unit_price: number;
   payment_method: string;
   payment_reference: string;
-  stock_sold: number;
   cash_collected: number;
   stock_added: number;
   notes: string;
@@ -36,7 +35,6 @@ export const useAppStore = create<AppState>((set) => ({
     unit_price: 0,
     payment_method: 'cash',
     payment_reference: '',
-    stock_sold: 0,
     cash_collected: 0,
     stock_added: 0,
     notes: '',
@@ -54,7 +52,6 @@ export const useAppStore = create<AppState>((set) => ({
         unit_price: 0,
         payment_method: 'cash',
         payment_reference: '',
-        stock_sold: 0,
         cash_collected: 0,
         stock_added: 0,
         notes: '',

@@ -12,7 +12,7 @@ export default function HomePage() {
               Vendor Management System
             </h1>
             <p className="mt-4 max-w-2xl text-slate-700">
-              Fast mobile-first workflow for field agents to record stock sales, cash collection, and deliveries without spreadsheets.
+              Fast mobile-first workflow for field agents to record stock supplies, cash collection, and deliveries without spreadsheets.
             </p>
           </div>
 
@@ -26,7 +26,7 @@ export default function HomePage() {
             <h2 className="text-xl font-semibold text-slate-900">Built for field agents</h2>
             <ul className="mt-4 space-y-3 text-slate-700">
               <li>• Search vendors instantly by ID, name, or phone.</li>
-              <li>• Record visits with stock sold, cash collected, and stock delivered.</li>
+              <li>• Record stock supplied to vendors and cash collected against their balances.</li>
               <li>• Offline-aware mobile UI designed for fast daily use.</li>
             </ul>
           </section>

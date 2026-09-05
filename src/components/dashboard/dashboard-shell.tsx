@@ -8,7 +8,6 @@ import { useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-provider';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
-import { VendorIntelligenceSection } from '@/components/dashboard/vendor-intelligence-section';
 import { useRouter } from 'next/navigation';
 
 export function DashboardShell({ initialRole }: { initialRole?: string }) {
@@ -115,9 +114,9 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
           description: 'Vendors visited today.',
         },
         {
-          label: 'Buckets sold',
-          value: isLoading ? '...' : stats?.bucketsSold ?? 0,
-          description: 'Buckets sold today.',
+          label: 'Buckets supplied',
+          value: isLoading ? '...' : stats?.bucketsSupplied ?? 0,
+          description: 'Buckets supplied to vendors today.',
         },
         {
           label: 'Cash collected',
@@ -148,9 +147,9 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
         description: 'Total number of active vendors.',
       },
       {
-        label: 'Buckets sold',
-        value: isLoading ? '...' : stats?.bucketsSold ?? 0,
-        description: 'Total stock sold in the selected period.',
+        label: 'Buckets supplied',
+        value: isLoading ? '...' : stats?.bucketsSupplied ?? 0,
+        description: 'Total stock supplied to vendors in the selected period.',
       },
       {
         label: 'Cash collected',
@@ -197,8 +196,6 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
         </section>
 
         {showFilters ? <DashboardFilters /> : null}
-
-        <VendorIntelligenceSection />
 
         <section className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
           <div className="space-y-4">

@@ -13,7 +13,6 @@ const visitSchema = z.object({
   sales_rep_id: z.string().min(1, 'Sales rep is required'),
   unit_price: z.number().min(0, 'Unit price must be 0 or more'),
   payment_method: z.string().min(1, 'Payment method is required'),
-  stock_sold: z.number().min(0, 'Stock sold must be 0 or more'),
   cash_collected: z.number().min(0, 'Cash collected must be 0 or more'),
   stock_added: z.number().min(0, 'Stock added must be 0 or more'),
   notes: z.string().max(200).optional(),
@@ -118,7 +117,6 @@ export function VisitForm({ vendors }: VisitFormProps) {
       vendor_id: visitDraft.vendor_id,
       product_id: visitDraft.product_id,
       sales_rep_id: salesRepIdToSubmit,
-      stock_sold: visitDraft.stock_sold,
       stock_added: visitDraft.stock_added,
       cash_collected: visitDraft.cash_collected,
       unit_price: visitDraft.unit_price,
@@ -253,17 +251,6 @@ export function VisitForm({ vendors }: VisitFormProps) {
 
         <div className="grid gap-4 sm:grid-cols-3">
           <label className="block text-sm text-slate-700">
-            Stock Sold
-            <input
-              type="number"
-              min={0}
-              value={visitDraft.stock_sold}
-              onChange={(event) => setVisitDraft({ stock_sold: Number(event.target.value) })}
-              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-              disabled={!hasVendorInventory || !visitDraft.product_id}
-            />
-          </label>
-          <label className="block text-sm text-slate-700">
             Cash Collected
             <input
               type="number"
@@ -358,11 +345,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
                     {previewDraft.payment_reference ? <div className="text-sm text-slate-600">Ref: {previewDraft.payment_reference}</div> : null}
                   </div>
                 </div>
-                <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
-                    <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Stock sold</div>
-                    <div className="mt-2 text-2xl font-semibold text-slate-900">{previewDraft.stock_sold}</div>
-                  </div>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
                     <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Stock added</div>
                     <div className="mt-2 text-2xl font-semibold text-slate-900">{previewDraft.stock_added}</div>

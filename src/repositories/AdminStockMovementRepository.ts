@@ -10,6 +10,8 @@ export interface AdminStockMovementRecord {
   source_vendor_id?: string | null;
   destination_vendor_id?: string | null;
   quantity: number;
+  unit_value: number;
+  total_value: number;
   admin_id: string;
   timestamp: string;
   notes?: string | null;
@@ -41,11 +43,13 @@ export class AdminStockMovementRepository extends BaseRepository {
         source_vendor_id,
         destination_vendor_id,
         quantity,
+        unit_value,
+        total_value,
         admin_id,
         timestamp,
         notes,
         created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         payload.admin_stock_movement_id,
         payload.operation_id,
@@ -54,6 +58,8 @@ export class AdminStockMovementRepository extends BaseRepository {
         payload.source_vendor_id ?? null,
         payload.destination_vendor_id ?? null,
         payload.quantity,
+        payload.unit_value ?? 0,
+        payload.total_value ?? 0,
         payload.admin_id,
         payload.timestamp,
         payload.notes ?? null,

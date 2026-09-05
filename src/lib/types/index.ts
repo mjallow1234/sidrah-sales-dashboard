@@ -71,6 +71,7 @@ export interface VendorInventory {
   current_stock: number;
   total_stock_received: number;
   total_stock_sold: number;
+  average_unit_value: number;
   created_at: string;
   updated_at: string;
 }
@@ -82,6 +83,7 @@ export interface VendorBalance {
   balance_owed: number;
   date_created: string;
   last_updated: string;
+  opening_balance_locked_at?: string | null;
 }
 
 export interface VendorOwing {
@@ -398,6 +400,8 @@ export interface AdminStockMovement {
   source_vendor_id?: string | null;
   destination_vendor_id?: string | null;
   quantity: number;
+  unit_value: number;
+  total_value: number;
   admin_id: string;
   timestamp: string;
   notes?: string | null;
@@ -449,7 +453,7 @@ export interface DashboardFilters {
 
 export interface DashboardStats {
   vendorsVisited: number;
-  bucketsSold: number;
+  bucketsSupplied: number;
   cashCollected: number;
   lowStockVendors: number;
   outstandingBalances: number;
@@ -461,14 +465,14 @@ export interface DashboardStats {
   newVendorsInRange: number;
   totalBucketsOutThere: number;
   totalBucketsOutThereByProduct?: Array<{ productName: string; quantity: number }>;
-  salesBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number; stock_sold: number }>;
+  salesBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number; stock_added: number }>;
   collectionsBySalesRep?: Array<{ sales_rep_id: string; cash_collected: number }>;
   top10VendorsBySales?: Array<{ vendor_id: string; cash_collected: number }>;
 }
 
 export const DEFAULT_DASHBOARD_STATS: DashboardStats = {
   vendorsVisited: 0,
-  bucketsSold: 0,
+  bucketsSupplied: 0,
   cashCollected: 0,
   lowStockVendors: 0,
   outstandingBalances: 0,

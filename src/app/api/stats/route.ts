@@ -64,15 +64,15 @@ export async function GET(request: NextRequest) {
     const summaryQuery = `
       SELECT
         COUNT(DISTINCT vl.vendor_id) AS vendorsVisited,
-        COALESCE(SUM(vl.stock_sold), 0) AS bucketsSold,
+        COALESCE(SUM(vl.stock_added), 0) AS bucketsSupplied,
         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
       FROM visit_logs vl
       ${visitJoinClause}
       ${visitWhereClause}
     `;
 
-    const [summaryRows] = await dbQuery<{ vendorsVisited: string | number; bucketsSold: string | number; cashCollected: string | number }[]>(summaryQuery, visitParams);
-    const summary = summaryRows[0] ?? { vendorsVisited: 0, bucketsSold: 0, cashCollected: 0 };
+    const [summaryRows] = await dbQuery<{ vendorsVisited: string | number; bucketsSupplied: string | number; cashCollected: string | number }[]>(summaryQuery, visitParams);
+    const summary = summaryRows[0] ?? { vendorsVisited: 0, bucketsSupplied: 0, cashCollected: 0 };
 
     const totalActiveVendorsQuery = `
       SELECT COUNT(*) AS totalActiveVendors
@@ -184,80 +184,6 @@ export async function GET(request: NextRequest) {
       balanceParams.market = market;
     }
 
-    const amountOwedFilters: string[] = [];
-    const amountOwedParams: Record<string, unknown> = {};
-    const amountOwedJoinClause = market || salesRepId ? 'INNER JOIN vendors v ON v.vendor_id = vi.vendor_id' : '';
-
-    if (vendorId) {
-      amountOwedFilters.push('vi.vendor_id = :vendor_id');
-      amountOwedParams.vendor_id = vendorId;
-    }
-    if (salesRepId) {
-      amountOwedFilters.push('v.sales_rep_id = :sales_rep_id');
-      amountOwedParams.sales_rep_id = salesRepId;
-    }
-    if (productId) {
-      amountOwedFilters.push('vi.product_id = :product_id');
-      amountOwedParams.product_id = productId;
-    }
-    if (market) {
-      amountOwedFilters.push('v.location = :market');
-      amountOwedParams.market = market;
-    }
-
-    const amountOwedWhereClause = amountOwedFilters.length > 0 ? `WHERE ${amountOwedFilters.join(' AND ')}` : '';
-    const netSuppliedValueQuery = `
-      SELECT
-        COALESCE(SUM(
-          (COALESCE(vi.total_stock_received, 0) - COALESCE(ar.retrieved_quantity, 0))
-          * COALESCE(p.default_unit_price, 0)
-        ), 0) AS netSuppliedValue
-      FROM vendor_inventory vi
-      LEFT JOIN products p ON p.product_id = vi.product_id
-      LEFT JOIN (
-        SELECT source_vendor_id AS vendor_id, product_id, COALESCE(SUM(quantity), 0) AS retrieved_quantity
-        FROM admin_stock_movements
-        WHERE movement_type = 'retrieval'
-        GROUP BY source_vendor_id, product_id
-      ) ar ON ar.vendor_id = vi.vendor_id AND ar.product_id = vi.product_id
-      ${amountOwedJoinClause}
-      ${amountOwedWhereClause}
-    `;
-    const [netSuppliedRows] = await dbQuery<Array<{ netSuppliedValue: string | number }>>(netSuppliedValueQuery, amountOwedParams);
-    const netSuppliedValue = toNumber(netSuppliedRows[0]?.netSuppliedValue ?? 0);
-
-    const activeCashFilters: string[] = ['COALESCE(vl.is_reversed, 0) = 0'];
-    const activeCashParams: Record<string, unknown> = {};
-    const activeCashJoinClause = market || salesRepId ? 'INNER JOIN vendors v ON v.vendor_id = vl.vendor_id' : '';
-
-    if (vendorId) {
-      activeCashFilters.push('vl.vendor_id = :vendor_id');
-      activeCashParams.vendor_id = vendorId;
-    }
-    if (salesRepId) {
-      activeCashFilters.push('vl.sales_rep_id = :sales_rep_id');
-      activeCashParams.sales_rep_id = salesRepId;
-    }
-    if (productId) {
-      activeCashFilters.push('vl.product_id = :product_id');
-      activeCashParams.product_id = productId;
-    }
-    if (market) {
-      activeCashFilters.push('v.location = :market');
-      activeCashParams.market = market;
-    }
-
-    const activeCashWhereClause = activeCashFilters.length > 0 ? `WHERE ${activeCashFilters.join(' AND ')}` : '';
-    const activeCashQuery = `
-      SELECT COALESCE(SUM(vl.cash_collected), 0) AS activeCash
-      FROM visit_logs vl
-      ${activeCashJoinClause}
-      ${activeCashWhereClause}
-    `;
-    const [activeCashRows] = await dbQuery<Array<{ activeCash: string | number }>>(activeCashQuery, activeCashParams);
-    const activeCash = toNumber(activeCashRows[0]?.activeCash ?? 0);
-    const totalAmountOwed = netSuppliedValue - activeCash;
-
     const balanceWhereClause = balanceFilters.length > 0 ? `WHERE ${balanceFilters.join(' AND ')}` : '';
     const balanceSummaryQuery = `
       SELECT
@@ -272,21 +198,24 @@ export async function GET(request: NextRequest) {
     const outstandingBalances = toNumber(balanceRows[0]?.outstandingBalances ?? 0);
     const totalVendorReceivables = toNumber(balanceRows[0]?.totalVendorReceivables ?? 0);
     const vendorCredits = toNumber(balanceRows[0]?.vendorCredits ?? 0);
+    // Amount Owed must always agree with the Vendor Balance / Vendors Owing figures,
+    // so it is derived from the same vendor_balances query rather than a separate formula.
+    const totalAmountOwed = totalVendorReceivables;
 
     const vendorsVisited = toNumber(summary.vendorsVisited);
-    const bucketsSold = toNumber(summary.bucketsSold);
+    const bucketsSupplied = toNumber(summary.bucketsSupplied);
     const cashCollected = toNumber(summary.cashCollected);
     const averageSalesPerVendor = vendorsVisited > 0 ? cashCollected / vendorsVisited : 0;
 
     const salesByRepQuery = `
-      SELECT vl.sales_rep_id, COALESCE(SUM(vl.cash_collected), 0) AS cash_collected, COALESCE(SUM(vl.stock_sold), 0) AS stock_sold
+      SELECT vl.sales_rep_id, COALESCE(SUM(vl.cash_collected), 0) AS cash_collected, COALESCE(SUM(vl.stock_added), 0) AS stock_added
       FROM visit_logs vl
       ${visitJoinClause}
       ${visitWhereClause}
       GROUP BY vl.sales_rep_id
       ORDER BY cash_collected DESC
     `;
-    const [salesByRepRows] = await dbQuery<Array<{ sales_rep_id: string; cash_collected: string | number; stock_sold: string | number }>>(salesByRepQuery, visitParams);
+    const [salesByRepRows] = await dbQuery<Array<{ sales_rep_id: string; cash_collected: string | number; stock_added: string | number }>>(salesByRepQuery, visitParams);
 
     const collectionsByRepQuery = `
       SELECT vl.sales_rep_id, COALESCE(SUM(vl.cash_collected), 0) AS cash_collected
@@ -315,8 +244,8 @@ export async function GET(request: NextRequest) {
       newVendorsInRange: newVendorsThisMonth,
       vendorsVisitedToday: vendorsVisited,
       vendorsVisited,
-      bucketsSoldToday: bucketsSold,
-      bucketsSold,
+      bucketsSuppliedToday: bucketsSupplied,
+      bucketsSupplied,
       cashCollectedToday: cashCollected,
       cashCollected,
       totalBucketsOutThere,
@@ -330,7 +259,7 @@ export async function GET(request: NextRequest) {
       salesBySalesRep: salesByRepRows.map((row) => ({
         sales_rep_id: String(row.sales_rep_id),
         cash_collected: toNumber(row.cash_collected),
-        stock_sold: toNumber(row.stock_sold),
+        stock_added: toNumber(row.stock_added),
       })),
       collectionsBySalesRep: collectionsByRepRows.map((row) => ({
         sales_rep_id: String(row.sales_rep_id),

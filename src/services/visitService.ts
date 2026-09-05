@@ -12,10 +12,10 @@ export interface CreateVisitPayload {
   vendor_id: string;
   product_id: string;
   sales_rep_id: string;
-  stock_sold: number;
+  stock_sold?: number;
   stock_added: number;
   cash_collected: number;
-  unit_price: number;
+  unit_price?: number;
   payment_method: string;
   payment_reference?: string;
   client_transaction_id: string;
@@ -24,6 +24,14 @@ export interface CreateVisitPayload {
   notes?: string;
   actor_role?: string;
   actor_sales_rep_id?: string;
+}
+
+function computeWeightedAverageUnitValue(existingQuantity: number, existingAverage: number, incomingQuantity: number, incomingUnitValue: number): number {
+  const newQuantity = existingQuantity + incomingQuantity;
+  if (newQuantity <= 0) {
+    return incomingUnitValue;
+  }
+  return ((existingQuantity * existingAverage) + (incomingQuantity * incomingUnitValue)) / newQuantity;
 }
 
 class HttpError extends Error {
@@ -117,10 +125,10 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
   const salesRepId = String(payload.sales_rep_id ?? '');
   const paymentMethod = String(payload.payment_method ?? '');
 
-  const stockSold = Number(payload.stock_sold);
+  // Stock Sold is no longer part of the operational model; any client-supplied value is ignored.
+  const stockSold = 0;
   const stockAdded = Number(payload.stock_added);
   const cashCollected = Number(payload.cash_collected);
-  const unitPrice = Number(payload.unit_price);
 
   const clientTransactionId = validateClientTransactionId(payload.client_transaction_id);
   const paymentReference = payload.payment_reference ? String(payload.payment_reference) : '';
@@ -264,10 +272,10 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     }
 
     const [productRows] = (await connection.execute(
-      'SELECT COUNT(1) AS count FROM products WHERE product_id = ?',
+      'SELECT product_id, default_unit_price FROM products WHERE product_id = ?',
       [productId]
-    )) as [{ count: number }[], unknown];
-    if (productRows.length === 0 || Number(productRows[0].count) === 0) {
+    )) as [any[], unknown];
+    if (productRows.length === 0) {
       await journalRepo.create({
         transaction_id: transactionId,
         timestamp: nowDateTime,
@@ -285,6 +293,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       });
       throw new HttpError(400, 'Invalid product_id.');
     }
+    const unitPrice = Number(productRows[0].default_unit_price) || 0;
 
     const [salesRepRows] = (await connection.execute(
       'SELECT COUNT(1) AS count FROM sales_reps WHERE sales_rep_id = ?',
@@ -353,47 +362,6 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       }
     }
 
-    const vendorOpeningStock = Number(vendorInventoryRow.current_stock) || openingStock;
-    const availableVendorStock = vendorOpeningStock + stockAdded;
-
-    if (stockSold > openingStock) {
-      await journalRepo.create({
-        transaction_id: transactionId,
-        timestamp: nowDateTime,
-        endpoint: '/visit',
-        stage: 'stock_overflow',
-        status: 'failure',
-        payload: {
-          ...payload,
-          client_transaction_id: clientTransactionId,
-        },
-        completed: false,
-        actor,
-        error_message: 'stock_sold cannot exceed opening_stock.',
-        duration_ms: 0,
-      });
-      throw new HttpError(400, 'stock_sold cannot exceed opening_stock.');
-    }
-
-    if (stockSold > availableVendorStock) {
-      await journalRepo.create({
-        transaction_id: transactionId,
-        timestamp: nowDateTime,
-        endpoint: '/visit',
-        stage: 'vendor_stock_overflow',
-        status: 'failure',
-        payload: {
-          ...payload,
-          client_transaction_id: clientTransactionId,
-        },
-        completed: false,
-        actor,
-        error_message: 'Vendor does not have enough stock for this sale.',
-        duration_ms: 0,
-      });
-      throw new HttpError(400, 'Vendor does not have enough stock for this sale.');
-    }
-
     if (!inventoryExisted) {
       inventoryId = generateId('I');
       await inventoryRepo.create({
@@ -410,7 +378,9 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       inventoryExisted = true;
     }
 
-    const expectedCash = stockSold * unitPrice;
+    // A visit no longer creates debt from a reported sale. If stock is added during
+    // a visit, that is a supply event and creates obligation the same way /supply does.
+    const addedStockValue = stockAdded * unitPrice;
     const closingStock = openingStock - stockSold + stockAdded;
 
     const [balanceRows] = (await connection.execute(
@@ -442,10 +412,17 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     });
 
     await createJournalEntry('vendor_inventory_update', 'pending', false);
+    const newAverageUnitValue = computeWeightedAverageUnitValue(
+      Number(vendorInventoryRow.current_stock),
+      Number(vendorInventoryRow.average_unit_value) || 0,
+      stockAdded,
+      unitPrice,
+    );
     const updatedVendorInventory = await vendorInventoryRepo.update(vendorInventoryRow.vendor_inventory_id, {
       current_stock: Number(vendorInventoryRow.current_stock) + stockAdded - stockSold,
       total_stock_received: Number(vendorInventoryRow.total_stock_received) + stockAdded,
       total_stock_sold: Number(vendorInventoryRow.total_stock_sold) + stockSold,
+      average_unit_value: newAverageUnitValue,
     });
     await journalRepo.create({
       transaction_id: transactionId,
@@ -468,18 +445,18 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     if (!balanceRow) {
       updatedVendorBalance = await vendorBalanceRepo.create({
         vendor_id: vendorId,
-        total_expected_cash: expectedCash,
+        total_expected_cash: addedStockValue,
         cash_collected: cashCollected,
-        balance_owed: expectedCash - cashCollected,
+        balance_owed: addedStockValue - cashCollected,
         date_created: nowDate,
         last_updated: nowDateTime,
       });
     } else {
       updatedVendorBalance = await vendorBalanceRepo.update(vendorId, {
-        total_expected_cash: Number(balanceRow.total_expected_cash) + expectedCash,
+        total_expected_cash: Number(balanceRow.total_expected_cash) + addedStockValue,
         cash_collected: Number(balanceRow.cash_collected) + cashCollected,
         balance_owed:
-          Number(balanceRow.total_expected_cash) + expectedCash -
+          Number(balanceRow.total_expected_cash) + addedStockValue -
           (Number(balanceRow.cash_collected) + cashCollected),
       });
     }
@@ -512,7 +489,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       stock_sold: stockSold,
       stock_added: stockAdded,
       cash_collected: cashCollected,
-      expected_cash: expectedCash,
+      expected_cash: addedStockValue,
       unit_price: unitPrice,
       closing_stock: closingStock,
       payment_method: paymentMethod,

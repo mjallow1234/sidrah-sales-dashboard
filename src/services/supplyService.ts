@@ -1,9 +1,10 @@
 import { randomUUID } from 'crypto';
 import type { PoolConnection } from 'mysql2/promise';
 import { getPool, transaction } from '@/lib/db';
-import type { Inventory, VendorInventory } from '@/lib/types';
+import type { Inventory, VendorBalance, VendorInventory } from '@/lib/types';
 import { InventoryRepository } from '@/repositories/InventoryRepository';
 import { VendorInventoryRepository } from '@/repositories/VendorInventoryRepository';
+import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository';
 import { TransactionJournalRepository } from '@/repositories/TransactionJournalRepository';
 import { OperationIdempotencyRepository } from '@/repositories/OperationIdempotencyRepository';
 import { VisitRepository, type VisitLogRecord } from '@/repositories/VisitRepository';
@@ -26,6 +27,7 @@ export interface SupplyResult {
   supplyLog: VisitLogRecord;
   inventory: Inventory;
   vendorInventory: VendorInventory;
+  vendorBalance: VendorBalance;
 }
 
 function generateId(prefix: string): string {
@@ -92,6 +94,14 @@ function isDeadlock(error: unknown): boolean {
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function computeWeightedAverageUnitValue(existingQuantity: number, existingAverage: number, incomingQuantity: number, incomingUnitValue: number): number {
+  const newQuantity = existingQuantity + incomingQuantity;
+  if (newQuantity <= 0) {
+    return incomingUnitValue;
+  }
+  return ((existingQuantity * existingAverage) + (incomingQuantity * incomingUnitValue)) / newQuantity;
 }
 
 async function createInventoryIfMissing(
@@ -221,7 +231,16 @@ async function getExistingSupplyResult(clientTransactionId: string): Promise<Sup
   if (!inventoryRows[0] || !vendorInventoryRows[0]) {
     throw new ServiceError('Existing Supply VisitLog is missing related inventory state.');
   }
-  return { supplyLog: existing, inventory: inventoryRows[0], vendorInventory: vendorInventoryRows[0] };
+  const [vendorBalanceRows] = await getPool().query<any[]>(
+    'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1',
+    [existing.vendor_id],
+  );
+  return {
+    supplyLog: existing,
+    inventory: inventoryRows[0],
+    vendorInventory: vendorInventoryRows[0],
+    vendorBalance: vendorBalanceRows[0] ?? null,
+  };
 }
 
 export async function createSupply(payload: CreateSupplyPayload): Promise<SupplyResult> {
@@ -244,6 +263,7 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
       const journalRepo = new TransactionJournalRepository(connection);
       const inventoryRepo = new InventoryRepository(connection);
       const vendorInventoryRepo = new VendorInventoryRepository(connection);
+      const vendorBalanceRepo = new VendorBalanceRepository(connection);
       const visitRepo = new VisitRepository(connection);
       const idempotencyRepo = new OperationIdempotencyRepository(connection);
 
@@ -294,12 +314,14 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
       }
 
       const [productRows] = await connection.execute<any[]>(
-        'SELECT product_id FROM products WHERE product_id = ? LIMIT 1',
+        'SELECT product_id, default_unit_price FROM products WHERE product_id = ? LIMIT 1',
         [productId],
       );
       if (productRows.length === 0) {
         throw new NotFoundError('Product', productId);
       }
+      const unitPrice = Number(productRows[0].default_unit_price) || 0;
+      const totalValue = quantity * unitPrice;
 
       if (salesRepId) {
         const [salesRepRows] = await connection.execute<any[]>(
@@ -322,11 +344,44 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
       await journal('inventory', 'success');
 
       await journal('vendor_inventory', 'pending');
+      const newAverageUnitValue = computeWeightedAverageUnitValue(
+        Number(vendorInventory.current_stock),
+        Number(vendorInventory.average_unit_value) || 0,
+        quantity,
+        unitPrice,
+      );
       const updatedVendorInventory = await vendorInventoryRepo.update(vendorInventory.vendor_inventory_id, {
         current_stock: Number(vendorInventory.current_stock) + quantity,
         total_stock_received: Number(vendorInventory.total_stock_received) + quantity,
+        average_unit_value: newAverageUnitValue,
       });
       await journal('vendor_inventory', 'success');
+
+      await journal('balance_update', 'pending');
+      const [balanceRows] = (await connection.execute(
+        'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1 FOR UPDATE',
+        [vendorId]
+      )) as [any[], unknown];
+      const balanceRow = balanceRows.length > 0 ? balanceRows[0] : null;
+      let updatedVendorBalance;
+      if (!balanceRow) {
+        updatedVendorBalance = await vendorBalanceRepo.create({
+          vendor_id: vendorId,
+          total_expected_cash: totalValue,
+          cash_collected: 0,
+          balance_owed: totalValue,
+          date_created: nowDate,
+          last_updated: now,
+        });
+      } else {
+        const newTotalExpectedCash = Number(balanceRow.total_expected_cash) + totalValue;
+        const newCashCollected = Number(balanceRow.cash_collected);
+        updatedVendorBalance = await vendorBalanceRepo.update(vendorId, {
+          total_expected_cash: newTotalExpectedCash,
+          balance_owed: newTotalExpectedCash - newCashCollected,
+        });
+      }
+      await journal('balance_update', 'success');
 
       const supplyLog = await visitRepo.create({
         visit_id: generateId('VL'),
@@ -339,8 +394,8 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
         stock_sold: 0,
         stock_added: quantity,
         cash_collected: 0,
-        expected_cash: 0,
-        unit_price: 0,
+        expected_cash: totalValue,
+        unit_price: unitPrice,
         closing_stock: Number(vendorInventory.current_stock) + quantity,
         payment_method: 'supply',
         payment_reference: paymentReference,
@@ -353,7 +408,7 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
       await journal('visit_append', 'success');
       await journal('complete', 'success', true);
 
-      return { supplyLog, inventory: updatedInventory, vendorInventory: updatedVendorInventory };
+      return { supplyLog, inventory: updatedInventory, vendorInventory: updatedVendorInventory, vendorBalance: updatedVendorBalance };
     }));
   } catch (error) {
     try {

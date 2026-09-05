@@ -104,6 +104,14 @@ function isDuplicateEntry(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && (error as { code?: string }).code === 'ER_DUP_ENTRY');
 }
 
+function computeWeightedAverageUnitValue(existingQuantity: number, existingAverage: number, incomingQuantity: number, incomingUnitValue: number): number {
+  const newQuantity = existingQuantity + incomingQuantity;
+  if (newQuantity <= 0) {
+    return incomingUnitValue;
+  }
+  return ((existingQuantity * existingAverage) + (incomingQuantity * incomingUnitValue)) / newQuantity;
+}
+
 export interface ReverseVisitPayload {
   visit_id: string;
   reason: string;
@@ -162,6 +170,14 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
       throw new ConflictError('Visit has already been reversed.');
     }
 
+    const [cutoverRows] = (await connection.execute(
+      "SELECT setting_value FROM system_settings WHERE setting_key = 'vendor_obligation_cutover_at' LIMIT 1"
+    )) as [Array<{ setting_value: string }>, unknown];
+    const cutoverAt = cutoverRows[0]?.setting_value;
+    if (!cutoverAt || new Date(visit.timestamp).getTime() < new Date(cutoverAt).getTime()) {
+      throw new ValidationError('Only visits created after the vendor-obligation cutover can be reversed.');
+    }
+
     const [inventoryRows] = (await connection.execute(
       'SELECT * FROM inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
       [visit.vendor_id, visit.product_id]
@@ -189,19 +205,20 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
     }
     const vendorBalance = balanceRows[0] as VendorBalance;
 
-    const updatedInventoryCurrent = Number(inventory.current_stock) - Number(visit.stock_added) + Number(visit.stock_sold);
-    const updatedVendorInventoryCurrent = Number(vendorInventory.current_stock) - Number(visit.stock_added) + Number(visit.stock_sold);
+    const suppliedQuantity = Number(visit.stock_added);
+    const suppliedValue = Number(visit.expected_cash);
+    const suppliedUnitValue = suppliedQuantity > 0 ? suppliedValue / suppliedQuantity : 0;
+    const updatedInventoryCurrent = Number(inventory.current_stock) - suppliedQuantity;
+    const updatedVendorInventoryCurrent = Number(vendorInventory.current_stock) - suppliedQuantity;
     const updatedTotalReceived = Number(vendorInventory.total_stock_received) - Number(visit.stock_added);
-    const updatedTotalSold = Number(vendorInventory.total_stock_sold) - Number(visit.stock_sold);
     const updatedTotalStockSupplied = Number(inventory.total_stock_supplied) - Number(visit.stock_added);
-    const updatedTotalStockSold = Number(inventory.total_stock_sold) - Number(visit.stock_sold);
     const updatedCashCollected = Number(vendorBalance.cash_collected) - Number(visit.cash_collected);
     const updatedExpectedCash = Number(vendorBalance.total_expected_cash) - Number(visit.expected_cash);
 
     if (updatedInventoryCurrent < 0 || updatedVendorInventoryCurrent < 0) {
       throw new ValidationError('Reversing this visit would result in negative stock balances.');
     }
-    if (updatedTotalReceived < 0 || updatedTotalSold < 0 || updatedTotalStockSupplied < 0 || updatedTotalStockSold < 0 || updatedCashCollected < 0 || updatedExpectedCash < 0) {
+    if (updatedTotalReceived < 0 || updatedTotalStockSupplied < 0 || updatedCashCollected < 0 || updatedExpectedCash < 0) {
       throw new ValidationError('Reversing this visit would produce invalid cumulative totals.');
     }
 
@@ -220,14 +237,12 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
 
     await inventoryRepo.update(inventory.inventory_id, {
       total_stock_supplied: updatedTotalStockSupplied,
-      total_stock_sold: updatedTotalStockSold,
       current_stock: updatedInventoryCurrent,
     });
 
     await vendorInventoryRepo.update(vendorInventory.vendor_inventory_id, {
       current_stock: updatedVendorInventoryCurrent,
       total_stock_received: updatedTotalReceived,
-      total_stock_sold: updatedTotalSold,
     });
 
     await vendorBalanceRepo.update(visit.vendor_id, {
@@ -247,20 +262,23 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
       [now, adminId, reason, operationId, visitId]
     );
 
-    const adminStockRepo = new AdminStockMovementRepository(connection);
-    const reversalQuantity = Math.abs(Number(visit.stock_sold ?? 0) - Number(visit.stock_added ?? 0));
-    await adminStockRepo.create({
-      admin_stock_movement_id: generateId('ASM'),
-      operation_id: operationId,
-      movement_type: 'retrieval',
-      product_id: visit.product_id,
-      source_vendor_id: visit.vendor_id,
-      destination_vendor_id: null,
-      quantity: reversalQuantity,
-      admin_id: adminId,
-      timestamp: now,
-      notes: reason ?? null,
-    });
+    if (suppliedQuantity > 0) {
+      const adminStockRepo = new AdminStockMovementRepository(connection);
+      await adminStockRepo.create({
+        admin_stock_movement_id: generateId('ASM'),
+        operation_id: operationId,
+        movement_type: 'retrieval',
+        product_id: visit.product_id,
+        source_vendor_id: visit.vendor_id,
+        destination_vendor_id: null,
+        quantity: suppliedQuantity,
+        unit_value: suppliedUnitValue,
+        total_value: suppliedValue,
+        admin_id: adminId,
+        timestamp: now,
+        notes: reason ?? null,
+      });
+    }
 
     await journalRepo.create({
       transaction_id: transactionId,
@@ -395,9 +413,54 @@ export async function transferStock(payload: TransferStockPayload) {
     const updatedDestinationInventory = await inventoryRepo.update(destinationInventory.inventory_id, {
       current_stock: Number(destinationInventory.current_stock) + quantity,
     });
+    const transferUnitValue = Number(sourceVendorInventory.average_unit_value) || 0;
+    const transferTotalValue = quantity * transferUnitValue;
+    const newDestinationAverageUnitValue = computeWeightedAverageUnitValue(
+      Number(destinationVendorInventory.current_stock),
+      Number(destinationVendorInventory.average_unit_value) || 0,
+      quantity,
+      transferUnitValue,
+    );
     const updatedDestinationVendorInventory = await vendorInventoryRepo.update(destinationVendorInventory.vendor_inventory_id, {
       current_stock: Number(destinationVendorInventory.current_stock) + quantity,
+      average_unit_value: newDestinationAverageUnitValue,
     });
+
+    const vendorBalanceRepo = new VendorBalanceRepository(connection);
+    const [sourceBalanceRows] = (await connection.execute(
+      'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1 FOR UPDATE',
+      [sourceVendorId]
+    )) as [any[], unknown];
+    const sourceBalanceRow = sourceBalanceRows[0] as VendorBalance | undefined;
+    if (sourceBalanceRow) {
+      const newSourceExpectedCash = Number(sourceBalanceRow.total_expected_cash) - transferTotalValue;
+      await vendorBalanceRepo.update(sourceVendorId, {
+        total_expected_cash: newSourceExpectedCash,
+        balance_owed: newSourceExpectedCash - Number(sourceBalanceRow.cash_collected),
+      });
+    }
+
+    const [destinationBalanceRows] = (await connection.execute(
+      'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1 FOR UPDATE',
+      [destinationVendorId]
+    )) as [any[], unknown];
+    const destinationBalanceRow = destinationBalanceRows[0] as VendorBalance | undefined;
+    if (!destinationBalanceRow) {
+      await vendorBalanceRepo.create({
+        vendor_id: destinationVendorId,
+        total_expected_cash: transferTotalValue,
+        cash_collected: 0,
+        balance_owed: transferTotalValue,
+        date_created: new Date().toISOString().slice(0, 10),
+        last_updated: now,
+      });
+    } else {
+      const newDestinationExpectedCash = Number(destinationBalanceRow.total_expected_cash) + transferTotalValue;
+      await vendorBalanceRepo.update(destinationVendorId, {
+        total_expected_cash: newDestinationExpectedCash,
+        balance_owed: newDestinationExpectedCash - Number(destinationBalanceRow.cash_collected),
+      });
+    }
 
     const movement = await adminStockRepo.create({
       admin_stock_movement_id: generateId('ASM'),
@@ -407,6 +470,8 @@ export async function transferStock(payload: TransferStockPayload) {
       source_vendor_id: sourceVendorId,
       destination_vendor_id: destinationVendorId,
       quantity,
+      unit_value: transferUnitValue,
+      total_value: transferTotalValue,
       admin_id: adminId,
       timestamp: now,
       notes: notes ?? null,
@@ -425,12 +490,17 @@ export async function transferStock(payload: TransferStockPayload) {
       duration_ms: 0,
     });
 
+    const refreshedSourceBalance = await vendorBalanceRepo.findById(sourceVendorId);
+    const refreshedDestinationBalance = await vendorBalanceRepo.findById(destinationVendorId);
+
     return {
       movement,
       sourceInventory: updatedSourceInventory,
       destinationInventory: updatedDestinationInventory,
       sourceVendorInventory: updatedSourceVendorInventory,
       destinationVendorInventory: updatedDestinationVendorInventory,
+      sourceVendorBalance: refreshedSourceBalance,
+      destinationVendorBalance: refreshedDestinationBalance,
     };
   });
 }
@@ -509,6 +579,24 @@ export async function retrieveStock(payload: RetrieveStockPayload) {
       current_stock: Number(vendorInventory.current_stock) - quantity,
     });
 
+    const retrievalUnitValue = Number(vendorInventory.average_unit_value) || 0;
+    const retrievalTotalValue = quantity * retrievalUnitValue;
+
+    const vendorBalanceRepo = new VendorBalanceRepository(connection);
+    const [balanceRows] = (await connection.execute(
+      'SELECT * FROM vendor_balances WHERE vendor_id = ? LIMIT 1 FOR UPDATE',
+      [vendorId]
+    )) as [any[], unknown];
+    const balanceRow = balanceRows[0] as VendorBalance | undefined;
+    let updatedVendorBalance: VendorBalance | undefined = balanceRow;
+    if (balanceRow) {
+      const newExpectedCash = Number(balanceRow.total_expected_cash) - retrievalTotalValue;
+      updatedVendorBalance = await vendorBalanceRepo.update(vendorId, {
+        total_expected_cash: newExpectedCash,
+        balance_owed: newExpectedCash - Number(balanceRow.cash_collected),
+      });
+    }
+
     const movement = await adminStockRepo.create({
       admin_stock_movement_id: generateId('ASM'),
       operation_id: operationId,
@@ -517,6 +605,8 @@ export async function retrieveStock(payload: RetrieveStockPayload) {
       source_vendor_id: vendorId,
       destination_vendor_id: null,
       quantity,
+      unit_value: retrievalUnitValue,
+      total_value: retrievalTotalValue,
       admin_id: adminId,
       timestamp: now,
       notes: notes ?? null,
@@ -535,6 +625,6 @@ export async function retrieveStock(payload: RetrieveStockPayload) {
       duration_ms: 0,
     });
 
-    return { movement, inventory: updatedInventory, vendorInventory: updatedVendorInventory };
+    return { movement, inventory: updatedInventory, vendorInventory: updatedVendorInventory, vendorBalance: updatedVendorBalance };
   });
 }

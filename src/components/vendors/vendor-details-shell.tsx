@@ -134,7 +134,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
 
           {showEmptyInventory ? (
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
-              <p className="font-semibold text-slate-900">This vendor has not received any stock yet. Supply stock to begin tracking sales.</p>
+              <p className="font-semibold text-slate-900">This vendor has not received any stock yet. Supply stock to begin tracking their obligation.</p>
               <p className="mt-2">Current stock is 0 until a VendorInventory record exists.</p>
               <div className="mt-4">
                 <a
@@ -154,7 +154,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Current stock</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total received</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total sold</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Supplied</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -166,7 +166,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.current_stock}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_sold}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
                     </tr>
                   ))
                 ) : (

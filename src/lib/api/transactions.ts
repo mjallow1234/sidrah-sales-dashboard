@@ -51,7 +51,6 @@ export async function createVisit(payload: {
   vendor_id: string;
   product_id: string;
   sales_rep_id: string;
-  stock_sold: number;
   stock_added: number;
   cash_collected: number;
   unit_price: number;
