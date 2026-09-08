@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuthQuery, useTransactionsByVendorQuery, useVendorBalanceQuery, useVendorInventoryQuery, useVendorQuery, useProductsQuery } from '@/lib/hooks/queries';
+import { useAuthQuery, useTransactionsByVendorQuery, useVendorBalanceQuery, useVendorInventoryQuery, useVendorQuery, useProductsQuery, useAdminActivityQuery } from '@/lib/hooks/queries';
 import { TransactionTable } from '@/components/vendors/transaction-table';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
@@ -38,8 +38,16 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     isLoading: productsLoading,
     isError: productsError,
   } = useProductsQuery();
+  const {
+    data: stockMovementsOut,
+    isLoading: stockMovementsOutLoading,
+    isError: stockMovementsOutError,
+  } = useAdminActivityQuery({ sourceVendorId: vendorId }, { enabled: canEditVendor });
 
   const hasVendorInventory = Array.isArray(vendorInventory) && vendorInventory.length > 0;
+  const hasStockMovementsOut = Array.isArray(stockMovementsOut) && stockMovementsOut.length > 0;
+  const showStockMovementsError = canEditVendor && !stockMovementsOutLoading && !!stockMovementsOutError;
+  const showEmptyStockMovementsOut = canEditVendor && !stockMovementsOutLoading && !stockMovementsOutError && !hasStockMovementsOut;
   const currentStock = hasVendorInventory
     ? vendorInventory.reduce((sum, record) => sum + (record.current_stock ?? 0), 0)
     : 0;
@@ -152,7 +160,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               <thead>
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Current stock</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total cash collected</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total received</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Supplied</th>
                 </tr>
@@ -164,9 +172,9 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
                         {productNames?.[record.product_id] ?? record.product_id}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.current_stock}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{vendorBalance?.cash_collected ?? 0}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.last_supplied_quantity}</td>
                     </tr>
                   ))
                 ) : (
@@ -180,6 +188,86 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             </table>
           </div>
         </section>
+
+        {canEditVendor ? (
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Stock traceability</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">Stock movements out of this vendor</h2>
+                <p className="mt-1 text-sm text-slate-600">Every retrieval or transfer that removed stock from this vendor, most recent first.</p>
+              </div>
+            </div>
+
+            {showStockMovementsError ? (
+              <div className="mt-4 rounded-3xl bg-rose-50 p-4 text-sm text-rose-700">
+                Unable to load stock movements. Vendor details are still available.
+              </div>
+            ) : null}
+
+            {showEmptyStockMovementsOut ? (
+              <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
+                No stock movements out of this vendor.
+              </div>
+            ) : null}
+
+            {hasStockMovementsOut ? (
+              <div className="mt-6 overflow-x-auto">
+                <table className="min-w-full divide-y divide-slate-200">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Quantity</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Destination / Outcome</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Actor</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {stockMovementsOut!.map((movement) => {
+                      const typeLabel =
+                        movement.action_type === 'transfer'
+                          ? 'Transferred'
+                          : movement.action_type === 'reversal'
+                            ? 'Reversed'
+                            : 'Retrieved';
+                      return (
+                        <tr key={`${movement.operation_id}-${movement.timestamp}`}>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                            {new Date(movement.timestamp).toLocaleString()}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{movement.product_name}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{movement.quantity}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{typeLabel}</td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                            {movement.action_type === 'transfer' ? (
+                              movement.destination_vendor_id ? (
+                                <Link
+                                  href={`/vendors/${movement.destination_vendor_id}`}
+                                  className="font-semibold text-sidrah-700 hover:underline"
+                                >
+                                  {movement.destination_vendor_id} — {movement.destination_vendor_name ?? 'Unknown vendor'}
+                                </Link>
+                              ) : (
+                                'Destination not recorded'
+                              )
+                            ) : movement.action_type === 'reversal' ? (
+                              movement.reversal_reason ? `Reversed: ${movement.reversal_reason}` : 'Reversed — original supply undone'
+                            ) : (
+                              'Retrieved'
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{movement.admin_name}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
           <div className="flex items-center justify-between gap-4">

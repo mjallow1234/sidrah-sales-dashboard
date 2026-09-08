@@ -55,6 +55,7 @@ function mapVendorInventoryRow(row: any): VendorInventory {
     total_stock_received: Number(row.total_stock_received) || 0,
     total_stock_sold: Number(row.total_stock_sold) || 0,
     average_unit_value: Number(row.average_unit_value) || 0,
+    last_supplied_quantity: Number(row.last_supplied_quantity) || 0,
     created_at: formatDateValue(row.created_at),
     updated_at: formatDateTimeValue(row.updated_at),
   };
@@ -79,7 +80,18 @@ export async function GET(request: NextRequest) {
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const sql = `SELECT vendor_inventory_id, vendor_id, product_id, current_stock, total_stock_received, total_stock_sold, average_unit_value, created_at, updated_at FROM vendor_inventory ${whereClause} ORDER BY vendor_id ASC, product_id ASC`;
+    const sql = `SELECT vendor_inventory_id, vendor_id, product_id, current_stock, total_stock_received, total_stock_sold, average_unit_value, created_at, updated_at,
+      (
+        SELECT vl.stock_added
+        FROM visit_logs vl
+        WHERE vl.vendor_id = vendor_inventory.vendor_id
+          AND vl.product_id = vendor_inventory.product_id
+          AND vl.stock_added > 0
+          AND vl.is_reversed = FALSE
+        ORDER BY vl.timestamp DESC, vl.visit_id DESC
+        LIMIT 1
+      ) AS last_supplied_quantity
+      FROM vendor_inventory ${whereClause} ORDER BY vendor_id ASC, product_id ASC`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
     return Response.json({ status: 'success', data: rows.map(mapVendorInventoryRow) });

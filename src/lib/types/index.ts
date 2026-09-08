@@ -72,6 +72,7 @@ export interface VendorInventory {
   total_stock_received: number;
   total_stock_sold: number;
   average_unit_value: number;
+  last_supplied_quantity: number;
   created_at: string;
   updated_at: string;
 }

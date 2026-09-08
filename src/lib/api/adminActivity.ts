@@ -31,6 +31,7 @@ export async function getAdminActivity(filters?: {
   actionType?: string;
   adminId?: string;
   vendorId?: string;
+  sourceVendorId?: string;
   productId?: string;
   search?: string;
 }): Promise<AdminActivityRecord[]> {

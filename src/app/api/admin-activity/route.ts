@@ -68,6 +68,7 @@ export async function GET(request: NextRequest) {
     const actionType = query.get('actionType');
     const adminId = query.get('adminId');
     const vendorId = query.get('vendorId');
+    const sourceVendorId = query.get('sourceVendorId');
     const productId = query.get('productId');
     const search = query.get('search');
 
@@ -90,6 +91,10 @@ export async function GET(request: NextRequest) {
     if (vendorId) {
       filters.push('(a.source_vendor_id = :vendorId OR a.destination_vendor_id = :vendorId OR vl.vendor_id = :vendorId)');
       params.vendorId = vendorId;
+    }
+    if (sourceVendorId) {
+      filters.push('a.source_vendor_id = :sourceVendorId');
+      params.sourceVendorId = sourceVendorId;
     }
     if (productId) {
       filters.push('a.product_id = :productId');

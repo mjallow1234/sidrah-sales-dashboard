@@ -425,11 +425,12 @@ export function useCreateSupplyMutation() {
   });
 }
 
-export function useAdminActivityQuery(filters?: { startDate?: string; endDate?: string; actionType?: string; adminId?: string; vendorId?: string; productId?: string; search?: string }) {
+export function useAdminActivityQuery(filters?: { startDate?: string; endDate?: string; actionType?: string; adminId?: string; vendorId?: string; sourceVendorId?: string; productId?: string; search?: string }, options?: { enabled?: boolean }) {
   return useQuery<AdminActivityRecord[]>({
     queryKey: ['adminActivity', filters],
     queryFn: () => getAdminActivity(filters),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+    enabled: options?.enabled ?? true,
   });
 }
