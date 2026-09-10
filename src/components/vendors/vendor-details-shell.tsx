@@ -48,8 +48,8 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
   const hasStockMovementsOut = Array.isArray(stockMovementsOut) && stockMovementsOut.length > 0;
   const showStockMovementsError = canEditVendor && !stockMovementsOutLoading && !!stockMovementsOutError;
   const showEmptyStockMovementsOut = canEditVendor && !stockMovementsOutLoading && !stockMovementsOutError && !hasStockMovementsOut;
-  const currentStock = hasVendorInventory
-    ? vendorInventory.reduce((sum, record) => sum + (record.current_stock ?? 0), 0)
+  const totalSupplied = hasVendorInventory
+    ? vendorInventory.reduce((sum, record) => sum + (record.total_stock_received ?? 0), 0)
     : 0;
   const isLoading = vendorLoading || vendorInventoryLoading || balanceLoading || transactionsLoading;
   const isVendorError = vendorError || !vendor;
@@ -104,13 +104,19 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             ) : null}
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="mt-6 grid gap-4 sm:grid-cols-3">
             <div className="rounded-3xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Current stock</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{currentStock}</p>
+              <p className="text-sm text-slate-500">Total supplied</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{totalSupplied}</p>
             </div>
             <div className="rounded-3xl bg-slate-50 p-4">
-              <p className="text-sm text-slate-500">Vendor balance</p>
+              <p className="text-sm text-slate-500">Total cash received</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">
+                GMD {(vendorBalance?.cash_collected ?? 0).toLocaleString()}
+              </p>
+            </div>
+            <div className="rounded-3xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Balance owed</p>
               <p className="mt-2 text-2xl font-semibold text-slate-900">
                 {vendorBalance?.balance_owed === undefined || vendorBalance?.balance_owed === null ? (
                   'GMD 0'
@@ -160,9 +166,9 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               <thead>
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total cash collected</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total received</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Supplied</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Vendor total cash received</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total supplied</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Last added stock</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
