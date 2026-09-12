@@ -29,12 +29,23 @@ test('multi-item movement migration groups rows under one idempotent event', () 
   }
 });
 
-test('factory API requires foreman and derives actor from session', () => {
+test('factory API requires a factory role and derives actor from session', () => {
   const movementRoute = read('src/app/api/factory/movements/route.ts');
-  assert.match(movementRoute, /isForemanRole\(session\.role\)/);
+  assert.match(movementRoute, /isFactoryRole\(session\.role\)/);
   assert.match(movementRoute, /actor_user_id: session\.userId/);
   assert.equal(movementRoute.includes('vendor_id'), false);
   assert.equal(movementRoute.includes('delivery_id'), false);
+});
+
+test('all factory APIs share the super_admin-enabled factory authorization boundary', () => {
+  for (const route of [
+    'src/app/api/factory/inventory/route.ts',
+    'src/app/api/factory/movements/route.ts',
+    'src/app/api/factory/containers/inventory/route.ts',
+    'src/app/api/factory/containers/movements/route.ts',
+  ]) {
+    assert.match(read(route), /isFactoryRole\(session\.role\)/, `${route} should use the shared Factory role helper`);
+  }
 });
 
 test('factory service contains rollback-safe duplicate retrieval', () => {
@@ -86,7 +97,7 @@ test('factory UI uses mobile cards, tabs, and event-based movement details', () 
   assert.equal(history.includes('<table'), false);
 });
 
-test('container tracking is manual, independent, and Foreman-protected', () => {
+test('container tracking is manual, independent, and factory-role protected', () => {
   const migration = read('db/migrations/0011_add_factory_container_tracking.sql');
   const service = read('src/services/factoryContainerService.ts');
   const component = read('src/components/factory/factory-container-section.tsx');
@@ -96,7 +107,7 @@ test('container tracking is manual, independent, and Foreman-protected', () => {
   assert.match(migration, /UNIQUE KEY ux_factory_container_movements_operation_id/);
   assert.match(service, /transaction\(/);
   assert.match(service, /FACTORY_STOCK_INSUFFICIENT/);
-  assert.match(route, /isForemanRole\(session\.role\)/);
+  assert.match(route, /isFactoryRole\(session\.role\)/);
   assert.match(route, /actor_user_id: session\.userId/);
   assert.match(component, /Production and product movements do not change/);
   assert.match(component, /Reason \/ Comment/);

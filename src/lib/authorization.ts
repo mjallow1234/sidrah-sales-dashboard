@@ -25,6 +25,10 @@ export function isForemanRole(role?: string): role is AppUserRole {
   return role === 'foreman';
 }
 
+export function isFactoryRole(role?: string): role is AppUserRole {
+  return role === 'super_admin' || role === 'admin' || isForemanRole(role);
+}
+
 export function isFactoryPath(pathname: string): boolean {
   return pathname === '/factory' || pathname.startsWith('/factory/');
 }
@@ -39,7 +43,7 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
   }
 
   if (isFactoryPath(pathname)) {
-    return role === 'foreman';
+    return isFactoryRole(role);
   }
 
   if (role === 'foreman') {
@@ -95,7 +99,7 @@ export function canViewLink(role: string | undefined, href: string): boolean {
   }
 
   if (isFactoryPath(href)) {
-    return role === 'foreman';
+    return isFactoryRole(role);
   }
 
   if (role === 'foreman') {
