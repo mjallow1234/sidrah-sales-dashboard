@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { canViewLink } from '@/lib/authorization';
 
 const navItems = [
+  { label: 'Factory', href: '/factory' },
   { label: 'Dashboard', href: '/dashboard' },
   { label: 'Vendors', href: '/vendors' },
   { label: 'Deliveries', href: '/deliveries' },

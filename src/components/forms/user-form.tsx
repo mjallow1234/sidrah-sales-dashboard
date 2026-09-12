@@ -11,7 +11,7 @@ const userSchema = z.object({
   email: z.string().email('Email is required'),
   phone: z.string().min(1, 'Phone is required'),
   name: z.string().min(1, 'Name is required'),
-  role: z.enum(['super_admin', 'admin', 'supervisor', 'agent', 'delivery']),
+  role: z.enum(['super_admin', 'admin', 'supervisor', 'agent', 'delivery', 'foreman']),
   status: z.enum(['active', 'inactive', 'suspended']),
   password: z.string().optional(),
 });
@@ -147,6 +147,7 @@ export function UserForm({ initialValues, userId, onSuccess }: UserFormProps) {
             <option value="supervisor">Supervisor</option>
             <option value="agent">Agent</option>
             <option value="delivery">Delivery</option>
+            <option value="foreman">Foreman</option>
           </select>
         </label>
 

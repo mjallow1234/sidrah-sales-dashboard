@@ -33,7 +33,8 @@ export async function middleware(request: NextRequest) {
   const dashboardUrl = buildPublicRedirectUrl(request, '/dashboard');
   const changePasswordUrl = buildPublicRedirectUrl(request, '/change-password');
   const deliveriesUrl = buildPublicRedirectUrl(request, '/deliveries');
-  const homeUrl = session.role === 'delivery' ? deliveriesUrl : dashboardUrl;
+  const factoryUrl = buildPublicRedirectUrl(request, '/factory');
+  const homeUrl = session.role === 'delivery' ? deliveriesUrl : session.role === 'foreman' ? factoryUrl : dashboardUrl;
 
   if (pathname === '/api/auth' || pathname.startsWith('/api/auth/')) {
     return NextResponse.next();
@@ -41,6 +42,10 @@ export async function middleware(request: NextRequest) {
 
   if (isApiRequest && !isAuthenticated) {
     return NextResponse.json({ status: 'error', message: 'Not authenticated.' }, { status: 401 });
+  }
+
+  if (isApiRequest && session.role === 'foreman' && !pathname.startsWith('/api/factory') && !pathname.startsWith('/api/products')) {
+    return NextResponse.json({ status: 'error', message: 'Forbidden.' }, { status: 403 });
   }
 
   if (isApiRequest && session.role === 'delivery' && !pathname.startsWith('/api/deliveries')) {
@@ -92,6 +97,8 @@ export const config = {
     '/salesreps/:path*',
     '/reports/:path*',
     '/deliveries/:path*',
+    '/factory',
+    '/factory/:path*',
     '/api/:path*',
   ],
 };

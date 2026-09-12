@@ -1,4 +1,4 @@
-export type AppUserRole = 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery';
+export type AppUserRole = 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery' | 'foreman';
 export const adminRoles = ['admin', 'super_admin'] as const;
 
 export function isAdminRole(role?: string): role is AppUserRole {
@@ -21,9 +21,29 @@ export function isAgentRole(role?: string): role is AppUserRole {
   return role === 'agent';
 }
 
+export function isForemanRole(role?: string): role is AppUserRole {
+  return role === 'foreman';
+}
+
+export function isFactoryPath(pathname: string): boolean {
+  return pathname === '/factory' || pathname.startsWith('/factory/');
+}
+
+export function isFactoryApiPath(pathname: string): boolean {
+  return pathname === '/api/factory' || pathname.startsWith('/api/factory/');
+}
+
 export function canAccessPath(role: string | undefined, pathname: string): boolean {
   if (!role) {
     return false;
+  }
+
+  if (isFactoryPath(pathname)) {
+    return role === 'foreman';
+  }
+
+  if (role === 'foreman') {
+    return isFactoryPath(pathname);
   }
 
   if (role === 'delivery') {
@@ -72,6 +92,14 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
 export function canViewLink(role: string | undefined, href: string): boolean {
   if (!role) {
     return false;
+  }
+
+  if (isFactoryPath(href)) {
+    return role === 'foreman';
+  }
+
+  if (role === 'foreman') {
+    return isFactoryPath(href);
   }
 
   if (role === 'delivery') {

@@ -1,4 +1,4 @@
-export type UserRole = 'agent' | 'supervisor' | 'admin' | 'delivery';
+export type UserRole = 'agent' | 'supervisor' | 'admin' | 'delivery' | 'foreman';
 
 export interface User {
   id: string;
@@ -321,7 +321,7 @@ export interface AppUser {
   email: string;
   phone: string;
   name: string;
-  role: 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery';
+  role: 'super_admin' | 'admin' | 'supervisor' | 'agent' | 'delivery' | 'foreman';
   status: 'active' | 'inactive' | 'suspended';
   sales_rep_id?: string;
   password_hash: string;
@@ -434,6 +434,69 @@ export interface AdminActivityRecord {
   original_actor?: string | null;
   reversal_reason?: string | null;
   status?: string | null;
+}
+
+export type FactoryMovementType = 'production' | 'leaving_factory' | 'returned_factory';
+
+export interface FactoryMovementItem {
+  product_id: string;
+  quantity: number;
+}
+
+export interface FactoryInventory {
+  factory_inventory_id: string;
+  product_id: string;
+  product_name?: string;
+  unit?: string;
+  current_quantity: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FactoryStockMovement {
+  movement_id: string;
+  event_id?: string;
+  operation_id: string;
+  movement_type: FactoryMovementType;
+  product_id: string;
+  product_name?: string;
+  unit?: string;
+  quantity: number;
+  occurred_at: string;
+  recorded_at: string;
+  actor_user_id: string;
+  actor_name?: string;
+  raw_material?: string | null;
+  temperature_c?: number | null;
+  processing_duration_hours?: number | null;
+  processing_duration_minutes?: number | null;
+  reason_comment?: string | null;
+  batch_reference?: string | null;
+  input_quantity?: number | null;
+  input_unit?: string | null;
+}
+
+export type FactoryContainerType = 'gallon' | 'bucket_5l' | 'bucket_1kg';
+export type FactoryContainerMovementType = 'received' | 'leaving_factory' | 'returned_factory';
+
+export interface FactoryContainerInventory {
+  container_type: FactoryContainerType;
+  current_quantity: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FactoryContainerMovement {
+  movement_id: string;
+  operation_id: string;
+  container_type: FactoryContainerType;
+  movement_type: FactoryContainerMovementType;
+  quantity: number;
+  occurred_at: string;
+  recorded_at: string;
+  actor_user_id: string;
+  actor_name?: string;
+  reason_comment?: string | null;
 }
 
 export interface ReverseVisitResult {

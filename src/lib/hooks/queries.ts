@@ -11,7 +11,9 @@ import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
 import { getVendorIntelligence } from '@/lib/api/intelligence';
-import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryItem, type DeliveryRecord, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
+import { getFactoryInventory, getFactoryMovements, createFactoryMovement } from '@/lib/api/factory';
+import { getFactoryContainerInventory, getFactoryContainerMovements, createFactoryContainerMovement } from '@/lib/api/factoryContainers';
+import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryItem, type DeliveryRecord, type FactoryContainerInventory, type FactoryContainerMovement, type FactoryInventory, type FactoryStockMovement, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
 export interface PaginatedResult<T> {
@@ -146,6 +148,44 @@ export function useProductsQuery() {
     queryFn: () => getProducts(),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
+  });
+}
+
+export function useFactoryInventoryQuery() {
+  return useQuery<FactoryInventory[]>({ queryKey: ['factoryInventory'], queryFn: getFactoryInventory });
+}
+
+export function useFactoryMovementsQuery() {
+  return useQuery<FactoryStockMovement[]>({ queryKey: ['factoryMovements'], queryFn: getFactoryMovements });
+}
+
+export function useCreateFactoryMovementMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createFactoryMovement,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['factoryInventory'] });
+      queryClient.invalidateQueries({ queryKey: ['factoryMovements'] });
+    },
+  });
+}
+
+export function useFactoryContainerInventoryQuery() {
+  return useQuery<FactoryContainerInventory[]>({ queryKey: ['factoryContainerInventory'], queryFn: getFactoryContainerInventory });
+}
+
+export function useFactoryContainerMovementsQuery() {
+  return useQuery<FactoryContainerMovement[]>({ queryKey: ['factoryContainerMovements'], queryFn: getFactoryContainerMovements });
+}
+
+export function useCreateFactoryContainerMovementMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: createFactoryContainerMovement,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['factoryContainerInventory'] });
+      queryClient.invalidateQueries({ queryKey: ['factoryContainerMovements'] });
+    },
   });
 }
 

@@ -30,6 +30,14 @@ const navSections = [
     ],
   },
   {
+    title: 'Factory',
+    links: [
+      { label: 'Factory', href: '/factory', icon: Box },
+      { label: 'Production', href: '/factory/production', icon: PlusSquare },
+      { label: 'Movements', href: '/factory/movements', icon: ArrowRightLeft },
+    ],
+  },
+  {
     title: 'Vendors',
     links: [
       { label: 'Vendor list', href: '/vendors', icon: Truck },
@@ -133,6 +141,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
     if (userRole === 'agent') return 'Agent dashboard';
     if (userRole === 'supervisor') return 'Supervisor dashboard';
     if (userRole === 'admin' || userRole === 'super_admin') return 'Admin dashboard';
+    if (userRole === 'foreman') return 'Factory dashboard';
     return 'Sales dashboard';
   }, [userRole]);
 
