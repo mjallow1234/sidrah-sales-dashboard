@@ -376,8 +376,14 @@ export interface PasswordResetToken {
 
 export interface Transaction {
   transaction_id: string;
+  visit_id?: string;
+  timestamp?: string;
   date: string;
   vendor_id: string;
+  vendor_name?: string;
+  product_id?: string;
+  product_name?: string;
+  sales_rep_id?: string;
   opening_stock: number;
   stock_sold: number;
   stock_added: number;

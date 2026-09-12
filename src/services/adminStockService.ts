@@ -7,6 +7,7 @@ import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository'
 import { VisitRepository } from '@/repositories/VisitRepository';
 import { AdminStockMovementRepository } from '@/repositories/AdminStockMovementRepository';
 import { TransactionJournalRepository } from '@/repositories/TransactionJournalRepository';
+import { isAgentRole } from '@/lib/authorization';
 import { ConflictError, NotFoundError, ServiceError, ValidationError } from './errors';
 
 function generateId(prefix: string): string {
@@ -137,7 +138,13 @@ export interface RetrieveStockPayload {
   admin_id?: string;
 }
 
-export async function reverseVisit(payload: ReverseVisitPayload, adminId: string) {
+export interface ReverseVisitActor {
+  userId: string;
+  role: string;
+  salesRepId?: string;
+}
+
+export async function reverseVisit(payload: ReverseVisitPayload, actor: ReverseVisitActor) {
   const visitId = validateString(payload.visit_id, 'visit_id', true)!;
   const reason = validateString(payload.reason, 'reason', true)!;
   const operationId = validateString(payload.operation_id, 'operation_id') ?? `REV_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
@@ -148,7 +155,7 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
     'SELECT * FROM visit_logs WHERE reversal_operation_id = ? LIMIT 1',
     [operationId]
   );
-  if (existingVisitRow[0]?.length > 0) {
+  if (existingVisitRow[0]?.length > 0 && !isAgentRole(actor.role)) {
     const existing = existingVisitRow[0][0];
     return {
       visitLog: existing,
@@ -156,6 +163,9 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
       vendorInventory: null,
       vendorBalance: null,
     } as unknown as VisitResult;
+  }
+  if (existingVisitRow[0]?.length > 0 && isAgentRole(actor.role)) {
+    throw new ConflictError('This reversal operation has already been used.');
   }
 
   return transaction(async (connection) => {
@@ -165,7 +175,27 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
     const vendorBalanceRepo = new VendorBalanceRepository(connection);
     const journalRepo = new TransactionJournalRepository(connection);
 
-    const visit = await visitRepo.findById(visitId);
+    const [visitRows] = (await connection.execute(
+      'SELECT *, NOW() AS server_now FROM visit_logs WHERE visit_id = ? LIMIT 1 FOR UPDATE',
+      [visitId]
+    )) as [Array<Record<string, any>>, unknown];
+    const visit = visitRows[0] as any;
+    if (!visit) {
+      throw new NotFoundError('Visit', visitId);
+    }
+
+    if (isAgentRole(actor.role)) {
+      if (!actor.salesRepId || String(visit.sales_rep_id) !== actor.salesRepId) {
+        throw new ServiceError('Agents can only reverse their own visits.', 403);
+      }
+
+      const recordedAt = new Date(visit.timestamp).getTime();
+      const serverNow = new Date(visit.server_now).getTime();
+      if (!Number.isFinite(recordedAt) || !Number.isFinite(serverNow) || serverNow > recordedAt + 24 * 60 * 60 * 1000) {
+        throw new ConflictError('This visit can only be reversed within 24 hours of recording.');
+      }
+    }
+
     if (visit.is_reversed) {
       throw new ConflictError('Visit has already been reversed.');
     }
@@ -228,9 +258,9 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
       endpoint: '/visit/reverse',
       stage: 'begin',
       status: 'pending',
-      payload: { visit_id: visitId, reason, operation_id: operationId },
+      payload: { visit_id: visitId, reason, operation_id: operationId, actor_user_id: actor.userId, actor_role: actor.role },
       completed: false,
-      actor: null,
+      actor: actor.userId,
       error_message: null,
       duration_ms: 0,
     });
@@ -259,7 +289,7 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
            reversal_reason = ?,
            reversal_operation_id = ?
        WHERE visit_id = ?`,
-      [now, adminId, reason, operationId, visitId]
+      [now, actor.userId, reason, operationId, visitId]
     );
 
     if (suppliedQuantity > 0) {
@@ -274,7 +304,7 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
         quantity: suppliedQuantity,
         unit_value: suppliedUnitValue,
         total_value: suppliedValue,
-        admin_id: adminId,
+        admin_id: actor.userId,
         timestamp: now,
         notes: reason ?? null,
       });
@@ -286,9 +316,9 @@ export async function reverseVisit(payload: ReverseVisitPayload, adminId: string
       endpoint: '/visit/reverse',
       stage: 'complete',
       status: 'success',
-      payload: { visit_id: visitId, reason, operation_id: operationId },
+      payload: { visit_id: visitId, reason, operation_id: operationId, actor_user_id: actor.userId, actor_role: actor.role },
       completed: true,
-      actor: null,
+      actor: actor.userId,
       error_message: null,
       duration_ms: 0,
     });

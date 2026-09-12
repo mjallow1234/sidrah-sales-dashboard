@@ -32,6 +32,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     data: transactions,
     isLoading: transactionsLoading,
     isError: transactionsError,
+    refetch: refetchTransactions,
   } = useTransactionsByVendorQuery(vendorId);
   const {
     data: products,
@@ -51,6 +52,13 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
   const totalSupplied = hasVendorInventory
     ? vendorInventory.reduce((sum, record) => sum + (record.total_stock_received ?? 0), 0)
     : 0;
+  const productCashReceived = (transactions ?? []).reduce<Record<string, number>>((totals, transaction) => {
+    if (transaction.is_reversed || !transaction.product_id) {
+      return totals;
+    }
+    totals[transaction.product_id] = (totals[transaction.product_id] ?? 0) + (transaction.cash_collected ?? 0);
+    return totals;
+  }, {});
   const isLoading = vendorLoading || vendorInventoryLoading || balanceLoading || transactionsLoading;
   const isVendorError = vendorError || !vendor;
   const showInventoryError = !vendorInventoryLoading && !!vendorInventoryError;
@@ -166,7 +174,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               <thead>
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Vendor total cash received</th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product cash received</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total supplied</th>
                   <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Last added stock</th>
                 </tr>
@@ -178,7 +186,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
                         {productNames?.[record.product_id] ?? record.product_id}
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{vendorBalance?.cash_collected ?? 0}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{(productCashReceived[record.product_id] ?? 0).toLocaleString()}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.last_supplied_quantity}</td>
                     </tr>
@@ -284,7 +292,13 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
           </div>
 
           <div className="mt-6">
-            <TransactionTable transactions={transactions?.slice(0, 10) ?? []} />
+            <TransactionTable
+              transactions={transactions?.slice(0, 10) ?? []}
+              enableAgentReversal={session?.role === 'agent'}
+              currentSalesRepId={session?.sales_rep_id}
+              canAdministrativeReversal={canEditVendor}
+              onReversed={() => { void refetchTransactions(); }}
+            />
           </div>
         </section>
       </div>

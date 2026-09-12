@@ -3,8 +3,14 @@ import type { Transaction } from '@/lib/types';
 function mapVisitLogToTransaction(log: any): Transaction {
   return {
     transaction_id: log.visit_id,
+    visit_id: log.visit_id,
+    timestamp: log.timestamp,
     date: log.date,
     vendor_id: log.vendor_id,
+    vendor_name: log.vendor_name,
+    product_id: log.product_id,
+    product_name: log.product_name,
+    sales_rep_id: log.sales_rep_id,
     opening_stock: Number(log.opening_stock) || 0,
     stock_sold: Number(log.stock_sold) || 0,
     stock_added: Number(log.stock_added) || 0,
@@ -13,6 +19,11 @@ function mapVisitLogToTransaction(log: any): Transaction {
     sales_rep: log.sales_rep_id || '',
     actor: log.actor || '',
     notes: log.notes || '',
+    is_reversed: Boolean(log.is_reversed),
+    reversed_at: log.reversed_at,
+    reversed_by: log.reversed_by,
+    reversal_reason: log.reversal_reason,
+    reversal_operation_id: log.reversal_operation_id,
   };
 }
 

@@ -4,9 +4,10 @@ import { useQuery } from '@tanstack/react-query';
 import { useAuthQuery, useSalesRepsQuery, useTransactionsQuery } from '@/lib/hooks/queries';
 import { useAppUsersQuery } from '@/lib/hooks/userQueries';
 import { TransactionTable } from '@/components/vendors/transaction-table';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
 
 export default function TransactionsPage() {
-  const { data: transactions, isLoading, isError } = useTransactionsQuery();
+  const { data: transactions, isLoading, isError, refetch } = useTransactionsQuery();
   const { data: salesReps = [] } = useSalesRepsQuery();
   const { data: authData } = useAuthQuery();
   const { data: appUsers = [] } = useAppUsersQuery();
@@ -65,6 +66,10 @@ export default function TransactionsPage() {
               transactions={transactions ?? []}
               salesRepNames={salesRepNames}
               actorNames={adminActorNames}
+              enableAgentReversal={authData?.role === 'agent'}
+              currentSalesRepId={authData?.sales_rep_id}
+              canAdministrativeReversal={isAdminOrSupervisorRole(authData?.role)}
+              onReversed={() => { void refetch(); }}
             />
           </div>
         </section>
