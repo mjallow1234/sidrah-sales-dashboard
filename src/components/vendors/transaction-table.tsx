@@ -12,15 +12,20 @@ interface TransactionTableProps {
   onReversed?: () => void;
 }
 
-function resolveActorLabel(rawActorId: string | undefined, salesRepNames?: Record<string, string>, actorNames?: Record<string, string>) {
-  if (!rawActorId) return 'Unknown actor';
-  return salesRepNames?.[rawActorId] || actorNames?.[rawActorId] || rawActorId;
+function formatVisitDate(value?: string) {
+  if (!value) return 'Not available';
+  const parsed = new Date(`${value.slice(0, 10)}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
 function formatRecordedAt(value?: string) {
   if (!value) return 'Not available';
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
+function formatCurrency(value: number) {
+  return `GMD ${value.toLocaleString()}`;
 }
 
 function Detail({ label, value }: { label: string; value: string }) {
@@ -70,22 +75,22 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
     <>
       <div className="space-y-3">
         {transactions.map((transaction, index) => {
-          const actor = resolveActorLabel(transaction.actor || transaction.sales_rep_id, salesRepNames, actorNames);
+          const actor = transaction.sales_rep_name || 'Sales representative unavailable';
           const reversed = Boolean(transaction.is_reversed);
           return (
             <article key={`${transaction.transaction_id || 'transaction'}-${transaction.vendor_id}-${transaction.date}-${index}`} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sidrah-300 hover:shadow-soft">
-              <button type="button" className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500" onClick={() => { setSelectedTransaction(transaction); setReason(''); }} aria-label={`View transaction ${transaction.transaction_id || transaction.date}`}>
+              <button type="button" className="w-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500" onClick={() => { setSelectedTransaction(transaction); setReason(''); }} aria-label="View transaction details">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-slate-900">{transaction.product_name ? `${transaction.product_name} (${transaction.product_id})` : (transaction.product_id || 'Visit transaction')}</p>
-                    <p className="mt-1 text-sm text-slate-600">Vendor: {transaction.vendor_name ? `${transaction.vendor_name} (${transaction.vendor_id})` : (transaction.vendor_id || '-')}</p>
+                    <p className="truncate text-base font-semibold text-slate-900">{transaction.product_name || 'Visit transaction'}</p>
+                    <p className="mt-1 text-sm text-slate-600">Vendor: {transaction.vendor_name || 'Unknown vendor'}</p>
                   </div>
                   <span className="shrink-0 text-xl text-slate-400" aria-hidden="true">›</span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Date</p><p className="mt-1 font-medium text-slate-800">{transaction.date}</p></div>
+                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.date)}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Supplied</p><p className="mt-1 font-medium text-slate-800">{transaction.stock_added}</p></div>
-                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Cash</p><p className="mt-1 font-medium text-slate-800">{transaction.cash_collected.toLocaleString()}</p></div>
+                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Cash</p><p className="mt-1 font-medium text-slate-800">{formatCurrency(transaction.cash_collected)}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Actor</p><p className="mt-1 truncate font-medium text-slate-800">{actor}</p></div>
                 </div>
                 <div className="mt-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
@@ -105,18 +110,16 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
 
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <Detail label="Status" value={selectedTransaction.is_reversed ? 'Reversed' : 'Active'} />
-              <Detail label="Visit ID" value={selectedTransaction.visit_id || selectedTransaction.transaction_id} />
-              <Detail label="Date" value={selectedTransaction.date} />
+              <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
-              <Detail label="Vendor" value={selectedTransaction.vendor_name ? `${selectedTransaction.vendor_name} (${selectedTransaction.vendor_id})` : selectedTransaction.vendor_id} />
-              <Detail label="Sales representative" value={resolveActorLabel(selectedTransaction.sales_rep_id, salesRepNames, actorNames)} />
-              <Detail label="Actor" value={resolveActorLabel(selectedTransaction.actor || selectedTransaction.sales_rep_id, salesRepNames, actorNames)} />
-              <Detail label="Product" value={selectedTransaction.product_name ? `${selectedTransaction.product_name} (${selectedTransaction.product_id})` : (selectedTransaction.product_id || '-')} />
+              <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Unknown vendor'} />
+              <Detail label="Actor" value={selectedTransaction.sales_rep_name || 'Sales representative unavailable'} />
+              <Detail label="Product" value={selectedTransaction.product_name || 'Unknown product'} />
               <Detail label="Quantity supplied" value={String(selectedTransaction.stock_added)} />
-              <Detail label="Cash collected" value={selectedTransaction.cash_collected.toLocaleString()} />
+              <Detail label="Cash collected" value={formatCurrency(selectedTransaction.cash_collected)} />
               <Detail label="Closing stock" value={String(selectedTransaction.closing_stock)} />
               <Detail label="Notes" value={selectedTransaction.notes || '-'} />
-              {selectedTransaction.is_reversed ? <><Detail label="Reversed by" value={selectedTransaction.reversed_by || '-'} /><Detail label="Reversal timestamp" value={formatRecordedAt(selectedTransaction.reversed_at)} /><Detail label="Reversal reason" value={selectedTransaction.reversal_reason || '-'} /><Detail label="Reversal operation ID" value={selectedTransaction.reversal_operation_id || '-'} /></> : null}
+              {selectedTransaction.is_reversed ? <><Detail label="Reversed by" value={selectedTransaction.reversed_by_name || actorNames?.[selectedTransaction.reversed_by || ''] || 'Reversing user unavailable'} /><Detail label="Reversal timestamp" value={formatRecordedAt(selectedTransaction.reversed_at)} /><Detail label="Reversal reason" value={selectedTransaction.reversal_reason || '-'} /></> : null}
             </dl>
 
             {canReverse(selectedTransaction) ? (

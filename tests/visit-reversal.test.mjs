@@ -100,6 +100,41 @@ test('administrative reversal and human-readable vendor/product labels use exist
   assert.match(vendorShell, /canAdministrativeReversal=\{canEditVendor\}/);
 });
 
+test('transaction details show the recording actor without exposing internal identifiers', () => {
+  const table = read('src/components/vendors/transaction-table.tsx');
+  const route = read('src/app/api/transactions/route.ts');
+  const mapper = read('src/lib/api/transactions.ts');
+  assert.doesNotMatch(table, /<Detail label="Sales representative"/);
+  assert.match(table, /<Detail label="Actor"/);
+  assert.match(table, /selectedTransaction\.sales_rep_name/);
+  assert.match(table, /reversed_by_name/);
+  assert.match(route, /COALESCE\(au\.name, au\.username\) AS actor_name/);
+  assert.match(mapper, /created_by: log\.created_by/);
+  assert.doesNotMatch(table, /Visit ID|Reversal operation ID/);
+});
+
+test('new visits persist the authenticated recording user and legacy actor gaps are explicit', () => {
+  const route = read('src/app/api/visit/route.ts');
+  const service = read('src/services/visitService.ts');
+  const table = read('src/components/vendors/transaction-table.tsx');
+  assert.match(route, /actor_user_id: session\.userId/);
+  assert.match(service, /created_by: payload\.actor_user_id/);
+  assert.match(service, /updated_by: payload\.actor_user_id/);
+  assert.match(table, /Sales representative unavailable/);
+  assert.doesNotMatch(table, /Unknown actor|Unknown person/);
+  assert.doesNotMatch(table, /transaction\.actor \|\| transaction\.sales_rep_id/);
+});
+
+test('transaction Actor uses the resolved sales representative name', () => {
+  const table = read('src/components/vendors/transaction-table.tsx');
+  const route = read('src/app/api/transactions/route.ts');
+  assert.match(route, /sales_rep_name/);
+  assert.match(table, /transaction\.sales_rep_name \|\| 'Sales representative unavailable'/);
+  assert.match(table, /selectedTransaction\.sales_rep_name \|\| 'Sales representative unavailable'/);
+  assert.doesNotMatch(table, /<Detail label="Sales representative"/);
+  assert.doesNotMatch(table, /Unknown actor|Unknown person/);
+});
+
 test('vendor inventory cash is calculated per product from active visits', () => {
   const shell = read('src/components/vendors/vendor-details-shell.tsx');
   assert.match(shell, /const productCashReceived = \(transactions \?\? \[\]\)\.reduce/);
