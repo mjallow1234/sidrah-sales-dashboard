@@ -385,6 +385,7 @@ export interface Transaction {
   product_id?: string;
   product_name?: string;
   sales_rep_id?: string;
+  sales_rep_name?: string;
   opening_stock: number;
   stock_sold: number;
   stock_added: number;
