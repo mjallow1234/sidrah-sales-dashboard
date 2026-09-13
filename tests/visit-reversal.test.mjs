@@ -128,7 +128,10 @@ test('new visits persist the authenticated recording user and legacy actor gaps 
 test('transaction Actor uses the resolved sales representative name', () => {
   const table = read('src/components/vendors/transaction-table.tsx');
   const route = read('src/app/api/transactions/route.ts');
+  const queries = read('src/lib/hooks/queries.ts');
   assert.match(route, /sales_rep_name/);
+  assert.match(queries, /vendor_name: log\.vendor_name/);
+  assert.match(queries, /product_name: log\.product_name/);
   assert.match(table, /transaction\.sales_rep_name \|\| 'Sales representative unavailable'/);
   assert.match(table, /selectedTransaction\.sales_rep_name \|\| 'Sales representative unavailable'/);
   assert.doesNotMatch(table, /<Detail label="Sales representative"/);
