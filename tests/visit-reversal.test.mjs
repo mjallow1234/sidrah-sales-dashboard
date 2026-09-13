@@ -147,3 +147,17 @@ test('vendor inventory cash is calculated per product from active visits', () =>
   assert.match(shell, /productCashReceived\[record\.product_id\]/);
   assert.doesNotMatch(shell, /<td[^>]*>\{vendorBalance\?\.cash_collected/);
 });
+
+test('admin activity and legacy visit logs keep human-readable identities separate', () => {
+  const activityRoute = read('src/app/api/admin-activity/route.ts');
+  const activityModal = read('src/components/admin-activity/activity-detail-modal.tsx');
+  const visitLogsRoute = read('src/app/api/visitlogs/route.ts');
+  assert.match(activityRoute, /sr\.name AS original_sales_rep_name/);
+  assert.match(activityRoute, /COALESCE\(au2\.name, au2\.username\) AS reversed_by_name/);
+  assert.match(activityModal, /activity\.original_sales_rep_name/);
+  assert.match(activityModal, /activity\.reversed_by_name/);
+  assert.match(visitLogsRoute, /vendor_info\.vendor_name AS vendor_name/);
+  assert.match(visitLogsRoute, /product_info\.product_name AS product_name/);
+  assert.match(visitLogsRoute, /sr\.name AS sales_rep_name/);
+  assert.doesNotMatch(activityModal, /activity\.original_sales_rep_id \|\|/);
+});

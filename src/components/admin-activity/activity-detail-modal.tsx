@@ -75,7 +75,7 @@ export function ActivityDetailModal({ activity, onClose }: ActivityDetailModalPr
             </div>
             <div className="space-y-1">
               <p className="text-sm text-slate-500">Admin</p>
-              <p className="font-semibold text-slate-900">{activity.admin_name} ({activity.admin_id})</p>
+              <p className="font-semibold text-slate-900">{activity.admin_name}</p>
             </div>
           </div>
 
@@ -100,7 +100,11 @@ export function ActivityDetailModal({ activity, onClose }: ActivityDetailModalPr
               </div>
               <div className="space-y-1">
                 <p className="text-sm text-slate-500">Sales rep / actor</p>
-                <p className="font-semibold text-slate-900">{activity.original_actor || activity.original_sales_rep_name || activity.original_sales_rep_id || 'Unknown'}</p>
+                <p className="font-semibold text-slate-900">{activity.original_sales_rep_name || activity.original_actor || 'Actor unavailable'}</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm text-slate-500">Reversed by</p>
+                <p className="font-semibold text-slate-900">{activity.reversed_by_name || 'Reversing user unavailable'}</p>
               </div>
             </div>
           ) : null}

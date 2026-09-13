@@ -441,6 +441,7 @@ export interface AdminActivityRecord {
   original_sales_rep_id?: string | null;
   original_sales_rep_name?: string | null;
   original_actor?: string | null;
+  reversed_by_name?: string | null;
   reversal_reason?: string | null;
   status?: string | null;
 }

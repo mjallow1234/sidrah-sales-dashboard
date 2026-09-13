@@ -43,6 +43,7 @@ function mapRow(row: any) {
     original_sales_rep_id: row.original_sales_rep_id ?? null,
     original_sales_rep_name: row.original_sales_rep_name ?? null,
     original_actor: row.original_actor ?? null,
+    reversed_by_name: row.reversed_by_name ?? null,
     reversal_reason: row.reversal_reason ?? null,
     status: row.status ?? null,
     action_type: row.action_type ?? null,
@@ -127,7 +128,9 @@ export async function GET(request: NextRequest) {
         vl.timestamp AS original_visit_timestamp,
         vl.date AS original_visit_date,
         vl.sales_rep_id AS original_sales_rep_id,
-        COALESCE(au2.name, au2.username, sr.name) AS original_actor,
+        sr.name AS original_sales_rep_name,
+        COALESCE(au2.name, au2.username) AS reversed_by_name,
+        sr.name AS original_actor,
         vl.reversal_reason,
         CASE WHEN vl.reversal_operation_id IS NOT NULL THEN 'reversal' ELSE a.movement_type END AS action_type,
         CASE WHEN vl.reversal_operation_id IS NOT NULL THEN 'Reversed' ELSE NULL END AS status
