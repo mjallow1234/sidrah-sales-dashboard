@@ -11,6 +11,7 @@ function mapVisitLogToTransaction(log: any): Transaction {
     product_id: log.product_id,
     product_name: log.product_name,
     sales_rep_id: log.sales_rep_id,
+    sales_rep_name: log.sales_rep_name,
     opening_stock: Number(log.opening_stock) || 0,
     stock_sold: Number(log.stock_sold) || 0,
     stock_added: Number(log.stock_added) || 0,
@@ -22,6 +23,7 @@ function mapVisitLogToTransaction(log: any): Transaction {
     is_reversed: Boolean(log.is_reversed),
     reversed_at: log.reversed_at,
     reversed_by: log.reversed_by,
+    reversed_by_name: log.reversed_by_name,
     reversal_reason: log.reversal_reason,
     reversal_operation_id: log.reversal_operation_id,
   };

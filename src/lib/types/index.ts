@@ -15,6 +15,7 @@ export interface Vendor {
   location: string;
   sales_rep?: string;
   sales_rep_id?: string;
+  sales_rep_name?: string;
   assigned_date?: string;
   assigned_by?: string;
   date_created: string;
@@ -395,6 +396,7 @@ export interface Transaction {
   is_reversed?: boolean;
   reversed_at?: string;
   reversed_by?: string;
+  reversed_by_name?: string;
   reversal_reason?: string;
   reversal_operation_id?: string;
 }

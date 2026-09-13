@@ -27,6 +27,7 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
     product_id: String(row.product_id),
     product_name: row.product_name === null ? undefined : String(row.product_name),
     sales_rep_id: String(row.sales_rep_id),
+    sales_rep_name: row.sales_rep_name === null ? undefined : String(row.sales_rep_name),
     opening_stock: Number(row.opening_stock) || 0,
     stock_sold: Number(row.stock_sold) || 0,
     stock_added: Number(row.stock_added) || 0,
@@ -46,6 +47,7 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
     is_reversed: Boolean(row.is_reversed === 1 || row.is_reversed === true),
     reversed_at: row.reversed_at === null ? undefined : formatDateTimeValue(row.reversed_at),
     reversed_by: row.reversed_by === null ? undefined : String(row.reversed_by),
+    reversed_by_name: row.reversed_by_name === null ? undefined : String(row.reversed_by_name),
     reversal_reason: row.reversal_reason === null ? undefined : String(row.reversal_reason),
     reversal_operation_id: row.reversal_operation_id === null ? undefined : String(row.reversal_operation_id),
   };
@@ -134,6 +136,7 @@ export async function GET(request: NextRequest) {
 
     const joinClause = [
       'LEFT JOIN app_users au ON au.user_id = vl.created_by',
+      'LEFT JOIN app_users reversal_user ON reversal_user.user_id = vl.reversed_by',
       'LEFT JOIN sales_reps sr ON sr.sales_rep_id = vl.sales_rep_id',
       'LEFT JOIN vendors vendor_info ON vendor_info.vendor_id = vl.vendor_id',
       'LEFT JOIN products product_info ON product_info.product_id = vl.product_id',
@@ -142,7 +145,7 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .join(' ');
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const sql = `SELECT vl.*, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, COALESCE(au.name, au.username, sr.name) AS actor_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY vl.date DESC, vl.timestamp DESC`;
+    const sql = `SELECT vl.*, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY vl.date DESC, vl.timestamp DESC`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
     return Response.json({ status: 'success', data: rows.map(mapVisitLogRow) });
