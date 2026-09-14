@@ -76,7 +76,7 @@ test('transaction cards use the same active/reversed status and remain visible',
   assert.match(table, /\{reversed \? 'Reversed' : 'Active'\}/);
   assert.match(table, /transactions\.map/);
   assert.match(vendorShell, /<TransactionTable/);
-  assert.match(vendorShell, /transactions\?\.slice\(0, 10\)/);
+  assert.match(vendorShell, /transactions \?\? \[\]/);
 });
 
 test('administrative reversal and human-readable vendor/product labels use existing visit data', () => {
@@ -120,7 +120,7 @@ test('new visits persist the authenticated recording user and legacy actor gaps 
   assert.match(route, /actor_user_id: session\.userId/);
   assert.match(service, /created_by: payload\.actor_user_id/);
   assert.match(service, /updated_by: payload\.actor_user_id/);
-  assert.match(table, /Sales representative unavailable/);
+  assert.match(table, /Actor unavailable — historical record/);
   assert.doesNotMatch(table, /Unknown actor|Unknown person/);
   assert.doesNotMatch(table, /transaction\.actor \|\| transaction\.sales_rep_id/);
 });
@@ -132,8 +132,8 @@ test('transaction Actor uses the resolved sales representative name', () => {
   assert.match(route, /sales_rep_name/);
   assert.match(queries, /vendor_name: log\.vendor_name/);
   assert.match(queries, /product_name: log\.product_name/);
-  assert.match(table, /transaction\.sales_rep_name \|\| 'Sales representative unavailable'/);
-  assert.match(table, /selectedTransaction\.sales_rep_name \|\| 'Sales representative unavailable'/);
+  assert.match(table, /transaction\.sales_rep_name \|\| 'Actor unavailable — historical record'/);
+  assert.match(table, /selectedTransaction\.sales_rep_name \|\| 'Actor unavailable — historical record'/);
   assert.doesNotMatch(table, /<Detail label="Sales representative"/);
   assert.doesNotMatch(table, /Unknown actor|Unknown person/);
 });
@@ -146,6 +146,43 @@ test('vendor inventory cash is calculated per product from active visits', () =>
   assert.match(shell, /Product cash received/);
   assert.match(shell, /productCashReceived\[record\.product_id\]/);
   assert.doesNotMatch(shell, /<td[^>]*>\{vendorBalance\?\.cash_collected/);
+});
+
+test('vendor detail explains that reversed supplied quantities are excluded from active totals', () => {
+  const shell = read('src/components/vendors/vendor-details-shell.tsx');
+  assert.match(shell, /const reversedSupplied = \(transactions \?\? \[\]\)\.reduce/);
+  assert.match(shell, /transaction\.is_reversed \? total \+ \(transaction\.stock_added \?\? 0\)/);
+  assert.match(shell, /const activeVisitSupplied/);
+  assert.match(shell, /const transferInQuantity/);
+  assert.match(shell, /const legacyOpeningQuantity/);
+  assert.match(shell, /const totalSupplied = inventoryReceivedTotal \+ transferInQuantity/);
+  assert.match(shell, /Reversed \(excluded\)/);
+  assert.doesNotMatch(shell, /Counted toward balance/);
+  assert.doesNotMatch(shell, /Active visit cash/);
+  assert.match(shell, /<dt>Cash received<\/dt>/);
+  assert.match(shell, /const reversedCash/);
+  assert.match(shell, /const lastAddedStock =/);
+  assert.match(shell, /Latest active supplied quantity/);
+});
+
+test('vendor detail includes transfer-in quantities in vendor and product totals and shows complete history', () => {
+  const shell = read('src/components/vendors/vendor-details-shell.tsx');
+  assert.match(shell, /useAdminActivityQuery\(\{ vendorId \}/);
+  assert.match(shell, /movement\.destination_vendor_id === vendorId/);
+  assert.match(shell, /const transferInByProduct/);
+  assert.match(shell, /transferInByProduct\[record\.product_id\]/);
+  assert.match(shell, /<h2 className="mt-2 text-xl font-semibold text-slate-900">All visits<\/h2>/);
+  assert.doesNotMatch(shell, /transactions\?\.slice\(0, 10\)/);
+});
+
+test('vendor stock movement history is mobile-card based and human-readable', () => {
+  const shell = read('src/components/vendors/vendor-details-shell.tsx');
+  assert.match(shell, /Stock movement history/);
+  assert.match(shell, /movement\.product_name \|\| 'Product unavailable — historical record'/);
+  assert.match(shell, /Recorded by/);
+  assert.match(shell, /From \{movement\.source_vendor_name/);
+  assert.match(shell, /To \{movement\.destination_vendor_name/);
+  assert.match(shell, /stockMovements!\.map/);
 });
 
 test('admin activity and legacy visit logs keep human-readable identities separate', () => {

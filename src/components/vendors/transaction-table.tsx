@@ -75,7 +75,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
     <>
       <div className="space-y-3">
         {transactions.map((transaction, index) => {
-          const actor = transaction.sales_rep_name || 'Sales representative unavailable';
+          const actor = transaction.sales_rep_name || 'Actor unavailable — historical record';
           const reversed = Boolean(transaction.is_reversed);
           return (
             <article key={`${transaction.transaction_id || 'transaction'}-${transaction.vendor_id}-${transaction.date}-${index}`} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sidrah-300 hover:shadow-soft">
@@ -83,7 +83,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold text-slate-900">{transaction.product_name || 'Visit transaction'}</p>
-                    <p className="mt-1 text-sm text-slate-600">Vendor: {transaction.vendor_name || 'Unknown vendor'}</p>
+                    <p className="mt-1 text-sm text-slate-600">Vendor: {transaction.vendor_name || 'Vendor unavailable — historical record'}</p>
                   </div>
                   <span className="shrink-0 text-xl text-slate-400" aria-hidden="true">›</span>
                 </div>
@@ -112,9 +112,9 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
               <Detail label="Status" value={selectedTransaction.is_reversed ? 'Reversed' : 'Active'} />
               <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
-              <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Unknown vendor'} />
-              <Detail label="Actor" value={selectedTransaction.sales_rep_name || 'Sales representative unavailable'} />
-              <Detail label="Product" value={selectedTransaction.product_name || 'Unknown product'} />
+              <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Vendor unavailable — historical record'} />
+              <Detail label="Actor" value={selectedTransaction.sales_rep_name || 'Actor unavailable — historical record'} />
+              <Detail label="Product" value={selectedTransaction.product_name || 'Product unavailable — historical record'} />
               <Detail label="Quantity supplied" value={String(selectedTransaction.stock_added)} />
               <Detail label="Cash collected" value={formatCurrency(selectedTransaction.cash_collected)} />
               <Detail label="Closing stock" value={String(selectedTransaction.closing_stock)} />

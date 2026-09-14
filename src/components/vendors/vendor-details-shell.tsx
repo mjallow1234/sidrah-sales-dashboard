@@ -40,18 +40,50 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     isError: productsError,
   } = useProductsQuery();
   const {
-    data: stockMovementsOut,
-    isLoading: stockMovementsOutLoading,
-    isError: stockMovementsOutError,
-  } = useAdminActivityQuery({ sourceVendorId: vendorId }, { enabled: canEditVendor });
+    data: stockMovements,
+    isLoading: stockMovementsLoading,
+    isError: stockMovementsError,
+  } = useAdminActivityQuery({ vendorId }, { enabled: canEditVendor });
 
   const hasVendorInventory = Array.isArray(vendorInventory) && vendorInventory.length > 0;
-  const hasStockMovementsOut = Array.isArray(stockMovementsOut) && stockMovementsOut.length > 0;
-  const showStockMovementsError = canEditVendor && !stockMovementsOutLoading && !!stockMovementsOutError;
-  const showEmptyStockMovementsOut = canEditVendor && !stockMovementsOutLoading && !stockMovementsOutError && !hasStockMovementsOut;
-  const totalSupplied = hasVendorInventory
+  const hasStockMovements = Array.isArray(stockMovements) && stockMovements.length > 0;
+  const showStockMovementsError = canEditVendor && !stockMovementsLoading && !!stockMovementsError;
+  const showEmptyStockMovements = canEditVendor && !stockMovementsLoading && !stockMovementsError && !hasStockMovements;
+  const activeVisitSupplied = (transactions ?? []).reduce((total, transaction) => (
+    transaction.is_reversed ? total : total + (transaction.stock_added ?? 0)
+  ), 0);
+  const reversedSupplied = (transactions ?? []).reduce((total, transaction) => (
+    transaction.is_reversed ? total + (transaction.stock_added ?? 0) : total
+  ), 0);
+  const reversedCash = (transactions ?? []).reduce((total, transaction) => (
+    transaction.is_reversed ? total + (transaction.cash_collected ?? 0) : total
+  ), 0);
+  const transferIn = (stockMovements ?? []).filter((movement) => movement.action_type === 'transfer' && movement.destination_vendor_id === vendorId);
+  const transferOut = (stockMovements ?? []).filter((movement) => movement.action_type === 'transfer' && movement.source_vendor_id === vendorId);
+  const retrievals = (stockMovements ?? []).filter((movement) => movement.action_type === 'retrieval');
+  const transferInQuantity = transferIn.reduce((total, movement) => total + movement.quantity, 0);
+  const transferOutQuantity = transferOut.reduce((total, movement) => total + movement.quantity, 0);
+  const retrievalQuantity = retrievals.reduce((total, movement) => total + movement.quantity, 0);
+  const inventoryReceivedTotal = hasVendorInventory
     ? vendorInventory.reduce((sum, record) => sum + (record.total_stock_received ?? 0), 0)
     : 0;
+  const totalSupplied = inventoryReceivedTotal + transferInQuantity - transferOutQuantity - retrievalQuantity;
+  const legacyOpeningQuantity = Math.max(totalSupplied - activeVisitSupplied - transferInQuantity, 0);
+  const lastAddedStock = [...(transactions ?? [])]
+    .filter((transaction) => !transaction.is_reversed && transaction.stock_added > 0)
+    .sort((left, right) => (right.timestamp ? new Date(right.timestamp).getTime() : -Infinity) - (left.timestamp ? new Date(left.timestamp).getTime() : -Infinity))[0]?.stock_added ?? 0;
+  const transferInByProduct = transferIn.reduce<Record<string, number>>((totals, movement) => {
+    totals[movement.product_id] = (totals[movement.product_id] ?? 0) + movement.quantity;
+    return totals;
+  }, {});
+  const transferOutByProduct = transferOut.reduce<Record<string, number>>((totals, movement) => {
+    totals[movement.product_id] = (totals[movement.product_id] ?? 0) + movement.quantity;
+    return totals;
+  }, {});
+  const retrievalByProduct = retrievals.reduce<Record<string, number>>((totals, movement) => {
+    totals[movement.product_id] = (totals[movement.product_id] ?? 0) + movement.quantity;
+    return totals;
+  }, {});
   const productCashReceived = (transactions ?? []).reduce<Record<string, number>>((totals, transaction) => {
     if (transaction.is_reversed || !transaction.product_id) {
       return totals;
@@ -59,7 +91,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     totals[transaction.product_id] = (totals[transaction.product_id] ?? 0) + (transaction.cash_collected ?? 0);
     return totals;
   }, {});
-  const isLoading = vendorLoading || vendorInventoryLoading || balanceLoading || transactionsLoading;
+  const isLoading = vendorLoading || vendorInventoryLoading || balanceLoading || transactionsLoading || (canEditVendor && stockMovementsLoading);
   const isVendorError = vendorError || !vendor;
   const showInventoryError = !vendorInventoryLoading && !!vendorInventoryError;
   const showEmptyInventory = !vendorInventoryLoading && !vendorInventoryError && !hasVendorInventory;
@@ -99,9 +131,6 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               <h1 className="mt-2 text-2xl font-semibold text-slate-900">{vendor.vendor_name}</h1>
               <p className="mt-1 text-sm text-slate-600">{vendor.location} • {vendor.phone}</p>
             </div>
-            <span className="rounded-3xl bg-sidrah-50 px-3 py-1 text-sm font-semibold text-sidrah-700">
-              {vendor.vendor_id}
-            </span>
             {canEditVendor ? (
               <Link
                 href={`/vendors/${vendor.vendor_id}/edit`}
@@ -112,10 +141,11 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             ) : null}
           </div>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-3xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Total supplied</p>
               <p className="mt-2 text-2xl font-semibold text-slate-900">{totalSupplied}</p>
+              <p className="mt-1 text-xs text-slate-500">Current received/attributable quantity</p>
             </div>
             <div className="rounded-3xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Total cash received</p>
@@ -137,7 +167,35 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                 )}
               </p>
             </div>
+            <div className="rounded-3xl bg-slate-50 p-4">
+              <p className="text-sm text-slate-500">Last added stock</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{lastAddedStock}</p>
+              <p className="mt-1 text-xs text-slate-500">Latest active supplied quantity</p>
+            </div>
           </div>
+        </section>
+
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
+          <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Supply and cash breakdown</p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="font-semibold text-slate-900">Supplied quantity</p>
+              <dl className="mt-3 space-y-2 text-sm text-slate-600">
+                <div className="flex justify-between gap-3"><dt>Visit supplied</dt><dd className="font-semibold text-slate-900">{activeVisitSupplied}</dd></div>
+                <div className="flex justify-between gap-3"><dt>Transfer in</dt><dd className="font-semibold text-slate-900">{transferInQuantity}</dd></div>
+                <div className="flex justify-between gap-3"><dt>Previous/opening inventory</dt><dd className="font-semibold text-slate-900">{legacyOpeningQuantity}</dd></div>
+                <div className="flex justify-between gap-3 border-t border-slate-200 pt-2"><dt>Reversed (excluded)</dt><dd className="font-semibold text-rose-700">{reversedSupplied}</dd></div>
+              </dl>
+            </div>
+            <div className="rounded-2xl bg-slate-50 p-4">
+              <p className="font-semibold text-slate-900">Cash received</p>
+              <dl className="mt-3 space-y-2 text-sm text-slate-600">
+                <div className="flex justify-between gap-3"><dt>Cash received</dt><dd className="font-semibold text-slate-900">GMD {(vendorBalance?.cash_collected ?? 0).toLocaleString()}</dd></div>
+                <div className="flex justify-between gap-3"><dt>Reversed (excluded)</dt><dd className="font-semibold text-rose-700">GMD {reversedCash.toLocaleString()}</dd></div>
+              </dl>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-slate-500">Legacy/opening quantity is shown only where it can be derived from the existing inventory and transaction records.</p>
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
@@ -169,37 +227,26 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             </div>
           ) : null}
 
-          <div className="mt-6 overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead>
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product cash received</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Total supplied</th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Last added stock</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 bg-white">
-                {hasVendorInventory ? (
-                  vendorInventory.map((record) => (
-                    <tr key={record.vendor_inventory_id}>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
-                        {productNames?.[record.product_id] ?? record.product_id}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{(productCashReceived[record.product_id] ?? 0).toLocaleString()}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.total_stock_received}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{record.last_supplied_quantity}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="px-4 py-6 text-sm text-slate-500" colSpan={4}>
-                      No vendor inventory records found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+          <div className="mt-6 space-y-3">
+            {reversedSupplied > 0 ? (
+              <p className="mb-3 text-xs text-slate-500">
+                Supplied totals show active stock only; {reversedSupplied} reversed unit{reversedSupplied === 1 ? '' : 's'} excluded.
+              </p>
+            ) : null}
+            {hasVendorInventory ? (
+              vendorInventory.map((record) => (
+                <article key={record.vendor_inventory_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="font-semibold text-slate-900">{productNames?.[record.product_id] ?? 'Product unavailable — historical record'}</p>
+                  <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                    <div><dt className="text-slate-500">Product cash received</dt><dd className="mt-1 font-semibold text-slate-900">GMD {(productCashReceived[record.product_id] ?? 0).toLocaleString()}</dd></div>
+                    <div><dt className="text-slate-500">Total supplied</dt><dd className="mt-1 font-semibold text-slate-900">{record.total_stock_received + (transferInByProduct[record.product_id] ?? 0) - (transferOutByProduct[record.product_id] ?? 0) - (retrievalByProduct[record.product_id] ?? 0)}</dd></div>
+                    <div><dt className="text-slate-500">Last added stock</dt><dd className="mt-1 font-semibold text-slate-900">{record.last_supplied_quantity}</dd></div>
+                  </dl>
+                </article>
+              ))
+            ) : (
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">No vendor inventory records found.</div>
+            )}
           </div>
         </section>
 
@@ -208,8 +255,8 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Stock traceability</p>
-                <h2 className="mt-2 text-xl font-semibold text-slate-900">Stock movements out of this vendor</h2>
-                <p className="mt-1 text-sm text-slate-600">Every retrieval or transfer that removed stock from this vendor, most recent first.</p>
+                <h2 className="mt-2 text-xl font-semibold text-slate-900">Stock movement history</h2>
+                <p className="mt-1 text-sm text-slate-600">Transfers, retrievals, and reversal movements for this vendor.</p>
               </div>
             </div>
 
@@ -219,27 +266,15 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               </div>
             ) : null}
 
-            {showEmptyStockMovementsOut ? (
+            {showEmptyStockMovements ? (
               <div className="mt-4 rounded-3xl border border-slate-200 bg-slate-50 p-6 text-sm text-slate-700">
-                No stock movements out of this vendor.
+                No stock movements recorded for this vendor.
               </div>
             ) : null}
 
-            {hasStockMovementsOut ? (
-              <div className="mt-6 overflow-x-auto">
-                <table className="min-w-full divide-y divide-slate-200">
-                  <thead>
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Quantity</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Type</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Destination / Outcome</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Actor</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100 bg-white">
-                    {stockMovementsOut!.map((movement) => {
+            {hasStockMovements ? (
+              <div className="mt-6 space-y-3">
+                {stockMovements!.map((movement) => {
                       const typeLabel =
                         movement.action_type === 'transfer'
                           ? 'Transferred'
@@ -247,37 +282,33 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                             ? 'Reversed'
                             : 'Retrieved';
                       return (
-                        <tr key={`${movement.operation_id}-${movement.timestamp}`}>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
-                            {new Date(movement.timestamp).toLocaleString()}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{movement.product_name}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{movement.quantity}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{typeLabel}</td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">
+                        <article key={`${movement.operation_id}-${movement.timestamp}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-semibold text-slate-900">{typeLabel}</p>
+                              <p className="mt-1 text-sm text-slate-600">{movement.product_name || 'Product unavailable — historical record'} · {movement.quantity}</p>
+                            </div>
+                            <p className="text-right text-xs text-slate-500">{new Date(movement.timestamp).toLocaleString()}</p>
+                          </div>
+                          <p className="mt-3 text-sm text-slate-700">
                             {movement.action_type === 'transfer' ? (
-                              movement.destination_vendor_id ? (
-                                <Link
-                                  href={`/vendors/${movement.destination_vendor_id}`}
-                                  className="font-semibold text-sidrah-700 hover:underline"
-                                >
-                                  {movement.destination_vendor_id} — {movement.destination_vendor_name ?? 'Unknown vendor'}
-                                </Link>
+                              movement.source_vendor_id === vendorId ? (
+                                <>To {movement.destination_vendor_name ?? 'destination not recorded'}</>
+                              ) : movement.destination_vendor_id === vendorId ? (
+                                <>From {movement.source_vendor_name ?? 'source not recorded'}</>
                               ) : (
-                                'Destination not recorded'
+                                'Transfer destination/source not recorded'
                               )
                             ) : movement.action_type === 'reversal' ? (
                               movement.reversal_reason ? `Reversed: ${movement.reversal_reason}` : 'Reversed — original supply undone'
                             ) : (
                               'Retrieved'
                             )}
-                          </td>
-                          <td className="whitespace-nowrap px-4 py-3 text-sm text-slate-700">{movement.admin_name}</td>
-                        </tr>
+                          </p>
+                          <p className="mt-2 text-xs text-slate-500">Recorded by {movement.admin_name || 'Actor unavailable — historical record'}</p>
+                        </article>
                       );
                     })}
-                  </tbody>
-                </table>
               </div>
             ) : null}
           </section>
@@ -286,14 +317,14 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
           <div className="flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Recent transactions</p>
-              <h2 className="mt-2 text-xl font-semibold text-slate-900">Last 10 visits</h2>
+              <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Transaction history</p>
+              <h2 className="mt-2 text-xl font-semibold text-slate-900">All visits</h2>
             </div>
           </div>
 
           <div className="mt-6">
             <TransactionTable
-              transactions={transactions?.slice(0, 10) ?? []}
+              transactions={transactions ?? []}
               enableAgentReversal={session?.role === 'agent'}
               currentSalesRepId={session?.sales_rep_id}
               canAdministrativeReversal={canEditVendor}
