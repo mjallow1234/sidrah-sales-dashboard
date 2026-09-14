@@ -486,6 +486,15 @@ export interface FactoryStockMovement {
   batch_reference?: string | null;
   input_quantity?: number | null;
   input_unit?: string | null;
+  status?: 'active' | 'reversed';
+  reversed_by?: string | null;
+  reversed_by_name?: string | null;
+  reversed_at?: string | null;
+  reversal_reason?: string | null;
+  reversal_operation_id?: string | null;
+  edited_by?: string | null;
+  edited_at?: string | null;
+  has_edits?: boolean;
 }
 
 export type FactoryContainerType = 'gallon' | 'bucket_5l' | 'bucket_1kg';
@@ -509,6 +518,15 @@ export interface FactoryContainerMovement {
   actor_user_id: string;
   actor_name?: string;
   reason_comment?: string | null;
+  status?: 'active' | 'reversed';
+  reversed_by?: string | null;
+  reversed_by_name?: string | null;
+  reversed_at?: string | null;
+  reversal_reason?: string | null;
+  reversal_operation_id?: string | null;
+  edited_by?: string | null;
+  edited_at?: string | null;
+  has_edits?: boolean;
 }
 
 export interface ReverseVisitResult {

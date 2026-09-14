@@ -29,3 +29,6 @@ export function createFactoryMovement(payload: {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
 }
+export function editFactoryMovement(payload: Record<string, unknown>) { return requestJson('/api/factory/movements', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
+export function reverseFactoryMovement(payload: { event_id: string; reason: string; operation_id?: string }) { return requestJson('/api/factory/movements/reverse', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); }
+export function getFactoryRevisions(eventId: string) { return requestJson<any[]>(`/api/factory/revisions?event_id=${encodeURIComponent(eventId)}`); }

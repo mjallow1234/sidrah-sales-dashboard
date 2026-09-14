@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isFactoryRole } from '@/lib/authorization';
-import { createFactoryMovement, listFactoryMovements } from '@/services/factoryInventoryService';
+import { createFactoryMovement, editFactoryMovement, listFactoryMovements } from '@/services/factoryInventoryService';
 
 export async function GET(request: NextRequest) {
   const session = await getVerifiedSession(request);
@@ -27,4 +27,10 @@ export async function POST(request: NextRequest) {
     const status = error instanceof Error && 'statusCode' in error ? Number((error as { statusCode?: number }).statusCode) || 500 : 500;
     return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status });
   }
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await getVerifiedSession(request); if (!session) return unauthorizedResponse(); if (!isFactoryRole(session.role) || !session.userId) return forbiddenResponse();
+  try { return Response.json({ status: 'success', data: await editFactoryMovement({ ...(await request.json()), actor_user_id: session.userId }) }); }
+  catch (error) { const status = error instanceof Error && 'statusCode' in error ? Number((error as { statusCode?: number }).statusCode) || 500 : 500; return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status }); }
 }

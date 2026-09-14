@@ -85,10 +85,10 @@ test('factory UI uses mobile cards, tabs, and event-based movement details', () 
   const history = read('src/components/factory/factory-history.tsx');
   const productionPage = read('src/app/factory/production/page.tsx');
   const movementPage = read('src/app/factory/movements/page.tsx');
-  assert.match(history, /item\.event_id \?\? item\.operation_id/);
+  assert.match(history, /item\.event_id\?\?item\.operation_id/);
   assert.match(history, /grouped\.set\(key/);
   assert.match(history, /role="dialog"/);
-  assert.match(history, /Production detail/);
+  assert.match(history, /Production Detail/);
   assert.match(history, /MovementDetail/);
   assert.match(productionPage, /FactoryTabs active="production"/);
   assert.match(productionPage, /\+ Record Production/);
@@ -118,4 +118,49 @@ test('container tracking is manual, independent, and factory-role protected', ()
   for (const forbidden of ['vendor_id', 'delivery_id', 'product_id', 'production_id']) {
     assert.equal(migration.includes(forbidden), false, `container migration must not contain ${forbidden}`);
   }
+});
+
+test('factory correction workflow is event-atomic, auditable, and role-protected', () => {
+  const migration = read('db/migrations/0012_add_factory_correction_audit.sql');
+  const productService = read('src/services/factoryInventoryService.ts');
+  const containerService = read('src/services/factoryContainerService.ts');
+  const productReverse = read('src/app/api/factory/movements/reverse/route.ts');
+  const containerReverse = read('src/app/api/factory/containers/movements/reverse/route.ts');
+  assert.match(migration, /CREATE TABLE factory_record_revisions/);
+  assert.match(migration, /status ENUM\('active','reversed'\)/);
+  assert.match(migration, /before_snapshot JSON/);
+  assert.match(migration, /after_snapshot JSON/);
+  assert.match(productService, /findItemsByEventId\(eventId, true\)/);
+  assert.match(productService, /Reversed factory events cannot be edited/);
+  assert.match(productService, /The correction would result in negative factory inventory/);
+  assert.match(productService, /revisionRepo\.create/);
+  assert.match(productService, /status =/);
+  assert.match(containerService, /findById\(movementId, true\)/);
+  assert.match(containerService, /Reversed container movements cannot be edited/);
+  assert.match(containerService, /factory_container_movements SET status/);
+  assert.match(containerService, /FactoryRecordRevisionRepository/);
+  for (const route of [productReverse, containerReverse]) assert.match(route, /isFactoryRole\(session\.role\)/);
+});
+
+test('factory edits normalize ISO datetime values and expose revision history', () => {
+  const service = read('src/services/factoryInventoryService.ts');
+  const history = read('src/components/factory/factory-history.tsx');
+  const containers = read('src/components/factory/factory-container-section.tsx');
+  assert.match(service, /sqlDateTime\(payload\.occurred_at \?\? event\.occurred_at\)/);
+  assert.match(history, /RevisionHistory/);
+  assert.match(containers, /Correction History/);
+  assert.match(read('src/repositories/FactoryRecordRevisionRepository.ts'), /before_snapshot/);
+});
+
+test('container history uses human-readable movement labels and edit badges', () => {
+  const component = read('src/components/factory/factory-container-section.tsx');
+  const movementRepository = read('src/repositories/FactoryContainerMovementRepository.ts');
+  assert.match(component, /received:'Received'/);
+  assert.match(component, /leaving_factory:'Used'/);
+  assert.match(component, /returned_factory:'Received'/);
+  assert.match(component, /Correction History/);
+  assert.match(component, /Inventory Impact/);
+  assert.match(component, /item\.has_edits/);
+  assert.match(movementRepository, /factory_record_revisions/);
+  assert.match(movementRepository, /has_edits/);
 });

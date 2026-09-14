@@ -11,13 +11,24 @@ function mapMovement(row: any): FactoryContainerMovement {
     recorded_at: row.recorded_at instanceof Date ? row.recorded_at.toISOString() : String(row.recorded_at ?? ''),
     actor_user_id: String(row.actor_user_id), actor_name: row.actor_name === null ? undefined : String(row.actor_name ?? ''),
     reason_comment: row.reason_comment === null ? null : String(row.reason_comment ?? ''),
+    status: row.status === 'reversed' ? 'reversed' : 'active', reversed_by: row.reversed_by === null ? null : String(row.reversed_by ?? ''),
+    reversed_by_name: row.reversed_by_name === null ? null : String(row.reversed_by_name ?? ''),
+    reversed_at: row.reversed_at === null ? null : (row.reversed_at instanceof Date ? row.reversed_at.toISOString() : String(row.reversed_at ?? '')),
+    reversal_reason: row.reversal_reason === null ? null : String(row.reversal_reason ?? ''), reversal_operation_id: row.reversal_operation_id === null ? null : String(row.reversal_operation_id ?? ''),
+    edited_by: row.edited_by === null ? null : String(row.edited_by ?? ''), edited_at: row.edited_at === null ? null : (row.edited_at instanceof Date ? row.edited_at.toISOString() : String(row.edited_at ?? '')), has_edits: Boolean(row.has_edits),
   };
 }
 
-const movementSelect = `SELECT m.*, u.name AS actor_name
-  FROM factory_container_movements m INNER JOIN app_users u ON u.user_id = m.actor_user_id`;
+const movementSelect = `SELECT m.*, u.name AS actor_name, ru.name AS reversed_by_name,
+  EXISTS (SELECT 1 FROM factory_record_revisions fr WHERE fr.record_type = 'container_movement' AND fr.movement_id = m.movement_id AND fr.action_type = 'edit') AS has_edits
+  FROM factory_container_movements m INNER JOIN app_users u ON u.user_id = m.actor_user_id
+  LEFT JOIN app_users ru ON ru.user_id = m.reversed_by`;
 
 export class FactoryContainerMovementRepository extends BaseRepository {
+  async findById(movementId: string, forUpdate = false): Promise<FactoryContainerMovement | null> {
+    const [rows] = await this.execute<any[]>(`${movementSelect} WHERE m.movement_id = ? LIMIT 1${forUpdate ? ' FOR UPDATE' : ''}`, [movementId]);
+    return rows.length > 0 ? mapMovement(rows[0]) : null;
+  }
   async findByOperationId(operationId: string, forUpdate = false): Promise<FactoryContainerMovement | null> {
     const [rows] = await this.execute<any[]>(`${movementSelect} WHERE m.operation_id = ? LIMIT 1${forUpdate ? ' FOR UPDATE' : ''}`, [operationId]);
     return rows.length > 0 ? mapMovement(rows[0]) : null;

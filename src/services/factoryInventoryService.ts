@@ -4,6 +4,7 @@ import type { FactoryInventory, FactoryMovementItem, FactoryMovementType, Factor
 import { FactoryInventoryRepository } from '@/repositories/FactoryInventoryRepository';
 import { FactoryMovementEventRepository, type FactoryMovementEvent } from '@/repositories/FactoryMovementEventRepository';
 import { FactoryStockMovementRepository } from '@/repositories/FactoryStockMovementRepository';
+import { FactoryRecordRevisionRepository } from '@/repositories/FactoryRecordRevisionRepository';
 import { ConflictError, NotFoundError, ValidationError } from './errors';
 import { calculateFactoryQuantity, isOperationDuplicateError } from './factoryRules';
 
@@ -32,6 +33,7 @@ function normalizeItems(payload: CreateFactoryMovementPayload): FactoryMovementI
 }
 export async function listFactoryInventory(): Promise<FactoryInventory[]> { return new FactoryInventoryRepository(getPool()).findAll(); }
 export async function listFactoryMovements(limit = 100): Promise<FactoryStockMovement[]> { return new FactoryStockMovementRepository(getPool()).findAll(limit); }
+export async function listFactoryEventRevisions(eventId: string) { return new FactoryRecordRevisionRepository(getPool()).findForRecord('movement_event', requiredString(eventId, 'event_id')); }
 function sameItems(a: FactoryStockMovement[], b: FactoryMovementItem[]): boolean { if (a.length !== b.length) return false; const expected = new Map(b.map((item) => [item.product_id, item.quantity])); return a.every((item) => expected.get(item.product_id) === Number(item.quantity)); }
 
 export async function createFactoryMovement(payload: CreateFactoryMovementPayload): Promise<FactoryMovementResult> {
@@ -63,4 +65,76 @@ export async function createFactoryMovement(payload: CreateFactoryMovementPayloa
     return { event, movements, inventories };
   });
   try { return await executeOperation(); } catch (error) { if (!isOperationDuplicateError(error)) throw error; const event = await new FactoryMovementEventRepository(getPool()).findByOperationId(operationId); const movementRepo = new FactoryStockMovementRepository(getPool()); const existing = await movementRepo.findByOperationId(operationId); const movements = await movementRepo.findItemsByOperationId(operationId); if (!event || !existing || movements.length === 0) throw new ConflictError('This factory operation was already submitted, but its result is not yet available. Please retry.'); if (event.movement_type !== movementType || !sameItems(movements, items)) throw new ConflictError('operation_id is already used by another factory operation.'); const inventories = await Promise.all(items.map((item) => new FactoryInventoryRepository(getPool()).findByProduct(item.product_id))); if (inventories.some((item) => !item)) throw new ConflictError('The existing factory operation has no inventory result. Please retry.'); return { event, movements, inventories: inventories as FactoryInventory[] }; }
+}
+
+export interface EditFactoryMovementPayload {
+  event_id: string; actor_user_id: string; items: FactoryMovementItem[]; occurred_at?: string;
+  reason_comment?: string; raw_material?: string; temperature_c?: number | string;
+  processing_duration_hours?: number | string; processing_duration_minutes?: number | string;
+  batch_reference?: string; input_quantity?: number | string; input_unit?: string; operation_id?: string;
+}
+
+export interface ReverseFactoryMovementPayload { event_id: string; actor_user_id: string; reason: string; operation_id?: string; }
+
+function movementEffect(type: FactoryMovementType, quantity: number): number { return type === 'leaving_factory' ? -quantity : quantity; }
+function normalizeEditItems(items: FactoryMovementItem[]): FactoryMovementItem[] {
+  if (!Array.isArray(items) || items.length === 0) throw new ValidationError('At least one product item is required.');
+  const seen = new Set<string>();
+  return items.map((item, index) => { const productId = requiredString(item?.product_id, `items[${index}].product_id`); if (seen.has(productId)) throw new ValidationError('The same product cannot be entered more than once.'); seen.add(productId); return { product_id: productId, quantity: positiveNumber(item?.quantity, `items[${index}].quantity`) }; });
+}
+
+async function applyEventInventoryDelta(connection: any, type: FactoryMovementType, oldItems: FactoryMovementItem[], newItems: FactoryMovementItem[], now: string): Promise<void> {
+  const delta = new Map<string, number>();
+  for (const item of oldItems) delta.set(item.product_id, (delta.get(item.product_id) ?? 0) - movementEffect(type, item.quantity));
+  for (const item of newItems) delta.set(item.product_id, (delta.get(item.product_id) ?? 0) + movementEffect(type, item.quantity));
+  for (const productId of [...delta.keys()].sort()) {
+    const change = delta.get(productId) ?? 0;
+    if (change === 0) continue;
+    const [rows] = await connection.execute('SELECT * FROM factory_inventory WHERE product_id = ? LIMIT 1 FOR UPDATE', [productId]) as any;
+    const current = rows[0];
+    const currentQuantity = Number(current?.current_quantity ?? 0);
+    const next = currentQuantity + change;
+    if (next < 0) throw new ConflictError('The correction would result in negative factory inventory.');
+    if (current) await connection.execute('UPDATE factory_inventory SET current_quantity = ?, updated_at = ? WHERE product_id = ?', [next, now, productId]);
+    else await connection.execute('INSERT INTO factory_inventory (factory_inventory_id, product_id, current_quantity, created_at, updated_at) VALUES (?, ?, ?, ?, ?)', [id('FI'), productId, next, now, now]);
+  }
+}
+
+export async function editFactoryMovement(payload: EditFactoryMovementPayload): Promise<FactoryMovementResult> {
+  const eventId = requiredString(payload.event_id, 'event_id'); const actorUserId = requiredString(payload.actor_user_id, 'actor_user_id');
+  const items = normalizeEditItems(payload.items); const now = sqlDateTime();
+  return transaction(async (connection) => {
+    const eventRepo = new FactoryMovementEventRepository(connection); const movementRepo = new FactoryStockMovementRepository(connection); const revisionRepo = new FactoryRecordRevisionRepository(connection);
+    const event = await eventRepo.findById(eventId, true); if (!event) throw new NotFoundError('Factory event', eventId); if (event.status === 'reversed') throw new ConflictError('Reversed factory events cannot be edited.');
+    const oldRows = await movementRepo.findItemsByEventId(eventId, true); const oldItems = oldRows.map((row) => ({ product_id: row.product_id, quantity: row.quantity }));
+    if (event.movement_type === 'production' && items.length !== 1) throw new ValidationError('Production records must contain one output item.');
+    if (items.length !== oldRows.length) throw new ValidationError('Edit must preserve the number of rows in this factory event.');
+    const productIds = [...new Set(items.map((item) => item.product_id))];
+    const [activeProducts] = await connection.execute(`SELECT product_id FROM products WHERE active = TRUE AND product_id IN (${productIds.map(() => '?').join(',')})`, productIds) as any;
+    if (activeProducts.length !== productIds.length) throw new NotFoundError('Active product', items.find((item) => !activeProducts.some((row: any) => String(row.product_id) === item.product_id))?.product_id ?? 'unknown');
+    const nextOccurredAt = sqlDateTime(payload.occurred_at ?? event.occurred_at);
+    await applyEventInventoryDelta(connection, event.movement_type, oldItems, items, now);
+    await connection.execute('UPDATE factory_movement_events SET occurred_at = ?, reason_comment = ?, edited_by = ?, edited_at = ? WHERE event_id = ?', [nextOccurredAt, payload.reason_comment ?? event.reason_comment, actorUserId, now, eventId]);
+    for (let index = 0; index < oldRows.length; index += 1) {
+      const item = items[index];
+      await connection.execute(`UPDATE factory_stock_movements SET product_id = ?, quantity = ?, occurred_at = ?, recorded_at = ?, raw_material = ?, temperature_c = ?, processing_duration_hours = ?, processing_duration_minutes = ?, batch_reference = ?, input_quantity = ?, input_unit = ? WHERE movement_id = ?`, [item.product_id, item.quantity, nextOccurredAt, now, event.movement_type === 'production' ? (payload.raw_material ?? oldRows[index].raw_material ?? null) : null, event.movement_type === 'production' ? (payload.temperature_c ?? oldRows[index].temperature_c ?? null) : null, event.movement_type === 'production' ? (payload.processing_duration_hours ?? oldRows[index].processing_duration_hours ?? null) : null, event.movement_type === 'production' ? (payload.processing_duration_minutes ?? oldRows[index].processing_duration_minutes ?? null) : null, event.movement_type === 'production' ? (payload.batch_reference ?? oldRows[index].batch_reference ?? null) : null, event.movement_type === 'production' ? (payload.input_quantity ?? oldRows[index].input_quantity ?? null) : null, event.movement_type === 'production' ? (payload.input_unit ?? oldRows[index].input_unit ?? null) : null, oldRows[index].movement_id] as any);
+    }
+    const afterRows = await movementRepo.findItemsByEventId(eventId, true); const afterEvent = await eventRepo.findById(eventId, true);
+    await revisionRepo.create({ revision_id: id('FR'), record_type: 'movement_event', event_id: eventId, action_type: 'edit', actor_user_id: actorUserId, recorded_at: now, reason_comment: payload.reason_comment ?? null, operation_id: payload.operation_id ?? null, before_snapshot: { event, movements: oldRows }, after_snapshot: { event: afterEvent, movements: afterRows } });
+    return { event: afterEvent as FactoryMovementEvent, movements: afterRows, inventories: await Promise.all(items.map((item) => new FactoryInventoryRepository(connection).findByProduct(item.product_id, true) as Promise<FactoryInventory>)) };
+  });
+}
+
+export async function reverseFactoryMovement(payload: ReverseFactoryMovementPayload): Promise<FactoryMovementResult> {
+  const eventId = requiredString(payload.event_id, 'event_id'); const actorUserId = requiredString(payload.actor_user_id, 'actor_user_id'); const reason = requiredString(payload.reason, 'reason'); const operationId = payload.operation_id?.trim() || id('REV'); const now = sqlDateTime();
+  return transaction(async (connection) => {
+    const eventRepo = new FactoryMovementEventRepository(connection); const movementRepo = new FactoryStockMovementRepository(connection); const revisionRepo = new FactoryRecordRevisionRepository(connection);
+    const event = await eventRepo.findById(eventId, true); if (!event) throw new NotFoundError('Factory event', eventId); if (event.status === 'reversed') throw new ConflictError('Factory event has already been reversed.');
+    const rows = await movementRepo.findItemsByEventId(eventId, true); const items = rows.map((row) => ({ product_id: row.product_id, quantity: row.quantity }));
+    await applyEventInventoryDelta(connection, event.movement_type, items, [], now);
+    await connection.execute('UPDATE factory_movement_events SET status = \'reversed\', reversed_by = ?, reversed_at = ?, reversal_reason = ?, reversal_operation_id = ? WHERE event_id = ?', [actorUserId, now, reason, operationId, eventId]);
+    const afterEvent = await eventRepo.findById(eventId, true); const revision = await new FactoryRecordRevisionRepository(connection).create({ revision_id: id('FR'), record_type: 'movement_event', event_id: eventId, action_type: 'reverse', actor_user_id: actorUserId, recorded_at: now, reason_comment: reason, operation_id: operationId, before_snapshot: { event, movements: rows }, after_snapshot: { event: afterEvent, movements: rows } });
+    void revision;
+    return { event: afterEvent as FactoryMovementEvent, movements: await movementRepo.findItemsByEventId(eventId), inventories: await Promise.all(items.map((item) => new FactoryInventoryRepository(connection).findByProduct(item.product_id, true) as Promise<FactoryInventory>)) };
+  });
 }
