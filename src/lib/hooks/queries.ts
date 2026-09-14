@@ -205,6 +205,8 @@ export function useCreateFactoryContainerMovementMutation() {
     },
   });
 }
+export function useEditFactoryContainerMovementMutation() { const queryClient = useQueryClient(); return useMutation({ mutationFn: editFactoryContainerMovement, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['factoryContainerInventory'] }); queryClient.invalidateQueries({ queryKey: ['factoryContainerMovements'] }); } }); }
+export function useReverseFactoryContainerMovementMutation() { const queryClient = useQueryClient(); return useMutation({ mutationFn: reverseFactoryContainerMovement, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['factoryContainerInventory'] }); queryClient.invalidateQueries({ queryKey: ['factoryContainerMovements'] }); } }); }
 
 export function useAuthQuery() {
   return useQuery<SessionVerificationResult>({
