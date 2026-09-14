@@ -164,3 +164,26 @@ test('container history uses human-readable movement labels and edit badges', ()
   assert.match(movementRepository, /factory_record_revisions/);
   assert.match(movementRepository, /has_edits/);
 });
+
+test('factory overview is current-state focused and records have dedicated tabs', () => {
+  const overview = read('src/components/factory/factory-overview.tsx');
+  const page = read('src/app/factory/page.tsx');
+  const records = read('src/components/factory/factory-records.tsx');
+  const recordsPage = read('src/app/factory/records/page.tsx');
+  const containersPage = read('src/app/factory/containers/page.tsx');
+  const navigation = read('src/components/layout/admin-layout.tsx');
+  assert.equal(overview.includes('FactoryHistory'), false);
+  assert.match(overview, /Record Production/);
+  assert.match(overview, /Record Product Movement/);
+  assert.match(overview, /Record Container Movement/);
+  assert.match(overview, /href="\/factory\/containers"/);
+  assert.match(page, /Factory overview/);
+  for (const label of ['All', 'Production', 'Product Movements', 'Containers']) assert.match(records, new RegExp(label));
+  assert.match(records, /FactoryHistory mode="production"/);
+  assert.match(records, /FactoryHistory mode="movements"/);
+  assert.match(records, /FactoryContainerSection/);
+  assert.match(records, /historyOnly/);
+  assert.match(recordsPage, /Factory records/);
+  assert.match(containersPage, /FactoryContainerSection/);
+  for (const href of ["/factory/production", "/factory/movements", "/factory/containers", "/factory/records"]) assert.match(navigation, new RegExp(href.replaceAll('/', '\\/')));
+});

@@ -8,6 +8,7 @@ import {
   BarChart3,
   Box,
   CalendarCheck,
+  ClipboardList,
   Home,
   LogOut,
   Menu,
@@ -31,11 +32,13 @@ const navSections = [
   },
   {
     title: 'Factory',
-    links: [
-      { label: 'Factory', href: '/factory', icon: Box },
-      { label: 'Production', href: '/factory/production', icon: PlusSquare },
-      { label: 'Movements', href: '/factory/movements', icon: ArrowRightLeft },
-    ],
+      links: [
+       { label: 'Overview', href: '/factory', icon: Box },
+       { label: 'Production', href: '/factory/production', icon: PlusSquare },
+       { label: 'Product Movements', href: '/factory/movements', icon: ArrowRightLeft },
+       { label: 'Containers', href: '/factory/containers', icon: Box },
+       { label: 'Records', href: '/factory/records', icon: ClipboardList },
+      ],
   },
   {
     title: 'Vendors',

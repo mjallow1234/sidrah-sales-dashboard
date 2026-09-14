@@ -186,8 +186,8 @@ export function useCreateFactoryMovementMutation() {
 export function useEditFactoryMovementMutation() { const queryClient = useQueryClient(); return useMutation({ mutationFn: editFactoryMovement, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['factoryInventory'] }); queryClient.invalidateQueries({ queryKey: ['factoryMovements'] }); } }); }
 export function useReverseFactoryMovementMutation() { const queryClient = useQueryClient(); return useMutation({ mutationFn: reverseFactoryMovement, onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['factoryInventory'] }); queryClient.invalidateQueries({ queryKey: ['factoryMovements'] }); } }); }
 
-export function useFactoryContainerInventoryQuery() {
-  return useQuery<FactoryContainerInventory[]>({ queryKey: ['factoryContainerInventory'], queryFn: getFactoryContainerInventory });
+export function useFactoryContainerInventoryQuery(enabled = true) {
+  return useQuery<FactoryContainerInventory[]>({ queryKey: ['factoryContainerInventory'], queryFn: getFactoryContainerInventory, enabled });
 }
 
 export function useFactoryContainerMovementsQuery() {
