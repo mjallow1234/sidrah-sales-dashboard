@@ -153,9 +153,10 @@ test('vendor detail explains that reversed supplied quantities are excluded from
   assert.match(shell, /const reversedSupplied = \(transactions \?\? \[\]\)\.reduce/);
   assert.match(shell, /transaction\.is_reversed \? total \+ \(transaction\.stock_added \?\? 0\)/);
   assert.match(shell, /const activeVisitSupplied/);
-  assert.match(shell, /const transferInQuantity/);
+  assert.match(shell, /roleIndependentTransferInQuantity/);
   assert.match(shell, /const legacyOpeningQuantity/);
-  assert.match(shell, /const totalSupplied = inventoryReceivedTotal \+ transferInQuantity/);
+  assert.match(shell, /const totalSupplied = inventoryReceivedTotal \+ roleIndependentTransferInQuantity/);
+  assert.match(shell, /Current attributable quantity/);
   assert.match(shell, /Reversed \(excluded\)/);
   assert.doesNotMatch(shell, /Counted toward balance/);
   assert.doesNotMatch(shell, /Active visit cash/);
@@ -167,12 +168,22 @@ test('vendor detail explains that reversed supplied quantities are excluded from
 
 test('vendor detail includes transfer-in quantities in vendor and product totals and shows complete history', () => {
   const shell = read('src/components/vendors/vendor-details-shell.tsx');
+  const inventoryRoute = read('src/app/api/vendorinventory/route.ts');
   assert.match(shell, /useAdminActivityQuery\(\{ vendorId \}/);
-  assert.match(shell, /movement\.destination_vendor_id === vendorId/);
-  assert.match(shell, /const transferInByProduct/);
-  assert.match(shell, /transferInByProduct\[record\.product_id\]/);
+  assert.match(inventoryRoute, /AS transfer_in_quantity/);
+  assert.match(inventoryRoute, /AS transfer_out_quantity/);
+  assert.match(shell, /record\.transfer_in_quantity/);
+  assert.match(shell, /record\.transfer_out_quantity/);
   assert.match(shell, /<h2 className="mt-2 text-xl font-semibold text-slate-900">All visits<\/h2>/);
   assert.doesNotMatch(shell, /transactions\?\.slice\(0, 10\)/);
+});
+
+test('vendor headline quantity is independent of optional Admin Activity access', () => {
+  const shell = read('src/components/vendors/vendor-details-shell.tsx');
+  assert.match(shell, /roleIndependentTransferInQuantity/);
+  assert.match(shell, /roleIndependentTransferOutQuantity/);
+  assert.match(shell, /- reversedSupplied/);
+  assert.doesNotMatch(shell, /totalSupplied = inventoryReceivedTotal[\s\S]{0,160}retrievalQuantity/);
 });
 
 test('vendor stock movement history is mobile-card based and human-readable', () => {
