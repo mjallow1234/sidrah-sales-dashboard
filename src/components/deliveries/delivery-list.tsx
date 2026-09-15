@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useAuthQuery, useDeliveriesQuery, useDeliveryPreparationSummaryQuery } from '@/lib/hooks/queries';
 import type { DeliveryRecord } from '@/lib/types';
+import { DeliveryCard } from './delivery-card';
 
 const statusOptions = [
   { value: '', label: 'All' },
@@ -12,12 +13,6 @@ const statusOptions = [
   { value: 'delivered', label: 'Delivered' },
   { value: 'cancelled', label: 'Cancelled' },
 ];
-
-const statusClassNames: Record<string, string> = {
-  pending: 'bg-rose-100 text-rose-700',
-  ongoing: 'bg-blue-100 text-blue-700',
-  delivered: 'bg-emerald-100 text-emerald-700',
-};
 
 export function DeliveryList() {
   const [status, setStatus] = useState('');
@@ -108,33 +103,8 @@ export function DeliveryList() {
           <p className="mt-2 text-sm text-slate-600">There are no deliveries to display right now.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-soft">
-          <div className="grid grid-cols-5 gap-4 border-b border-slate-200 px-4 py-3 text-xs uppercase tracking-[0.24em] text-slate-500">
-            <div>Customer</div>
-            <div>Status</div>
-            <div>Assigned to</div>
-            <div>Created by</div>
-            <div>Created</div>
-          </div>
-          <div className="divide-y divide-slate-200">
-            {rows.map((delivery) => (
-              <Link
-                key={delivery.delivery_id}
-                href={`/deliveries/${delivery.delivery_id}`}
-                className="grid grid-cols-5 gap-4 px-4 py-4 text-sm text-slate-700 transition hover:bg-slate-50"
-              >
-                <div className="font-medium text-slate-900">{delivery.customer_name}</div>
-                <div>
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold capitalize ${statusClassNames[delivery.status] ?? ''}`}>
-                    {delivery.status}
-                  </span>
-                </div>
-                <div>{delivery.claimed_by ? delivery.claimed_by_name || 'Unknown user' : 'Unassigned'}</div>
-                <div>{delivery.created_by_name || 'Unknown user'}</div>
-                <div>{new Date(delivery.date_created).toLocaleString()}</div>
-              </Link>
-            ))}
-          </div>
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {rows.map((delivery) => <DeliveryCard key={delivery.delivery_id} delivery={delivery} />)}
         </div>
       )}
     </div>
