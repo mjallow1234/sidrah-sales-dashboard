@@ -1,4 +1,4 @@
-import type { DeliveryItem, DeliveryRecord, DeliveryStatus } from '@/lib/types';
+import type { DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
 import type { RepositoryDbClient } from './types';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError } from './errors';
@@ -128,6 +128,51 @@ export class DeliveryRepository extends BaseRepository {
     );
     const records = Array.isArray(rows) ? rows : [];
     return records.map((row) => this.mapJoinedRow(row));
+  }
+
+  public async getPreparationSummary(): Promise<DeliveryPreparationSummary> {
+    const [rows] = await this.execute<any[]>(
+      `SELECT
+         item.product_id,
+         p.product_name,
+         p.sku,
+         p.unit,
+         SUM(item.quantity) AS quantity,
+         COUNT(DISTINCT d.delivery_id) AS request_count
+       FROM deliveries d
+       JOIN JSON_TABLE(
+         d.items,
+         '$[*]' COLUMNS (
+           product_id VARCHAR(64) PATH '$.product_id',
+           quantity DECIMAL(18, 3) PATH '$.quantity'
+         )
+       ) AS item ON TRUE
+       JOIN products p ON p.product_id = item.product_id
+       WHERE d.status IN ('pending', 'ongoing')
+       GROUP BY item.product_id, p.product_name, p.sku, p.unit
+       ORDER BY p.product_name ASC, item.product_id ASC`
+    );
+    const [totals] = await this.execute<any[]>(
+      `SELECT COUNT(DISTINCT d.delivery_id) AS request_count, COALESCE(SUM(item.quantity), 0) AS total_quantity
+       FROM deliveries d
+       JOIN JSON_TABLE(
+         d.items,
+         '$[*]' COLUMNS (quantity DECIMAL(18, 3) PATH '$.quantity')
+       ) AS item ON TRUE
+       WHERE d.status IN ('pending', 'ongoing')`
+    );
+    return {
+      items: (Array.isArray(rows) ? rows : []).map((row) => ({
+        product_id: String(row.product_id),
+        product_name: String(row.product_name),
+        sku: row.sku === null || row.sku === undefined ? undefined : String(row.sku),
+        unit: String(row.unit),
+        quantity: Number(row.quantity),
+        request_count: Number(row.request_count),
+      })),
+      total_quantity: Number(totals?.[0]?.total_quantity ?? 0),
+      request_count: Number(totals?.[0]?.request_count ?? 0),
+    };
   }
 
   public async findById(deliveryId: string): Promise<DeliveryRecord> {

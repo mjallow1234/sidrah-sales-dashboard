@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
-import { useAuthQuery, useDeliveriesQuery } from '@/lib/hooks/queries';
+import { useAuthQuery, useDeliveriesQuery, useDeliveryPreparationSummaryQuery } from '@/lib/hooks/queries';
 import type { DeliveryRecord } from '@/lib/types';
 
 const statusOptions = [
@@ -26,6 +26,8 @@ export function DeliveryList() {
 
   const rows = useMemo(() => deliveries, [deliveries]);
   const canCreateDelivery = !authLoading && auth?.role !== 'delivery';
+  const canViewPreparationSummary = auth?.role === 'admin' || auth?.role === 'super_admin' || auth?.role === 'supervisor';
+  const preparationSummary = useDeliveryPreparationSummaryQuery(canViewPreparationSummary);
   const emptyStateTitle = auth?.role === 'delivery' ? 'Currently no delivery requests available.' : 'No deliveries yet.';
 
   if (isLoading) {
@@ -65,6 +67,40 @@ export function DeliveryList() {
           )}
         </div>
       </div>
+
+      {canViewPreparationSummary ? (
+        <section className="rounded-3xl border border-sidrah-100 bg-sidrah-50/60 p-5 shadow-soft sm:p-6" aria-labelledby="delivery-preparation-heading">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.22em] text-sidrah-600">Delivery Preparation</p>
+              <h2 id="delivery-preparation-heading" className="mt-2 text-xl font-semibold text-slate-900">Outstanding quantities</h2>
+              <p className="mt-1 text-sm text-slate-600">Pending and ongoing requests still requiring delivery preparation.</p>
+            </div>
+            {preparationSummary.isLoading ? <p className="text-sm text-slate-500">Loading summary…</p> : null}
+          </div>
+          {preparationSummary.isError ? (
+            <p className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">Unable to load the preparation summary. Delivery requests are still available below.</p>
+          ) : preparationSummary.data && preparationSummary.data.items.length === 0 ? (
+            <p className="mt-4 rounded-2xl bg-white p-4 text-sm text-slate-600">No outstanding deliveries. All current delivery requests have been delivered or cancelled.</p>
+          ) : preparationSummary.data ? (
+            <div className="mt-5 space-y-4">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl bg-white p-4"><p className="text-sm text-slate-600">Outstanding quantity</p><p className="mt-1 text-3xl font-semibold text-sidrah-700">{preparationSummary.data.total_quantity}</p></div>
+                <div className="rounded-2xl bg-white p-4"><p className="text-sm text-slate-600">Outstanding requests</p><p className="mt-1 text-3xl font-semibold text-sidrah-700">{preparationSummary.data.request_count}</p></div>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {preparationSummary.data.items.map((item) => (
+                  <div key={item.product_id} className="rounded-2xl border border-sidrah-100 bg-white p-4">
+                    <p className="font-semibold text-slate-900">{item.product_name}</p>
+                    <p className="mt-2 text-2xl font-semibold text-sidrah-700">{item.quantity} <span className="text-base font-medium text-slate-600">{item.unit}</span></p>
+                    <p className="mt-1 text-sm text-slate-600">{item.request_count} {item.request_count === 1 ? 'request' : 'requests'}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       {rows.length === 0 ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-600">

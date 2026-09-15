@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getPool } from '@/lib/db';
-import type { DeliveryItem, DeliveryRecord, DeliveryStatus } from '@/lib/types';
+import type { DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
 import { DeliveryRepository, type CreateDeliveryPayload, type DeliverySearchFilters } from '@/repositories/DeliveryRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { AppUserRepository } from '@/repositories/AppUserRepository';
@@ -116,6 +116,11 @@ export async function getDeliveries(status?: DeliveryStatus, deliveryUserId?: st
     filters.deliveryUserId = deliveryUserId;
   }
   return repository.findAll(filters);
+}
+
+export async function getDeliveryPreparationSummary(): Promise<DeliveryPreparationSummary> {
+  const repository = new DeliveryRepository(getPool());
+  return repository.getPreparationSummary();
 }
 
 export async function getDeliveryById(deliveryId: string): Promise<DeliveryRecord> {

@@ -126,6 +126,21 @@ export type TrendDirection = 'up' | 'down' | 'flat' | 'insufficient_data';
 
 export type DeliveryStatus = 'pending' | 'ongoing' | 'delivered' | 'cancelled';
 
+export interface DeliveryPreparationSummaryItem {
+  product_id: string;
+  product_name: string;
+  sku?: string;
+  unit: string;
+  quantity: number;
+  request_count: number;
+}
+
+export interface DeliveryPreparationSummary {
+  items: DeliveryPreparationSummaryItem[];
+  total_quantity: number;
+  request_count: number;
+}
+
 export interface DeliveryItem {
   product_id?: string;
   product_name?: string;

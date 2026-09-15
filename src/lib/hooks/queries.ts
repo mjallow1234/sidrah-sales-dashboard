@@ -6,14 +6,14 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
 import { getVendorIntelligence } from '@/lib/api/intelligence';
 import { getFactoryInventory, getFactoryMovements, createFactoryMovement, editFactoryMovement, reverseFactoryMovement, getFactoryRevisions } from '@/lib/api/factory';
 import { getFactoryContainerInventory, getFactoryContainerMovements, createFactoryContainerMovement, editFactoryContainerMovement, reverseFactoryContainerMovement, getFactoryContainerRevisions } from '@/lib/api/factoryContainers';
-import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryItem, type DeliveryRecord, type FactoryContainerInventory, type FactoryContainerMovement, type FactoryInventory, type FactoryStockMovement, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
+import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryItem, type DeliveryPreparationSummary, type DeliveryRecord, type FactoryContainerInventory, type FactoryContainerMovement, type FactoryInventory, type FactoryStockMovement, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
 export interface PaginatedResult<T> {
@@ -351,6 +351,7 @@ export function useCreateDeliveryMutation() {
     mutationFn: createDelivery,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
     },
   });
 }
@@ -363,6 +364,7 @@ export function useClaimDeliveryMutation() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
       },
     }
   );
@@ -376,6 +378,7 @@ export function useMarkDeliveryDeliveredMutation() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
       },
     }
   );
@@ -389,6 +392,7 @@ export function useReassignDeliveryMutation() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
       },
     }
   );
@@ -402,6 +406,7 @@ export function useCancelDeliveryMutation() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
       },
     }
   );
@@ -472,6 +477,16 @@ export function useReverseVisitMutation() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
     },
+  });
+}
+
+export function useDeliveryPreparationSummaryQuery(enabled = true) {
+  return useQuery<DeliveryPreparationSummary>({
+    queryKey: ['deliveryPreparationSummary'],
+    queryFn: getDeliveryPreparationSummary,
+    enabled,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
   });
 }
 
