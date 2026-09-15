@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
-import { getPool } from '@/lib/db';
+import { getPool, transaction } from '@/lib/db';
 import type { DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
+import type { AppUserRole } from '@/lib/authorization';
 import { DeliveryRepository, type CreateDeliveryPayload, type DeliverySearchFilters } from '@/repositories/DeliveryRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { AppUserRepository } from '@/repositories/AppUserRepository';
@@ -78,7 +79,6 @@ export interface CreateDeliveryRequest {
 }
 
 export async function createDelivery(payload: CreateDeliveryRequest, createdBy: string): Promise<DeliveryRecord> {
-  const repository = new DeliveryRepository(getPool());
   const productRepository = new ProductRepository(getPool());
   const customerName = validateRequiredString(payload.customer_name, 'Customer name');
   const customerPhone = validateRequiredString(payload.customer_phone, 'Customer phone');
@@ -88,8 +88,11 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
-  return repository.create({
-    delivery_id: buildId('DLV'),
+  const deliveryId = buildId('DLV');
+  return transaction(async (connection) => {
+    const repository = new DeliveryRepository(connection);
+    const result = await repository.create({
+    delivery_id: deliveryId,
     customer_name: customerName,
     customer_phone: customerPhone,
     delivery_address: deliveryAddress,
@@ -103,6 +106,9 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
     date_created: now,
     last_updated: now,
     updated_by: createdBy,
+    });
+    await repository.createActivity({ activity_id: buildId('DA'), delivery_id: deliveryId, activity_type: 'created', new_status: 'pending', actor_user_id: createdBy });
+    return result;
   });
 }
 
@@ -118,6 +124,20 @@ export async function getDeliveries(status?: DeliveryStatus, deliveryUserId?: st
   return repository.findAll(filters);
 }
 
+function normalizeComment(value: unknown): string | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== 'string') throw new HttpError(400, 'Comment must be text.');
+  const trimmed = value.trim();
+  if (trimmed.length > 2000) throw new HttpError(400, 'Comment must be 2,000 characters or fewer.');
+  return trimmed || undefined;
+}
+
+function requireComment(value: unknown): string {
+  const comment = normalizeComment(value);
+  if (!comment) throw new HttpError(400, 'Comment is required.');
+  return comment;
+}
+
 export async function getDeliveryPreparationSummary(): Promise<DeliveryPreparationSummary> {
   const repository = new DeliveryRepository(getPool());
   return repository.getPreparationSummary();
@@ -128,10 +148,10 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryRecor
   return repository.findById(deliveryId);
 }
 
-export async function claimDelivery(deliveryId: string, deliveryUserId: string): Promise<DeliveryRecord> {
-  const repository = new DeliveryRepository(getPool());
+export async function claimDelivery(deliveryId: string, deliveryUserId: string, comment?: unknown): Promise<DeliveryRecord> {
+  const normalizedComment = normalizeComment(comment);
   try {
-    return await repository.claim(deliveryId, deliveryUserId, deliveryUserId);
+    return await transaction(async (connection) => new DeliveryRepository(connection).claim(deliveryId, deliveryUserId, deliveryUserId, buildId('DA'), normalizedComment));
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('not pending')) {
       throw new HttpError(409, error.message);
@@ -143,10 +163,10 @@ export async function claimDelivery(deliveryId: string, deliveryUserId: string):
   }
 }
 
-export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: string): Promise<DeliveryRecord> {
-  const repository = new DeliveryRepository(getPool());
+export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: string, comment?: unknown): Promise<DeliveryRecord> {
+  const normalizedComment = normalizeComment(comment);
   try {
-    return await repository.deliver(deliveryId, deliveryUserId, deliveryUserId);
+    return await transaction(async (connection) => new DeliveryRepository(connection).deliver(deliveryId, deliveryUserId, deliveryUserId, buildId('DA'), normalizedComment));
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('cannot be marked')) {
       throw new HttpError(409, error.message);
@@ -158,10 +178,10 @@ export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: 
   }
 }
 
-export async function completeDeliveryAsAdmin(deliveryId: string, actingUserId: string): Promise<DeliveryRecord> {
-  const repository = new DeliveryRepository(getPool());
+export async function completeDeliveryAsAdmin(deliveryId: string, actingUserId: string, comment?: unknown): Promise<DeliveryRecord> {
+  const normalizedComment = normalizeComment(comment);
   try {
-    return await repository.completeAsAdmin(deliveryId, actingUserId);
+    return await transaction(async (connection) => new DeliveryRepository(connection).completeAsAdmin(deliveryId, actingUserId, buildId('DA'), normalizedComment));
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('cannot be marked')) {
       throw new HttpError(409, error.message);
@@ -173,7 +193,7 @@ export async function completeDeliveryAsAdmin(deliveryId: string, actingUserId: 
   }
 }
 
-export async function reassignDelivery(deliveryId: string, targetUserId: string, actingUserId: string): Promise<DeliveryRecord> {
+export async function reassignDelivery(deliveryId: string, targetUserId: string, actingUserId: string, comment?: unknown): Promise<DeliveryRecord> {
   const trimmedTargetId = validateRequiredString(targetUserId, 'Delivery user');
   const userRepository = new AppUserRepository(getPool());
 
@@ -191,9 +211,9 @@ export async function reassignDelivery(deliveryId: string, targetUserId: string,
     throw new HttpError(400, 'Delivery can only be assigned to an active delivery user.');
   }
 
-  const repository = new DeliveryRepository(getPool());
+  const normalizedComment = normalizeComment(comment);
   try {
-    return await repository.reassign(deliveryId, trimmedTargetId, actingUserId);
+    return await transaction(async (connection) => new DeliveryRepository(connection).reassign(deliveryId, trimmedTargetId, actingUserId, buildId('DA'), normalizedComment));
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('cannot be reassigned')) {
       throw new HttpError(409, error.message);
@@ -205,10 +225,10 @@ export async function reassignDelivery(deliveryId: string, targetUserId: string,
   }
 }
 
-export async function cancelDelivery(deliveryId: string, actingUserId: string): Promise<DeliveryRecord> {
-  const repository = new DeliveryRepository(getPool());
+export async function cancelDelivery(deliveryId: string, actingUserId: string, comment?: unknown): Promise<DeliveryRecord> {
+  const normalizedComment = normalizeComment(comment);
   try {
-    return await repository.cancel(deliveryId, actingUserId);
+    return await transaction(async (connection) => new DeliveryRepository(connection).cancel(deliveryId, actingUserId, buildId('DA'), normalizedComment));
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('cannot be cancelled')) {
       throw new HttpError(409, error.message);
@@ -218,4 +238,23 @@ export async function cancelDelivery(deliveryId: string, actingUserId: string): 
     }
     throw error;
   }
+}
+
+export async function getDeliveryActivity(deliveryId: string) {
+  const repository = new DeliveryRepository(getPool());
+  await repository.findById(deliveryId);
+  return repository.findActivity(deliveryId);
+}
+
+export async function addDeliveryComment(deliveryId: string, actorUserId: string, role: AppUserRole, value: unknown) {
+  const comment = requireComment(value);
+  return transaction(async (connection) => {
+    const repository = new DeliveryRepository(connection);
+    const delivery = await repository.findById(deliveryId);
+    const elevated = role === 'admin' || role === 'super_admin' || role === 'supervisor';
+    const deliveryUserAllowed = role === 'agent' || (role === 'delivery' && (delivery.status === 'pending' || delivery.claimed_by === actorUserId));
+    if (!elevated && !deliveryUserAllowed) throw new HttpError(403, 'You are not allowed to comment on this delivery.');
+    await repository.createStandaloneComment(deliveryId, buildId('DA'), actorUserId, comment);
+    return repository.findActivity(deliveryId);
+  });
 }

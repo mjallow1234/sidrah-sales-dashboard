@@ -6,14 +6,14 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
 import { getVendorIntelligence } from '@/lib/api/intelligence';
 import { getFactoryInventory, getFactoryMovements, createFactoryMovement, editFactoryMovement, reverseFactoryMovement, getFactoryRevisions } from '@/lib/api/factory';
 import { getFactoryContainerInventory, getFactoryContainerMovements, createFactoryContainerMovement, editFactoryContainerMovement, reverseFactoryContainerMovement, getFactoryContainerRevisions } from '@/lib/api/factoryContainers';
-import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryItem, type DeliveryPreparationSummary, type DeliveryRecord, type FactoryContainerInventory, type FactoryContainerMovement, type FactoryInventory, type FactoryStockMovement, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
+import { DEFAULT_DASHBOARD_STATS, type AdminActivityRecord, type DashboardStats, type DeliveryActivity, type DeliveryItem, type DeliveryPreparationSummary, type DeliveryRecord, type FactoryContainerInventory, type FactoryContainerMovement, type FactoryInventory, type FactoryStockMovement, type Inventory, type Product, type ReverseVisitResult, type SalesRep, type Transaction, type Vendor, type VendorBalance, type VendorInventory, type VendorIntelligence, type VisitResult } from '@/lib/types';
 import type { SessionVerificationResult } from '@/lib/session';
 
 export interface PaginatedResult<T> {
@@ -358,13 +358,14 @@ export function useCreateDeliveryMutation() {
 
 export function useClaimDeliveryMutation() {
   const queryClient = useQueryClient();
-  return useMutation<DeliveryRecord, Error, { deliveryId: string }>(
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; comment?: string }>(
     {
-      mutationFn: ({ deliveryId }: { deliveryId: string }) => claimDelivery(deliveryId),
-      onSuccess: () => {
+      mutationFn: ({ deliveryId, comment }) => claimDelivery(deliveryId, comment),
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
         queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryActivity', variables.deliveryId] });
       },
     }
   );
@@ -372,13 +373,14 @@ export function useClaimDeliveryMutation() {
 
 export function useMarkDeliveryDeliveredMutation() {
   const queryClient = useQueryClient();
-  return useMutation<DeliveryRecord, Error, { deliveryId: string }>(
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; comment?: string }>(
     {
-      mutationFn: ({ deliveryId }: { deliveryId: string }) => markDeliveryDelivered(deliveryId),
-      onSuccess: () => {
+      mutationFn: ({ deliveryId, comment }) => markDeliveryDelivered(deliveryId, comment),
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
         queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryActivity', variables.deliveryId] });
       },
     }
   );
@@ -386,13 +388,14 @@ export function useMarkDeliveryDeliveredMutation() {
 
 export function useReassignDeliveryMutation() {
   const queryClient = useQueryClient();
-  return useMutation<DeliveryRecord, Error, { deliveryId: string; deliveryUserId: string }>(
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; deliveryUserId: string; comment?: string }>(
     {
-      mutationFn: ({ deliveryId, deliveryUserId }) => reassignDelivery(deliveryId, deliveryUserId),
-      onSuccess: () => {
+      mutationFn: ({ deliveryId, deliveryUserId, comment }) => reassignDelivery(deliveryId, deliveryUserId, comment),
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
         queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryActivity', variables.deliveryId] });
       },
     }
   );
@@ -400,13 +403,14 @@ export function useReassignDeliveryMutation() {
 
 export function useCancelDeliveryMutation() {
   const queryClient = useQueryClient();
-  return useMutation<DeliveryRecord, Error, { deliveryId: string }>(
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; comment?: string }>(
     {
-      mutationFn: ({ deliveryId }: { deliveryId: string }) => cancelDelivery(deliveryId),
-      onSuccess: () => {
+      mutationFn: ({ deliveryId, comment }) => cancelDelivery(deliveryId, comment),
+      onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
         queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
+        queryClient.invalidateQueries({ queryKey: ['deliveryActivity', variables.deliveryId] });
       },
     }
   );
@@ -476,6 +480,24 @@ export function useReverseVisitMutation() {
     mutationFn: reverseVisit,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+    },
+  });
+}
+
+export function useDeliveryActivityQuery(deliveryId?: string) {
+  return useQuery({
+    queryKey: ['deliveryActivity', deliveryId],
+    queryFn: () => getDeliveryActivity(deliveryId ?? ''),
+    enabled: !!deliveryId,
+  });
+}
+
+export function useAddDeliveryCommentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryActivity[], Error, { deliveryId: string; comment: string }>({
+    mutationFn: ({ deliveryId, comment }) => addDeliveryComment(deliveryId, comment),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['deliveryActivity', variables.deliveryId] });
     },
   });
 }

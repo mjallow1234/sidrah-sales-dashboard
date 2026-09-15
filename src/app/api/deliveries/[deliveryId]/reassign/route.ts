@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     const deliveryId = getDeliveryId(request);
     const payload = await request.json();
     const targetUserId = typeof payload?.deliveryUserId === 'string' ? payload.deliveryUserId : '';
-    const result = await reassignDelivery(deliveryId, targetUserId, session.userId ?? '');
+    const result = await reassignDelivery(deliveryId, targetUserId, session.userId ?? '', payload?.comment);
     return Response.json({ status: 'success', data: result });
   } catch (error: unknown) {
     if (error instanceof Error && 'status' in error) {

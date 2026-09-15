@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
 
   try {
     const deliveryId = getDeliveryId(request);
-    const result = await claimDelivery(deliveryId, session.userId ?? '');
+    const payload = await request.json().catch(() => ({}));
+    const result = await claimDelivery(deliveryId, session.userId ?? '', payload?.comment);
     return Response.json({ status: 'success', data: result });
   } catch (error: unknown) {
     if (error instanceof Error && 'status' in error) {

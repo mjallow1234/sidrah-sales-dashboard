@@ -171,6 +171,22 @@ export interface DeliveryRecord {
   cancelled_by_name?: string;
 }
 
+export type DeliveryActivityType = 'created' | 'claimed' | 'assigned' | 'reassigned' | 'delivered' | 'cancelled' | 'comment';
+
+export interface DeliveryActivity {
+  activity_id: string;
+  delivery_id: string;
+  activity_type: DeliveryActivityType;
+  previous_status?: DeliveryStatus;
+  new_status?: DeliveryStatus;
+  comment?: string;
+  actor_user_id: string;
+  actor_name?: string;
+  related_user_id?: string;
+  related_user_name?: string;
+  occurred_at: string;
+}
+
 export interface TrendSignal {
   name: string;
   label: string;

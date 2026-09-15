@@ -4,9 +4,11 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   useAuthQuery,
+  useAddDeliveryCommentMutation,
   useCancelDeliveryMutation,
   useClaimDeliveryMutation,
   useDeliveryQuery,
+  useDeliveryActivityQuery,
   useDeliveryUsersQuery,
   useMarkDeliveryDeliveredMutation,
   useReassignDeliveryMutation,
@@ -32,10 +34,12 @@ const statusClassNames: Record<string, string> = {
 export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const authQuery = useAuthQuery();
   const { data: delivery, isLoading, isError } = useDeliveryQuery(deliveryId);
+  const { data: activities = [], isLoading: activitiesLoading } = useDeliveryActivityQuery(deliveryId);
   const claimMutation = useClaimDeliveryMutation();
   const deliverMutation = useMarkDeliveryDeliveredMutation();
   const reassignMutation = useReassignDeliveryMutation();
   const cancelMutation = useCancelDeliveryMutation();
+  const addCommentMutation = useAddDeliveryCommentMutation();
 
   const currentUserId = authQuery.data?.userId ?? '';
   const currentRole = authQuery.data?.role;
@@ -53,6 +57,9 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const { data: deliveryUsers = [] } = useDeliveryUsersQuery(canReassign);
   const [reassignTarget, setReassignTarget] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [actionComment, setActionComment] = useState('');
+  const [standaloneComment, setStandaloneComment] = useState('');
+  const [showCommentForm, setShowCommentForm] = useState(false);
 
   const assignedToLabel = useMemo(() => {
     if (!delivery?.claimed_by) {
@@ -60,6 +67,8 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
     }
     return delivery.claimed_by_name || 'Unknown user';
   }, [delivery]);
+
+  const canAddComment = currentRole === 'agent' || currentRole === 'admin' || currentRole === 'super_admin' || currentRole === 'supervisor' || (currentRole === 'delivery' && (delivery?.status === 'pending' || delivery?.claimed_by === currentUserId));
 
   if (isLoading) {
     return <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-600">Loading delivery details…</div>;
@@ -73,11 +82,11 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
     if (!reassignTarget) {
       return;
     }
-    reassignMutation.mutate({ deliveryId: delivery.delivery_id, deliveryUserId: reassignTarget });
+    reassignMutation.mutate({ deliveryId: delivery.delivery_id, deliveryUserId: reassignTarget, comment: actionComment });
   };
 
   const handleCancel = () => {
-    cancelMutation.mutate({ deliveryId: delivery.delivery_id });
+    cancelMutation.mutate({ deliveryId: delivery.delivery_id, comment: actionComment });
     setShowCancelConfirm(false);
   };
 
@@ -108,6 +117,37 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
               </>
             ) : null}
           </div>
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold text-slate-900">Activity</h2>
+          {canAddComment ? <Button type="button" variant="secondary" onClick={() => setShowCommentForm((value) => !value)}>+ Add comment</Button> : null}
+        </div>
+        {showCommentForm && canAddComment ? (
+          <div className="mt-4 rounded-2xl border border-sidrah-100 bg-sidrah-50/40 p-4">
+            <label htmlFor="standalone-delivery-comment" className="text-sm font-semibold text-slate-900">Add comment</label>
+            <textarea id="standalone-delivery-comment" value={standaloneComment} onChange={(event) => setStandaloneComment(event.target.value)} maxLength={2000} rows={4} className="mt-3 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sidrah-500" placeholder="Add operational context" />
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-500"><span>{standaloneComment.length} / 2000</span>{addCommentMutation.error ? <span className="text-rose-600">{addCommentMutation.error.message}</span> : null}</div>
+            <div className="mt-3 flex justify-end gap-2"><Button type="button" variant="secondary" onClick={() => { setShowCommentForm(false); setStandaloneComment(''); addCommentMutation.reset(); }}>Cancel</Button><Button type="button" onClick={() => addCommentMutation.mutate({ deliveryId: delivery.delivery_id, comment: standaloneComment }, { onSuccess: () => { setStandaloneComment(''); setShowCommentForm(false); } })} disabled={!standaloneComment.trim() || addCommentMutation.isPending}>{addCommentMutation.isPending ? 'Adding…' : 'Add comment'}</Button></div>
+          </div>
+        ) : null}
+        {activitiesLoading ? <p className="mt-4 text-sm text-slate-500">Loading activity…</p> : null}
+        {!activitiesLoading && activities.length === 0 ? <p className="mt-4 text-sm text-slate-500">No activity recorded yet.</p> : null}
+        <div className="mt-4 space-y-4">
+          {activities.map((activity) => {
+            const labels: Record<string, string> = { created: 'Created', claimed: 'Claimed', assigned: 'Assigned', reassigned: 'Reassigned', delivered: 'Delivered', cancelled: 'Cancelled', comment: 'Comment' };
+            return (
+              <div key={activity.activity_id} className="border-l-2 border-sidrah-200 pl-4">
+                <p className="font-semibold text-slate-900">{labels[activity.activity_type] ?? 'Activity'}</p>
+                <p className="text-xs text-slate-500">{new Date(activity.occurred_at).toLocaleString()} · {activity.actor_name || 'Unknown user'}</p>
+                {activity.previous_status || activity.new_status ? <p className="mt-1 text-xs text-slate-600">{activity.previous_status ? statusLabels[activity.previous_status] : 'Created'}{activity.new_status ? ` → ${statusLabels[activity.new_status]}` : ''}</p> : null}
+                {activity.related_user_name ? <p className="mt-1 text-sm text-slate-700">Assigned to {activity.related_user_name}</p> : null}
+                {activity.comment ? <p className="mt-2 rounded-2xl bg-slate-50 p-3 text-sm text-slate-700">{activity.comment}</p> : null}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -167,14 +207,21 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
         </div>
       ) : null}
 
+      {isActionable && (canClaim || canMarkDelivered || canReassign || canCancel) ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+          <label htmlFor="delivery-action-comment" className="text-sm font-semibold text-slate-900">Activity comment <span className="font-normal text-slate-500">(optional)</span></label>
+          <textarea id="delivery-action-comment" value={actionComment} onChange={(event) => setActionComment(event.target.value)} maxLength={2000} rows={3} className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sidrah-500" placeholder="Add context for this action" />
+        </div>
+      ) : null}
+
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         {canClaim ? (
-          <Button type="button" onClick={() => claimMutation.mutate({ deliveryId: delivery.delivery_id })} disabled={claimMutation.isPending}>
+          <Button type="button" onClick={() => claimMutation.mutate({ deliveryId: delivery.delivery_id, comment: actionComment })} disabled={claimMutation.isPending}>
             {claimMutation.isPending ? 'Claiming…' : 'Claim Delivery'}
           </Button>
         ) : null}
         {canMarkDelivered ? (
-          <Button type="button" onClick={() => deliverMutation.mutate({ deliveryId: delivery.delivery_id })} disabled={deliverMutation.isPending}>
+          <Button type="button" onClick={() => deliverMutation.mutate({ deliveryId: delivery.delivery_id, comment: actionComment })} disabled={deliverMutation.isPending}>
             {deliverMutation.isPending ? 'Marking…' : 'Mark as Delivered'}
           </Button>
         ) : null}

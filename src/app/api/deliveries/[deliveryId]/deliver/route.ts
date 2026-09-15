@@ -20,9 +20,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const deliveryId = getDeliveryId(request);
+    const payload = await request.json().catch(() => ({}));
     const result = isAdminOrSupervisorRole(session.role)
-      ? await completeDeliveryAsAdmin(deliveryId, session.userId ?? '')
-      : await markDeliveryDelivered(deliveryId, session.userId ?? '');
+      ? await completeDeliveryAsAdmin(deliveryId, session.userId ?? '', payload?.comment)
+      : await markDeliveryDelivered(deliveryId, session.userId ?? '', payload?.comment);
     return Response.json({ status: 'success', data: result });
   } catch (error: unknown) {
     if (error instanceof Error && 'status' in error) {

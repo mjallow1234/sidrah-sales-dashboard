@@ -1,4 +1,4 @@
-import type { DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
+import type { DeliveryActivity, DeliveryActivityType, DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
 import type { RepositoryDbClient } from './types';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError } from './errors';
@@ -23,6 +23,17 @@ export interface CreateDeliveryPayload {
 export interface DeliverySearchFilters {
   status?: DeliveryStatus;
   deliveryUserId?: string;
+}
+
+export interface DeliveryActivityPayload {
+  activity_id: string;
+  delivery_id: string;
+  activity_type: DeliveryActivityType;
+  previous_status?: DeliveryStatus | null;
+  new_status?: DeliveryStatus | null;
+  comment?: string | null;
+  actor_user_id: string;
+  related_user_id?: string | null;
 }
 
 export class DeliveryRepository extends BaseRepository {
@@ -237,77 +248,148 @@ export class DeliveryRepository extends BaseRepository {
     return this.findById(payload.delivery_id);
   }
 
-  public async claim(deliveryId: string, deliveryUserId: string, updatedBy: string): Promise<DeliveryRecord> {
+  private async lockDelivery(deliveryId: string): Promise<any> {
+    const [rows] = await (this.db.execute as any)(
+      `SELECT * FROM deliveries WHERE delivery_id = :delivery_id LIMIT 1 FOR UPDATE`,
+      { delivery_id: deliveryId }
+    );
+    if (!Array.isArray(rows) || rows.length === 0) throw new NotFoundError('Delivery', deliveryId);
+    return rows[0];
+  }
+
+  public async createActivity(payload: DeliveryActivityPayload): Promise<void> {
+    await (this.db.execute as any)(
+      `INSERT INTO delivery_activity (
+        activity_id, delivery_id, activity_type, previous_status, new_status,
+        comment, actor_user_id, related_user_id, occurred_at
+      ) VALUES (:activity_id, :delivery_id, :activity_type, :previous_status, :new_status,
+        :comment, :actor_user_id, :related_user_id, NOW())`,
+      {
+        activity_id: payload.activity_id,
+        delivery_id: payload.delivery_id,
+        activity_type: payload.activity_type,
+        previous_status: payload.previous_status ?? null,
+        new_status: payload.new_status ?? null,
+        comment: payload.comment ?? null,
+        actor_user_id: payload.actor_user_id,
+        related_user_id: payload.related_user_id ?? null,
+      }
+    );
+  }
+
+  public async createStandaloneComment(deliveryId: string, activityId: string, actorUserId: string, comment: string): Promise<void> {
+    await this.findById(deliveryId);
+    await this.createActivity({
+      activity_id: activityId,
+      delivery_id: deliveryId,
+      activity_type: 'comment',
+      comment,
+      actor_user_id: actorUserId,
+    });
+  }
+
+  public async findActivity(deliveryId: string): Promise<DeliveryActivity[]> {
+    const [rows] = await this.execute<any[]>(
+      `SELECT a.activity_id, a.delivery_id, a.activity_type, a.previous_status, a.new_status,
+          a.comment, a.actor_user_id, a.related_user_id, a.occurred_at,
+          actor.name AS actor_name, actor.username AS actor_username,
+          related.name AS related_user_name, related.username AS related_user_username
+       FROM delivery_activity a
+       LEFT JOIN app_users actor ON actor.user_id = a.actor_user_id
+       LEFT JOIN app_users related ON related.user_id = a.related_user_id
+       WHERE a.delivery_id = ?
+       ORDER BY a.occurred_at ASC, a.activity_id ASC`,
+      [deliveryId]
+    );
+    return (Array.isArray(rows) ? rows : []).map((row) => ({
+      activity_id: String(row.activity_id),
+      delivery_id: String(row.delivery_id),
+      activity_type: String(row.activity_type) as DeliveryActivityType,
+      previous_status: row.previous_status == null ? undefined : String(row.previous_status) as DeliveryStatus,
+      new_status: row.new_status == null ? undefined : String(row.new_status) as DeliveryStatus,
+      comment: row.comment == null ? undefined : String(row.comment),
+      actor_user_id: String(row.actor_user_id),
+      actor_name: row.actor_name || row.actor_username || 'Unknown user',
+      related_user_id: row.related_user_id == null ? undefined : String(row.related_user_id),
+      related_user_name: row.related_user_id == null ? undefined : (row.related_user_name || row.related_user_username || 'Unknown user'),
+      occurred_at: String(row.occurred_at),
+    }));
+  }
+
+  public async claim(deliveryId: string, deliveryUserId: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+    const current = await this.lockDelivery(deliveryId);
+    if (String(current.status) !== 'pending') {
+      throw new Error('Delivery is not pending or has already been claimed.');
+    }
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'ongoing', claimed_by = :claimed_by, claimed_at = NOW(), updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status = 'pending'`,
       { claimed_by: deliveryUserId, updated_by: updatedBy, delivery_id: deliveryId }
     );
 
-    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
-      await this.findById(deliveryId);
-      throw new Error('Delivery is not pending or has already been claimed.');
-    }
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) throw new Error('Delivery is not pending or has already been claimed.');
+    await this.createActivity({ activity_id: activityId, delivery_id: deliveryId, activity_type: 'claimed', previous_status: 'pending', new_status: 'ongoing', comment, actor_user_id: updatedBy, related_user_id: deliveryUserId });
 
     return this.findById(deliveryId);
   }
 
-  public async deliver(deliveryId: string, claimedBy: string, updatedBy: string): Promise<DeliveryRecord> {
+  public async deliver(deliveryId: string, claimedBy: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+    const current = await this.lockDelivery(deliveryId);
+    if (String(current.status) !== 'ongoing' || String(current.claimed_by) !== claimedBy) throw new Error('Delivery cannot be marked as delivered by this user.');
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'delivered', delivered_at = NOW(), updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status = 'ongoing' AND claimed_by = :claimed_by`,
       { updated_by: updatedBy, delivery_id: deliveryId, claimed_by: claimedBy }
     );
 
-    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
-      await this.findById(deliveryId);
-      throw new Error('Delivery cannot be marked as delivered by this user.');
-    }
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) throw new Error('Delivery cannot be marked as delivered by this user.');
+    await this.createActivity({ activity_id: activityId, delivery_id: deliveryId, activity_type: 'delivered', previous_status: 'ongoing', new_status: 'delivered', comment, actor_user_id: updatedBy });
 
     return this.findById(deliveryId);
   }
 
-  public async reassign(deliveryId: string, newDeliveryUserId: string, updatedBy: string): Promise<DeliveryRecord> {
+  public async reassign(deliveryId: string, newDeliveryUserId: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+    const current = await this.lockDelivery(deliveryId);
+    if (!['pending', 'ongoing'].includes(String(current.status))) throw new Error('Delivery cannot be reassigned in its current status.');
+    const activityType: DeliveryActivityType = current.claimed_by ? 'reassigned' : 'assigned';
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'ongoing', claimed_by = :claimed_by, claimed_at = NOW(), updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,
       { claimed_by: newDeliveryUserId, updated_by: updatedBy, delivery_id: deliveryId }
     );
 
-    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
-      await this.findById(deliveryId);
-      throw new Error('Delivery cannot be reassigned in its current status.');
-    }
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) throw new Error('Delivery cannot be reassigned in its current status.');
+    await this.createActivity({ activity_id: activityId, delivery_id: deliveryId, activity_type: activityType, previous_status: current.status as DeliveryStatus, new_status: 'ongoing', comment, actor_user_id: updatedBy, related_user_id: newDeliveryUserId });
 
     return this.findById(deliveryId);
   }
 
-  public async completeAsAdmin(deliveryId: string, updatedBy: string): Promise<DeliveryRecord> {
+  public async completeAsAdmin(deliveryId: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+    const current = await this.lockDelivery(deliveryId);
+    if (!['pending', 'ongoing'].includes(String(current.status))) throw new Error('Delivery cannot be marked as delivered in its current status.');
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'delivered', delivered_at = NOW(), updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,
       { updated_by: updatedBy, delivery_id: deliveryId }
     );
 
-    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
-      await this.findById(deliveryId);
-      throw new Error('Delivery cannot be marked as delivered in its current status.');
-    }
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) throw new Error('Delivery cannot be marked as delivered in its current status.');
+    await this.createActivity({ activity_id: activityId, delivery_id: deliveryId, activity_type: 'delivered', previous_status: current.status as DeliveryStatus, new_status: 'delivered', comment, actor_user_id: updatedBy });
 
     return this.findById(deliveryId);
   }
 
-  public async cancel(deliveryId: string, updatedBy: string): Promise<DeliveryRecord> {
+  public async cancel(deliveryId: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+    const current = await this.lockDelivery(deliveryId);
+    if (!['pending', 'ongoing'].includes(String(current.status))) throw new Error('Delivery cannot be cancelled in its current status.');
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'cancelled', cancelled_at = NOW(), cancelled_by = :cancelled_by, updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,
       { cancelled_by: updatedBy, updated_by: updatedBy, delivery_id: deliveryId }
     );
 
-    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
-      await this.findById(deliveryId);
-      throw new Error('Delivery cannot be cancelled in its current status.');
-    }
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) throw new Error('Delivery cannot be cancelled in its current status.');
+    await this.createActivity({ activity_id: activityId, delivery_id: deliveryId, activity_type: 'cancelled', previous_status: current.status as DeliveryStatus, new_status: 'cancelled', comment, actor_user_id: updatedBy });
 
     return this.findById(deliveryId);
   }

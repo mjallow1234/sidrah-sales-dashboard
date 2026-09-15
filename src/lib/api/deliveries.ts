@@ -1,4 +1,4 @@
-import type { DeliveryItem, DeliveryPreparationSummary, DeliveryRecord } from '@/lib/types';
+import type { DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryRecord } from '@/lib/types';
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, options);
@@ -63,34 +63,46 @@ export async function createDelivery(payload: {
   return result.data;
 }
 
-export async function claimDelivery(deliveryId: string): Promise<DeliveryRecord> {
+export async function claimDelivery(deliveryId: string, comment?: string): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/claim`, {
-    method: 'POST',
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
   });
   return result.data;
 }
 
-export async function markDeliveryDelivered(deliveryId: string): Promise<DeliveryRecord> {
+export async function markDeliveryDelivered(deliveryId: string, comment?: string): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/deliver`, {
-    method: 'POST',
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
   });
   return result.data;
 }
 
-export async function reassignDelivery(deliveryId: string, deliveryUserId: string): Promise<DeliveryRecord> {
+export async function reassignDelivery(deliveryId: string, deliveryUserId: string, comment?: string): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/reassign`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ deliveryUserId }),
+    body: JSON.stringify({ deliveryUserId, comment }),
   });
   return result.data;
 }
 
-export async function cancelDelivery(deliveryId: string): Promise<DeliveryRecord> {
+export async function cancelDelivery(deliveryId: string, comment?: string): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/cancel`, {
-    method: 'POST',
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
+  });
+  return result.data;
+}
+
+export async function getDeliveryActivity(deliveryId: string): Promise<DeliveryActivity[]> {
+  const result = await fetchJson<{ status: string; data: DeliveryActivity[] }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/activity`);
+  return result.data;
+}
+
+export async function addDeliveryComment(deliveryId: string, comment: string): Promise<DeliveryActivity[]> {
+  const result = await fetchJson<{ status: string; data: DeliveryActivity[] }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/comments`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
   });
   return result.data;
 }
