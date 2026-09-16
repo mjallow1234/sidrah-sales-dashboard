@@ -9,6 +9,7 @@ import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-pr
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
 import { useRouter } from 'next/navigation';
+import { AdminControlCenter } from '@/components/dashboard/admin-control-center';
 
 export function DashboardShell({ initialRole }: { initialRole?: string }) {
   const router = useRouter();
@@ -48,6 +49,7 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
   }, []);
 
   const isAgent = role === 'agent';
+  const isManagement = role === 'admin' || role === 'super_admin';
   const showFilters = role !== undefined && !isAgent;
   const statsFilters = useMemo(
     () => (isAgent ? undefined : filters),
@@ -66,6 +68,10 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
   const [isTotalBucketsModalOpen, setIsTotalBucketsModalOpen] = useState(false);
 
   const { data: vendorsOwing, isLoading: vendorsOwingLoading } = useVendorsOwingQuery();
+
+  if (isManagement) {
+    return <AdminControlCenter />;
+  }
 
   const bucketsOutThereDescription = useMemo(() => {
     const productBreakdown = stats?.totalBucketsOutThereByProduct ?? [];
