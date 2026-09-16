@@ -29,6 +29,10 @@ export function isFactoryRole(role?: string): role is AppUserRole {
   return role === 'super_admin' || role === 'admin' || isForemanRole(role);
 }
 
+export function canReverseFactoryRecords(role?: string): role is AppUserRole {
+  return isAdminRole(role);
+}
+
 export function isFactoryPath(pathname: string): boolean {
   return pathname === '/factory' || pathname.startsWith('/factory/');
 }

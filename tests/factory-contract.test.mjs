@@ -139,7 +139,7 @@ test('factory correction workflow is event-atomic, auditable, and role-protected
   assert.match(containerService, /Reversed container movements cannot be edited/);
   assert.match(containerService, /factory_container_movements SET status/);
   assert.match(containerService, /FactoryRecordRevisionRepository/);
-  for (const route of [productReverse, containerReverse]) assert.match(route, /isFactoryRole\(session\.role\)/);
+  for (const route of [productReverse, containerReverse]) assert.match(route, /canReverseFactoryRecords\(session\.role\)/);
 });
 
 test('factory edits normalize ISO datetime values and expose revision history', () => {

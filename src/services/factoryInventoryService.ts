@@ -25,6 +25,17 @@ function optionalNonNegativeNumber(value: unknown, name: string): number | null 
 function requiredFiniteNumber(value: unknown, name: string): number { if (value === undefined || value === null || value === '') throw new ValidationError(`${name} must be a valid number.`); const parsed = Number(value); if (!Number.isFinite(parsed)) throw new ValidationError(`${name} must be a valid number.`); return parsed; }
 function requiredWholeNumber(value: unknown, name: string): number { if (value === undefined || value === null || value === '') throw new ValidationError(`${name} must be a non-negative whole number.`); const parsed = Number(value); if (!Number.isInteger(parsed) || parsed < 0) throw new ValidationError(`${name} must be a non-negative whole number.`); return parsed; }
 function sqlDateTime(value?: string): string { const date = value ? new Date(value) : new Date(); if (Number.isNaN(date.getTime())) throw new ValidationError('occurred_at must be a valid date.'); return date.toISOString().slice(0, 19).replace('T', ' '); }
+function productionDateTime(value: unknown, existingValue?: string): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) throw new ValidationError('Production Date must be a valid date in YYYY-MM-DD format.');
+  const [year, month, day] = value.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) throw new ValidationError('Production Date must be a valid calendar date.');
+  const today = new Date();
+  const todayValue = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, '0')}-${String(today.getUTCDate()).padStart(2, '0')}`;
+  if (value > todayValue) throw new ValidationError('Production Date cannot be in the future.');
+  const existingTime = existingValue?.match(/[ T](\d{2}:\d{2}:\d{2})/)?.[1];
+  return `${value} ${existingTime ?? '00:00:00'}`;
+}
 function normalizeItems(payload: CreateFactoryMovementPayload): FactoryMovementItem[] {
   const source = Array.isArray(payload.items) ? payload.items : [{ product_id: payload.product_id, quantity: payload.quantity }];
   if (source.length === 0) throw new ValidationError('At least one product item is required.');
@@ -41,7 +52,8 @@ export async function createFactoryMovement(payload: CreateFactoryMovementPayloa
   if (!['production', 'leaving_factory', 'returned_factory'].includes(movementType)) throw new ValidationError('movement_type is invalid.');
   const actorUserId = requiredString(payload.actor_user_id, 'actor_user_id'); const items = normalizeItems(payload);
   if (movementType === 'production' && items.length !== 1) throw new ValidationError('Production records must contain one output item.');
-  const inputQuantity = optionalNonNegativeNumber(payload.input_quantity, 'input_quantity'); const occurredAt = sqlDateTime(payload.occurred_at);
+  const inputQuantity = optionalNonNegativeNumber(payload.input_quantity, 'input_quantity');
+  const occurredAt = movementType === 'production' ? productionDateTime(payload.occurred_at) : sqlDateTime(payload.occurred_at);
   const reasonComment = payload.reason_comment === undefined ? null : String(payload.reason_comment); const batchReference = payload.batch_reference === undefined ? null : String(payload.batch_reference);
   const inputUnit = payload.input_unit === undefined ? null : String(payload.input_unit); const rawMaterial = payload.raw_material === undefined ? null : String(payload.raw_material).trim();
   const temperature = payload.temperature_c === undefined ? null : requiredFiniteNumber(payload.temperature_c, 'temperature_c');
@@ -112,12 +124,14 @@ export async function editFactoryMovement(payload: EditFactoryMovementPayload): 
     const productIds = [...new Set(items.map((item) => item.product_id))];
     const [activeProducts] = await connection.execute(`SELECT product_id FROM products WHERE active = TRUE AND product_id IN (${productIds.map(() => '?').join(',')})`, productIds) as any;
     if (activeProducts.length !== productIds.length) throw new NotFoundError('Active product', items.find((item) => !activeProducts.some((row: any) => String(row.product_id) === item.product_id))?.product_id ?? 'unknown');
-    const nextOccurredAt = sqlDateTime(payload.occurred_at ?? event.occurred_at);
+    const nextOccurredAt = event.movement_type === 'production'
+      ? (payload.occurred_at === undefined ? sqlDateTime(event.occurred_at) : productionDateTime(payload.occurred_at, event.occurred_at))
+      : sqlDateTime(payload.occurred_at ?? event.occurred_at);
     await applyEventInventoryDelta(connection, event.movement_type, oldItems, items, now);
     await connection.execute('UPDATE factory_movement_events SET occurred_at = ?, reason_comment = ?, edited_by = ?, edited_at = ? WHERE event_id = ?', [nextOccurredAt, payload.reason_comment ?? event.reason_comment, actorUserId, now, eventId]);
     for (let index = 0; index < oldRows.length; index += 1) {
       const item = items[index];
-      await connection.execute(`UPDATE factory_stock_movements SET product_id = ?, quantity = ?, occurred_at = ?, recorded_at = ?, raw_material = ?, temperature_c = ?, processing_duration_hours = ?, processing_duration_minutes = ?, batch_reference = ?, input_quantity = ?, input_unit = ? WHERE movement_id = ?`, [item.product_id, item.quantity, nextOccurredAt, now, event.movement_type === 'production' ? (payload.raw_material ?? oldRows[index].raw_material ?? null) : null, event.movement_type === 'production' ? (payload.temperature_c ?? oldRows[index].temperature_c ?? null) : null, event.movement_type === 'production' ? (payload.processing_duration_hours ?? oldRows[index].processing_duration_hours ?? null) : null, event.movement_type === 'production' ? (payload.processing_duration_minutes ?? oldRows[index].processing_duration_minutes ?? null) : null, event.movement_type === 'production' ? (payload.batch_reference ?? oldRows[index].batch_reference ?? null) : null, event.movement_type === 'production' ? (payload.input_quantity ?? oldRows[index].input_quantity ?? null) : null, event.movement_type === 'production' ? (payload.input_unit ?? oldRows[index].input_unit ?? null) : null, oldRows[index].movement_id] as any);
+      await connection.execute(`UPDATE factory_stock_movements SET product_id = ?, quantity = ?, occurred_at = ?, raw_material = ?, temperature_c = ?, processing_duration_hours = ?, processing_duration_minutes = ?, batch_reference = ?, input_quantity = ?, input_unit = ? WHERE movement_id = ?`, [item.product_id, item.quantity, nextOccurredAt, event.movement_type === 'production' ? (payload.raw_material ?? oldRows[index].raw_material ?? null) : null, event.movement_type === 'production' ? (payload.temperature_c ?? oldRows[index].temperature_c ?? null) : null, event.movement_type === 'production' ? (payload.processing_duration_hours ?? oldRows[index].processing_duration_hours ?? null) : null, event.movement_type === 'production' ? (payload.processing_duration_minutes ?? oldRows[index].processing_duration_minutes ?? null) : null, event.movement_type === 'production' ? (payload.batch_reference ?? oldRows[index].batch_reference ?? null) : null, event.movement_type === 'production' ? (payload.input_quantity ?? oldRows[index].input_quantity ?? null) : null, event.movement_type === 'production' ? (payload.input_unit ?? oldRows[index].input_unit ?? null) : null, oldRows[index].movement_id] as any);
     }
     const afterRows = await movementRepo.findItemsByEventId(eventId, true); const afterEvent = await eventRepo.findById(eventId, true);
     await revisionRepo.create({ revision_id: id('FR'), record_type: 'movement_event', event_id: eventId, action_type: 'edit', actor_user_id: actorUserId, recorded_at: now, reason_comment: payload.reason_comment ?? null, operation_id: payload.operation_id ?? null, before_snapshot: { event, movements: oldRows }, after_snapshot: { event: afterEvent, movements: afterRows } });
