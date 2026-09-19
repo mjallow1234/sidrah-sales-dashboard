@@ -18,9 +18,17 @@ export async function POST(request: NextRequest) {
     if (isAgentRole(session.role) && payload.sales_rep_id && payload.sales_rep_id !== session.sales_rep_id) {
       return forbiddenResponse();
     }
+    const {
+      created_by: _clientCreatedBy,
+      actor_user_id: _clientActorUserId,
+      actor_role: _clientActorRole,
+      actor_sales_rep_id: _clientActorSalesRepId,
+      ...clientPayload
+    } = payload;
     const body = {
-      ...payload,
+      ...clientPayload,
       actor_role: session.role,
+      actor_user_id: session.userId,
       actor_sales_rep_id: session.sales_rep_id || '',
     };
 

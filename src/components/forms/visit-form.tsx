@@ -77,9 +77,6 @@ export function VisitForm({ vendors }: VisitFormProps) {
       return;
     }
 
-    if (!visitDraft.sales_rep_id && salesReps.length > 0) {
-      setVisitDraft({ sales_rep_id: salesReps[0].sales_rep_id });
-    }
   }, [authData, salesReps, setVisitDraft, visitDraft.sales_rep_id]);
 
   useEffect(() => {
@@ -198,6 +195,32 @@ export function VisitForm({ vendors }: VisitFormProps) {
             <p className="mt-2 text-2xl font-semibold text-slate-900">{vendorInventoryQuery.isLoading ? '…' : openingStock}</p>
           </div>
         </div>
+
+        {authData?.valid && authData.role === 'agent' ? (
+          <div className="rounded-3xl bg-slate-50 p-4">
+            <p className="text-sm text-slate-500">Sales Representative</p>
+            <p className="mt-2 font-semibold text-slate-900">{selectedSalesRepName}</p>
+            <p className="mt-1 text-xs text-slate-500">Your authenticated sales representative</p>
+          </div>
+        ) : (
+          <label className="block text-sm text-slate-700">
+            Sales Representative
+            <select
+              value={visitDraft.sales_rep_id}
+              onChange={(event) => setVisitDraft({ sales_rep_id: event.target.value })}
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              required
+            >
+              <option value="">Select sales representative</option>
+              {salesReps.map((salesRep) => (
+                <option key={salesRep.sales_rep_id} value={salesRep.sales_rep_id}>
+                  {salesRep.name}
+                </option>
+              ))}
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">This is the representative associated with the visit, not the user recording it.</span>
+          </label>
+        )}
 
         {!vendorInventoryQuery.isLoading && !hasVendorInventory ? (
           <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">

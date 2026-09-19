@@ -104,8 +104,9 @@ test('transaction details show the recording actor without exposing internal ide
   const table = read('src/components/vendors/transaction-table.tsx');
   const route = read('src/app/api/transactions/route.ts');
   const mapper = read('src/lib/api/transactions.ts');
-  assert.doesNotMatch(table, /<Detail label="Sales representative"/);
-  assert.match(table, /<Detail label="Actor"/);
+  assert.match(table, /<Detail label="Recorded By"/);
+  assert.match(table, /<Detail label="Sales Representative"/);
+  assert.match(table, /selectedTransaction\.actor/);
   assert.match(table, /selectedTransaction\.sales_rep_name/);
   assert.match(table, /reversed_by_name/);
   assert.match(route, /COALESCE\(au\.name, au\.username\) AS actor_name/);
@@ -122,10 +123,10 @@ test('new visits persist the authenticated recording user and legacy actor gaps 
   assert.match(service, /updated_by: payload\.actor_user_id/);
   assert.match(table, /Actor unavailable — historical record/);
   assert.doesNotMatch(table, /Unknown actor|Unknown person/);
-  assert.doesNotMatch(table, /transaction\.actor \|\| transaction\.sales_rep_id/);
+  assert.match(table, /transaction\.actor/);
 });
 
-test('transaction Actor uses the resolved sales representative name', () => {
+test('transaction UI keeps resolved sales representative separate from the actor', () => {
   const table = read('src/components/vendors/transaction-table.tsx');
   const route = read('src/app/api/transactions/route.ts');
   const queries = read('src/lib/hooks/queries.ts');

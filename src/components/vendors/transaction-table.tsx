@@ -75,7 +75,8 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
     <>
       <div className="space-y-3">
         {transactions.map((transaction, index) => {
-          const actor = transaction.sales_rep_name || 'Actor unavailable — historical record';
+          const actor = transaction.actor || 'Actor unavailable — historical record';
+          const salesRepresentative = transaction.sales_rep_name || 'Sales representative unavailable — historical record';
           const reversed = Boolean(transaction.is_reversed);
           return (
             <article key={`${transaction.transaction_id || 'transaction'}-${transaction.vendor_id}-${transaction.date}-${index}`} className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-sidrah-300 hover:shadow-soft">
@@ -87,11 +88,12 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
                   </div>
                   <span className="shrink-0 text-xl text-slate-400" aria-hidden="true">›</span>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.date)}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Supplied</p><p className="mt-1 font-medium text-slate-800">{transaction.stock_added}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Cash</p><p className="mt-1 font-medium text-slate-800">{formatCurrency(transaction.cash_collected)}</p></div>
-                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Actor</p><p className="mt-1 truncate font-medium text-slate-800">{actor}</p></div>
+                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Recorded By</p><p className="mt-1 truncate font-medium text-slate-800">{actor}</p></div>
+                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Sales Representative</p><p className="mt-1 truncate font-medium text-slate-800">{salesRepresentative}</p></div>
                 </div>
                 <div className="mt-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
               </button>
@@ -113,7 +115,8 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
               <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
               <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Vendor unavailable — historical record'} />
-              <Detail label="Actor" value={selectedTransaction.sales_rep_name || 'Actor unavailable — historical record'} />
+              <Detail label="Actor" value={selectedTransaction.actor || 'Actor unavailable — historical record'} />
+              <Detail label="Sales Representative" value={selectedTransaction.sales_rep_name || 'Sales representative unavailable — historical record'} />
               <Detail label="Product" value={selectedTransaction.product_name || 'Product unavailable — historical record'} />
               <Detail label="Quantity supplied" value={String(selectedTransaction.stock_added)} />
               <Detail label="Cash collected" value={formatCurrency(selectedTransaction.cash_collected)} />
