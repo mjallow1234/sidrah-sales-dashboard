@@ -480,6 +480,13 @@ export function useReverseVisitMutation() {
     mutationFn: reverseVisit,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorInventory'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorBalance'] });
+      queryClient.invalidateQueries({ queryKey: ['vendor'] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorBalances'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsOwing'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
     },
   });
 }
@@ -513,14 +520,40 @@ export function useDeliveryPreparationSummaryQuery(enabled = true) {
 }
 
 export function useTransferStockMutation() {
+  const queryClient = useQueryClient();
   return useMutation<any, Error, Parameters<typeof transferStock>[0]>({
     mutationFn: transferStock,
+    onSuccess: (_data, variables) => {
+      for (const vendorId of [variables.source_vendor_id, variables.destination_vendor_id]) {
+        queryClient.invalidateQueries({ queryKey: ['vendorInventory', vendorId] });
+        queryClient.invalidateQueries({ queryKey: ['vendorBalance', vendorId] });
+        queryClient.invalidateQueries({ queryKey: ['vendor', vendorId] });
+        queryClient.invalidateQueries({ queryKey: ['inventory', vendorId] });
+      }
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorBalances'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsOwing'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['adminActivity'] });
+    },
   });
 }
 
 export function useRetrieveStockMutation() {
+  const queryClient = useQueryClient();
   return useMutation<any, Error, Parameters<typeof retrieveStock>[0]>({
     mutationFn: retrieveStock,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendorInventory', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['vendorBalance', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['vendor', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorBalances'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsOwing'] });
+      queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['adminActivity'] });
+    },
   });
 }
 

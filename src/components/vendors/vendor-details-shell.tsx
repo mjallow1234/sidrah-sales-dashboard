@@ -227,7 +227,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                   <p className="font-semibold text-slate-900">{productNames?.[record.product_id] ?? 'Product unavailable — historical record'}</p>
                   <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div><dt className="text-slate-500">Product cash received</dt><dd className="mt-1 font-semibold text-slate-900">GMD {(productCashReceived[record.product_id] ?? 0).toLocaleString()}</dd></div>
-                    <div><dt className="text-slate-500">Current attributable quantity</dt><dd className="mt-1 font-semibold text-slate-900">{record.total_stock_received + (record.transfer_in_quantity ?? 0) - (record.transfer_out_quantity ?? 0) - (transactions ?? []).reduce((total, transaction) => transaction.product_id === record.product_id && transaction.is_reversed ? total + (transaction.stock_added ?? 0) : total, 0)}</dd></div>
+                    <div><dt className="text-slate-500">Current attributable quantity</dt><dd className="mt-1 font-semibold text-slate-900">{record.total_stock_received + (record.transfer_in_quantity ?? 0) - (record.transfer_out_quantity ?? 0) - (transactions ?? []).reduce((total, transaction) => transaction.product_id === record.product_id && transaction.is_reversed ? total + (transaction.stock_added ?? 0) : total, 0) - (record.retrieval_quantity ?? 0)}</dd></div>
                     <div><dt className="text-slate-500">Last added stock</dt><dd className="mt-1 font-semibold text-slate-900">{record.last_supplied_quantity}</dd></div>
                   </dl>
                 </article>

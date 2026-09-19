@@ -76,6 +76,7 @@ export interface VendorInventory {
   last_supplied_quantity: number;
   transfer_in_quantity?: number;
   transfer_out_quantity?: number;
+  retrieval_quantity?: number;
   created_at: string;
   updated_at: string;
 }

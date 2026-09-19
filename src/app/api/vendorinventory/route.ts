@@ -58,6 +58,7 @@ function mapVendorInventoryRow(row: any): VendorInventory {
     last_supplied_quantity: Number(row.last_supplied_quantity) || 0,
     transfer_in_quantity: Number(row.transfer_in_quantity) || 0,
     transfer_out_quantity: Number(row.transfer_out_quantity) || 0,
+    retrieval_quantity: Number(row.retrieval_quantity) || 0,
     created_at: formatDateValue(row.created_at),
     updated_at: formatDateTimeValue(row.updated_at),
   };
@@ -106,7 +107,14 @@ export async function GET(request: NextRequest) {
         WHERE asm.movement_type = 'transfer'
           AND asm.source_vendor_id = vendor_inventory.vendor_id
           AND asm.product_id = vendor_inventory.product_id
-      ), 0) AS transfer_out_quantity
+      ), 0) AS transfer_out_quantity,
+      COALESCE((
+        SELECT SUM(asm.quantity)
+        FROM admin_stock_movements asm
+        WHERE asm.movement_type = 'retrieval'
+          AND asm.source_vendor_id = vendor_inventory.vendor_id
+          AND asm.product_id = vendor_inventory.product_id
+      ), 0) AS retrieval_quantity
       FROM vendor_inventory ${whereClause} ORDER BY vendor_id ASC, product_id ASC`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
