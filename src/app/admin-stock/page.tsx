@@ -1,7 +1,7 @@
 'use client';
 
 import { type FormEvent, useState } from 'react';
-import { useProductsQuery, useVendorsQuery, useTransferStockMutation, useRetrieveStockMutation } from '@/lib/hooks/queries';
+import { useProductsQuery, useVendorsQuery, useVendorInventoryQuery, useTransferStockMutation, useRetrieveStockMutation, useResolveVendorInventoryValuationMutation } from '@/lib/hooks/queries';
 import { Button } from '@/components/ui/button';
 
 export default function AdminStockPage() {
@@ -9,6 +9,7 @@ export default function AdminStockPage() {
   const { data: products } = useProductsQuery();
   const transferMutation = useTransferStockMutation();
   const retrieveMutation = useRetrieveStockMutation();
+  const valuationMutation = useResolveVendorInventoryValuationMutation();
   const [mode, setMode] = useState<'transfer' | 'retrieval'>('transfer');
   const [sourceVendorId, setSourceVendorId] = useState('');
   const [destinationVendorId, setDestinationVendorId] = useState('');
@@ -17,10 +18,17 @@ export default function AdminStockPage() {
   const [quantity, setQuantity] = useState(0);
   const [notes, setNotes] = useState('');
   const [message, setMessage] = useState<string | null>(null);
+  const [valuationVendorId, setValuationVendorId] = useState('');
+  const [valuationProductId, setValuationProductId] = useState('');
+  const [approvedUnitValue, setApprovedUnitValue] = useState('');
+  const [valuationReason, setValuationReason] = useState('');
+  const [valuationMessage, setValuationMessage] = useState<string | null>(null);
+  const { data: valuationInventory } = useVendorInventoryQuery(valuationVendorId);
 
   const isTransfer = mode === 'transfer';
   const productOptions = products ?? [];
   const vendorOptions = vendors ?? [];
+  const selectedValuationInventory = valuationInventory?.find((row) => row.product_id === valuationProductId);
 
   function resetForm() {
     setSourceVendorId('');
@@ -97,6 +105,39 @@ export default function AdminStockPage() {
     }
   }
 
+  function handleValuationSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setValuationMessage(null);
+    if (!valuationVendorId || !valuationProductId) {
+      setValuationMessage('Vendor and product are required.');
+      return;
+    }
+    if (!approvedUnitValue || !Number.isFinite(Number(approvedUnitValue)) || Number(approvedUnitValue) <= 0) {
+      setValuationMessage('Approved unit valuation must be greater than zero.');
+      return;
+    }
+    if (!valuationReason.trim()) {
+      setValuationMessage('Reason is required.');
+      return;
+    }
+    valuationMutation.mutate(
+      {
+        vendor_id: valuationVendorId,
+        product_id: valuationProductId,
+        approved_unit_value: Number(approvedUnitValue),
+        reason: valuationReason.trim(),
+      },
+      {
+        onSuccess: () => {
+          setValuationMessage('Vendor stock valuation resolved successfully.');
+          setApprovedUnitValue('');
+          setValuationReason('');
+        },
+        onError: (error) => setValuationMessage(error.message),
+      },
+    );
+  }
+
   return (
     <main className="px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
@@ -104,6 +145,37 @@ export default function AdminStockPage() {
           <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Admin stock movement</p>
           <h1 className="mt-2 text-2xl font-semibold text-slate-900">Transfer or retrieve stock</h1>
           <p className="mt-2 text-sm text-slate-600">Use this page to move stock between vendors or retrieve stock from a vendor.</p>
+        </section>
+
+        <section className="rounded-3xl border border-amber-200 bg-amber-50 p-6 shadow-soft">
+          <p className="text-sm uppercase tracking-[0.22em] text-amber-700">Stock valuation resolution</p>
+          <h2 className="mt-2 text-xl font-semibold text-slate-900">Resolve unvalued vendor stock</h2>
+          <p className="mt-2 text-sm text-slate-700">Valuation resolution changes the stock valuation only. It does not change the vendor balance.</p>
+          <form className="mt-5 space-y-4" onSubmit={handleValuationSubmit}>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm text-slate-700">
+                Vendor
+                <select value={valuationVendorId} onChange={(event) => { setValuationVendorId(event.target.value); setValuationProductId(''); }} className="mt-2 w-full rounded-3xl border border-amber-200 bg-white px-4 py-3 outline-none">
+                  <option value="">Select vendor</option>
+                  {vendorOptions.map((vendor) => <option key={vendor.vendor_id} value={vendor.vendor_id}>{vendor.vendor_name}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm text-slate-700">
+                Product
+                <select value={valuationProductId} onChange={(event) => setValuationProductId(event.target.value)} className="mt-2 w-full rounded-3xl border border-amber-200 bg-white px-4 py-3 outline-none">
+                  <option value="">Select product</option>
+                  {(valuationInventory ?? []).map((row) => <option key={row.product_id} value={row.product_id}>{productOptions.find((product) => product.product_id === row.product_id)?.product_name ?? row.product_id}</option>)}
+                </select>
+              </label>
+            </div>
+            {selectedValuationInventory ? <p className="text-sm text-slate-700">Current stock: <strong>{selectedValuationInventory.current_stock}</strong> · Current valuation: <strong>GMD {selectedValuationInventory.average_unit_value.toLocaleString()}</strong></p> : null}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block text-sm text-slate-700">Approved unit valuation<input type="number" min="0.01" step="0.01" value={approvedUnitValue} onChange={(event) => setApprovedUnitValue(event.target.value)} className="mt-2 w-full rounded-3xl border border-amber-200 bg-white px-4 py-3 outline-none" /></label>
+              <label className="block text-sm text-slate-700">Reason<textarea value={valuationReason} onChange={(event) => setValuationReason(event.target.value)} rows={2} className="mt-2 w-full rounded-3xl border border-amber-200 bg-white px-4 py-3 outline-none" /></label>
+            </div>
+            {valuationMessage ? <p className="text-sm text-rose-700">{valuationMessage}</p> : null}
+            <Button type="submit" disabled={valuationMutation.isPending}>{valuationMutation.isPending ? 'Resolving…' : 'Resolve valuation'}</Button>
+          </form>
         </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">

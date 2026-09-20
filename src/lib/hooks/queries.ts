@@ -7,7 +7,7 @@ import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
 import { addDeliveryComment, claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
-import { reverseVisit, transferStock, retrieveStock } from '@/lib/api/adminStock';
+import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
 import { getVendorIntelligence } from '@/lib/api/intelligence';
@@ -552,6 +552,19 @@ export function useRetrieveStockMutation() {
       queryClient.invalidateQueries({ queryKey: ['vendorBalances'] });
       queryClient.invalidateQueries({ queryKey: ['vendorsOwing'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['adminActivity'] });
+    },
+  });
+}
+
+export function useResolveVendorInventoryValuationMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<any, Error, Parameters<typeof resolveVendorInventoryValuation>[0]>({
+    mutationFn: resolveVendorInventoryValuation,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['vendorInventory', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['vendorBalance', variables.vendor_id] });
+      queryClient.invalidateQueries({ queryKey: ['vendor', variables.vendor_id] });
       queryClient.invalidateQueries({ queryKey: ['adminActivity'] });
     },
   });

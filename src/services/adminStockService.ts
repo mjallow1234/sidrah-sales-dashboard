@@ -129,6 +129,17 @@ export interface TransferStockPayload {
   admin_id?: string;
 }
 
+export interface ResolveVendorInventoryValuationPayload {
+  vendor_id: string;
+  product_id: string;
+  approved_unit_value: number;
+  reason: string;
+}
+
+export interface ResolveVendorInventoryValuationActor {
+  userId: string;
+}
+
 export interface RetrieveStockPayload {
   vendor_id: string;
   product_id: string;
@@ -662,5 +673,88 @@ export async function retrieveStock(payload: RetrieveStockPayload) {
     });
 
     return { movement, inventory: updatedInventory, vendorInventory: updatedVendorInventory, vendorBalance: updatedVendorBalance };
+  });
+}
+
+export async function resolveVendorInventoryValuation(
+  payload: ResolveVendorInventoryValuationPayload,
+  actor: ResolveVendorInventoryValuationActor,
+) {
+  const vendorId = validateString(payload.vendor_id, 'vendor_id', true)!;
+  const productId = validateString(payload.product_id, 'product_id', true)!;
+  const approvedUnitValue = typeof payload.approved_unit_value === 'number'
+    ? payload.approved_unit_value
+    : Number(payload.approved_unit_value);
+  if (!Number.isFinite(approvedUnitValue) || approvedUnitValue <= 0) {
+    throw new ValidationError('approved_unit_value must be greater than zero.');
+  }
+  const reason = validateString(payload.reason, 'reason', true)!;
+  if (!reason) {
+    throw new ValidationError('reason is required.');
+  }
+  const actorUserId = validateString(actor.userId, 'actor_user_id', true)!;
+  const operationId = `VAL_${randomUUID().replace(/-/g, '').slice(0, 16)}`;
+  const transactionId = generateId('T');
+  const now = formatDateTime(new Date());
+
+  return transaction(async (connection) => {
+    const vendorInventoryRepo = new VendorInventoryRepository(connection);
+    const journalRepo = new TransactionJournalRepository(connection);
+    const [rows] = (await connection.execute(
+      'SELECT * FROM vendor_inventory WHERE vendor_id = ? AND product_id = ? LIMIT 1 FOR UPDATE',
+      [vendorId, productId],
+    )) as [any[], unknown];
+    if (rows.length === 0) {
+      throw new NotFoundError('Vendor inventory', `${vendorId}/${productId}`);
+    }
+
+    const current = rows[0] as VendorInventory;
+    const affectedQuantity = Number(current.current_stock);
+    const beforeUnitValue = Number(current.average_unit_value) || 0;
+    if (affectedQuantity <= 0) {
+      throw new ValidationError('Vendor stock must be greater than zero before valuation can be resolved.');
+    }
+    if (beforeUnitValue > 0) {
+      throw new ConflictError('This vendor stock already has a recorded valuation.');
+    }
+
+    const approvedStockValue = affectedQuantity * approvedUnitValue;
+    const financialAdjustment = 0;
+    const updatedVendorInventory = await vendorInventoryRepo.updateAverageUnitValue(current.vendor_inventory_id, approvedUnitValue);
+
+    const auditPayload = {
+      operation_id: operationId,
+      vendor_id: vendorId,
+      product_id: productId,
+      affected_quantity: affectedQuantity,
+      before_unit_value: beforeUnitValue,
+      after_unit_value: approvedUnitValue,
+      approved_stock_value: approvedStockValue,
+      financial_adjustment: financialAdjustment,
+      reason,
+      actor_user_id: actorUserId,
+      occurred_at: now,
+    };
+    const audit = await journalRepo.create({
+      transaction_id: transactionId,
+      timestamp: now,
+      endpoint: '/admin-stock/valuation-resolution',
+      stage: 'complete',
+      status: 'success',
+      payload: auditPayload,
+      completed: true,
+      actor: actorUserId,
+      error_message: null,
+      duration_ms: 0,
+    });
+
+    return {
+      vendorInventory: updatedVendorInventory,
+      audit: {
+        transaction_id: transactionId,
+        ...auditPayload,
+        audit_id: audit.transaction_journal_id,
+      },
+    };
   });
 }

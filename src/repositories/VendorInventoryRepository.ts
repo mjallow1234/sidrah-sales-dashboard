@@ -141,6 +141,14 @@ export class VendorInventoryRepository extends BaseRepository {
     return this.findById(vendorInventoryId);
   }
 
+  public async updateAverageUnitValue(vendorInventoryId: string, averageUnitValue: number): Promise<VendorInventory> {
+    await this.execute(
+      'UPDATE vendor_inventory SET average_unit_value = ? WHERE vendor_inventory_id = ?',
+      [averageUnitValue, vendorInventoryId],
+    );
+    return this.findById(vendorInventoryId);
+  }
+
   public async delete(vendorInventoryId: string): Promise<void> {
     await this.execute('DELETE FROM vendor_inventory WHERE vendor_inventory_id = ?', [vendorInventoryId]);
   }

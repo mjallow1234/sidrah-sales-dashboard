@@ -58,3 +58,17 @@ export async function retrieveStock(payload: {
   });
   return mapResponse<any>('/api/admin-stock', response, json);
 }
+
+export async function resolveVendorInventoryValuation(payload: {
+  vendor_id: string;
+  product_id: string;
+  approved_unit_value: number;
+  reason: string;
+}) {
+  const { response, json } = await fetchJson('/api/admin-stock/valuation', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  return mapResponse<any>('/api/admin-stock/valuation', response, json);
+}
