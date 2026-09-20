@@ -602,6 +602,12 @@ export async function retrieveStock(payload: RetrieveStockPayload) {
       throw new ValidationError('Vendor does not have enough stock to retrieve.');
     }
 
+    const currentVendorStock = Number(vendorInventory.current_stock);
+    const recordedUnitValue = Number(vendorInventory.average_unit_value);
+    if (currentVendorStock > 0 && !(recordedUnitValue > 0)) {
+      throw new ValidationError('This vendor stock has no recorded valuation. Retrieval cannot be completed until the stock valuation is resolved.');
+    }
+
     const updatedInventory = await inventoryRepo.update(inventory.inventory_id, {
       current_stock: Number(inventory.current_stock) - quantity,
     });
