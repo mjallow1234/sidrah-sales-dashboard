@@ -420,6 +420,7 @@ export interface Transaction {
   product_name?: string;
   sales_rep_id?: string;
   sales_rep_name?: string;
+  created_by?: string | null;
   opening_stock: number;
   stock_sold: number;
   stock_added: number;
