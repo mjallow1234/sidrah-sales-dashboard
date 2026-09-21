@@ -157,6 +157,7 @@ test('vendor detail explains that reversed supplied quantities are excluded from
   assert.match(shell, /roleIndependentTransferInQuantity/);
   assert.match(shell, /const legacyOpeningQuantity/);
   assert.match(shell, /const totalSupplied = inventoryReceivedTotal \+ roleIndependentTransferInQuantity/);
+  assert.match(shell, /roleIndependentRetrievalQuantity/);
   assert.match(shell, /Current attributable quantity/);
   assert.match(shell, /Reversed \(excluded\)/);
   assert.doesNotMatch(shell, /Counted toward balance/);
@@ -183,8 +184,9 @@ test('vendor headline quantity is independent of optional Admin Activity access'
   const shell = read('src/components/vendors/vendor-details-shell.tsx');
   assert.match(shell, /roleIndependentTransferInQuantity/);
   assert.match(shell, /roleIndependentTransferOutQuantity/);
+  assert.match(shell, /roleIndependentRetrievalQuantity/);
   assert.match(shell, /- reversedSupplied/);
-  assert.doesNotMatch(shell, /totalSupplied = inventoryReceivedTotal[\s\S]{0,160}retrievalQuantity/);
+  assert.match(shell, /totalSupplied = inventoryReceivedTotal[\s\S]{0,220}roleIndependentRetrievalQuantity/);
 });
 
 test('vendor stock movement history is mobile-card based and human-readable', () => {

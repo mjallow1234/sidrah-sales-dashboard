@@ -67,7 +67,10 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
   const roleIndependentTransferOutQuantity = hasVendorInventory
     ? vendorInventory.reduce((sum, record) => sum + (record.transfer_out_quantity ?? 0), 0)
     : 0;
-  const totalSupplied = inventoryReceivedTotal + roleIndependentTransferInQuantity - roleIndependentTransferOutQuantity - reversedSupplied;
+  const roleIndependentRetrievalQuantity = hasVendorInventory
+    ? vendorInventory.reduce((sum, record) => sum + (record.retrieval_quantity ?? 0), 0)
+    : 0;
+  const totalSupplied = inventoryReceivedTotal + roleIndependentTransferInQuantity - roleIndependentTransferOutQuantity - reversedSupplied - roleIndependentRetrievalQuantity;
   const legacyOpeningQuantity = Math.max(inventoryReceivedTotal - activeVisitSupplied - roleIndependentTransferInQuantity, 0);
   const lastAddedStock = [...(transactions ?? [])]
     .filter((transaction) => !transaction.is_reversed && transaction.stock_added > 0)
