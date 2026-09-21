@@ -20,6 +20,7 @@ export interface CreateSupplyPayload {
   payment_reference?: string;
   client_transaction_id: string;
   actor_role?: string;
+  actor_user_id?: string;
   actor_sales_rep_id?: string;
 }
 
@@ -252,7 +253,7 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
   const salesRepId = validateString(payload.sales_rep_id, 'sales_rep_id');
   const paymentReference = validateString(payload.payment_reference, 'payment_reference') ?? '';
   const clientTransactionId = validateClientTransactionId(payload.client_transaction_id);
-  const actor = payload.actor_role ? String(payload.actor_role) : undefined;
+  const actor = payload.actor_user_id ? String(payload.actor_user_id) : undefined;
   const transactionId = generateId('T');
   const now = formatSqlDateTime(new Date());
   const nowDate = new Date().toISOString().slice(0, 10);
@@ -403,6 +404,8 @@ export async function createSupply(payload: CreateSupplyPayload): Promise<Supply
         notes: notes ?? '',
         date_created: now,
         last_updated: now,
+        created_by: payload.actor_user_id,
+        updated_by: payload.actor_user_id,
       });
       await idempotencyRepo.markCompleted(clientTransactionId, supplyLog.visit_id, now);
       await journal('visit_append', 'success');

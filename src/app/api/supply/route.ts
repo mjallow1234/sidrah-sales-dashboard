@@ -14,10 +14,19 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json();
+    const {
+      actor_user_id: _clientActorUserId,
+      created_by: _clientCreatedBy,
+      updated_by: _clientUpdatedBy,
+      actor_role: _clientActorRole,
+      actor_sales_rep_id: _clientActorSalesRepId,
+      ...clientPayload
+    } = payload;
     const result = await createSupply({
-      ...payload,
+      ...clientPayload,
       actor_role: session.role,
       actor_sales_rep_id: session.sales_rep_id || '',
+      actor_user_id: session.userId,
     });
     return Response.json({ status: 'success', data: result });
   } catch (error) {

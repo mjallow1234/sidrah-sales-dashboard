@@ -7,11 +7,12 @@ import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository'
 import { VisitRepository } from '@/repositories/VisitRepository';
 import { TransactionJournalRepository } from '@/repositories/TransactionJournalRepository';
 import { OperationIdempotencyRepository } from '@/repositories/OperationIdempotencyRepository';
+import { isAgentRole } from '@/lib/authorization';
 
 export interface CreateVisitPayload {
   vendor_id: string;
   product_id: string;
-  sales_rep_id: string;
+  sales_rep_id?: string | null;
   stock_sold?: number;
   stock_added: number;
   cash_collected: number;
@@ -23,6 +24,7 @@ export interface CreateVisitPayload {
   longitude?: number | null;
   notes?: string;
   actor_role?: string;
+  actor_user_id?: string;
   actor_sales_rep_id?: string;
 }
 
@@ -295,27 +297,29 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
     }
     const unitPrice = Number(productRows[0].default_unit_price) || 0;
 
-    const [salesRepRows] = (await connection.execute(
-      'SELECT COUNT(1) AS count FROM sales_reps WHERE sales_rep_id = ?',
-      [salesRepId]
-    )) as [{ count: number }[], unknown];
-    if (salesRepRows.length === 0 || Number(salesRepRows[0].count) === 0) {
-      await journalRepo.create({
-        transaction_id: transactionId,
-        timestamp: nowDateTime,
-        endpoint: '/visit',
-        stage: 'invalid_sales_rep',
-        status: 'failure',
-        payload: {
-          ...payload,
-          client_transaction_id: clientTransactionId,
-        },
-        completed: false,
-        actor,
-        error_message: 'Invalid sales_rep_id.',
-        duration_ms: 0,
-      });
-      throw new HttpError(400, 'Invalid sales_rep_id.');
+    if (salesRepId) {
+      const [salesRepRows] = (await connection.execute(
+        'SELECT COUNT(1) AS count FROM sales_reps WHERE sales_rep_id = ?',
+        [salesRepId]
+      )) as [{ count: number }[], unknown];
+      if (salesRepRows.length === 0 || Number(salesRepRows[0].count) === 0) {
+        await journalRepo.create({
+          transaction_id: transactionId,
+          timestamp: nowDateTime,
+          endpoint: '/visit',
+          stage: 'invalid_sales_rep',
+          status: 'failure',
+          payload: {
+            ...payload,
+            client_transaction_id: clientTransactionId,
+          },
+          completed: false,
+          actor,
+          error_message: 'Invalid sales_rep_id.',
+          duration_ms: 0,
+        });
+        throw new HttpError(400, 'Invalid sales_rep_id.');
+      }
     }
 
     const [inventoryRows] = (await connection.execute(
@@ -500,6 +504,8 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       notes,
       date_created: nowDateTime,
       last_updated: nowDateTime,
+      created_by: payload.actor_user_id,
+      updated_by: payload.actor_user_id,
     }) as unknown as Record<string, unknown>;
     await idempotencyRepo.markCompleted(clientTransactionId, visitId, nowDateTime);
     await journalRepo.create({

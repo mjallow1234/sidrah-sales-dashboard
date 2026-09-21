@@ -19,6 +19,7 @@ function mapVisitLogToTransaction(log: any): Transaction {
     closing_stock: Number(log.closing_stock) || 0,
     sales_rep: log.sales_rep_id || '',
     actor: log.actor || '',
+    created_by: log.created_by,
     notes: log.notes || '',
     is_reversed: Boolean(log.is_reversed),
     reversed_at: log.reversed_at,
@@ -63,7 +64,7 @@ export async function getTransactionsByVendor(vendorId: string): Promise<Transac
 export async function createVisit(payload: {
   vendor_id: string;
   product_id: string;
-  sales_rep_id: string;
+  sales_rep_id?: string | null;
   stock_added: number;
   cash_collected: number;
   unit_price: number;

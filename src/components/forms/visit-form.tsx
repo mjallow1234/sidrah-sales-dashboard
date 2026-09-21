@@ -10,7 +10,7 @@ import type { Vendor, Product, SalesRep } from '@/lib/types';
 const visitSchema = z.object({
   vendor_id: z.string().min(1, 'Vendor is required'),
   product_id: z.string().min(1, 'Product is required'),
-  sales_rep_id: z.string().min(1, 'Sales rep is required'),
+  sales_rep_id: z.string().optional(),
   unit_price: z.number().min(0, 'Unit price must be 0 or more'),
   payment_method: z.string().min(1, 'Payment method is required'),
   cash_collected: z.number().min(0, 'Cash collected must be 0 or more'),
@@ -100,9 +100,15 @@ export function VisitForm({ vendors }: VisitFormProps) {
       return;
     }
 
-    const salesRepIdToSubmit = authData?.valid && authData.role === 'agent' ? authData.sales_rep_id ?? '' : visitDraft.sales_rep_id;
+    const salesRepIdToSubmit = authData?.valid && authData.role === 'agent'
+      ? authData.sales_rep_id ?? ''
+      : visitDraft.sales_rep_id || null;
     if (authData?.valid && authData.role === 'agent' && !authData.sales_rep_id) {
       setErrorMessage('Unable to determine your authenticated sales rep.');
+      return;
+    }
+    if (authData?.valid && authData.role === 'agent' && !salesRepIdToSubmit) {
+      setErrorMessage('Sales representative is required for agents.');
       return;
     }
 
@@ -204,12 +210,11 @@ export function VisitForm({ vendors }: VisitFormProps) {
           </div>
         ) : (
           <label className="block text-sm text-slate-700">
-            Sales Representative
+            Sales Representative (Optional)
             <select
               value={visitDraft.sales_rep_id}
               onChange={(event) => setVisitDraft({ sales_rep_id: event.target.value })}
               className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-              required
             >
               <option value="">Select sales representative</option>
               {salesReps.map((salesRep) => (

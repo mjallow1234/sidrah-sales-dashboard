@@ -14,7 +14,7 @@ test('visit API owns the recorded-by identity and strips client identity fields'
 
 test('visit service persists the authenticated actor separately from sales representative assignment', () => {
   const service = read('src/services/visitService.ts');
-  assert.match(service, /const salesRepId = validateRequiredString\(payload\.sales_rep_id/);
+  assert.match(service, /const salesRepIdValue = typeof payload\.sales_rep_id === 'string'/);
   assert.match(service, /created_by: payload\.actor_user_id/);
   assert.match(service, /updated_by: payload\.actor_user_id/);
   assert.doesNotMatch(service, /created_by: payload\.sales_rep_id/);
