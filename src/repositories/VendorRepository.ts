@@ -57,6 +57,7 @@ export class VendorRepository extends BaseRepository {
       sales_rep_id: row.sales_rep_id === null ? undefined : String(row.sales_rep_id),
       acquired_by: row.acquired_by === null ? undefined : String(row.acquired_by),
       acquired_by_name: row.acquired_by_name === null || row.acquired_by_name === undefined ? undefined : String(row.acquired_by_name),
+      status_name: row.status_name === null || row.status_name === undefined ? undefined : String(row.status_name),
       vendor_type_id: row.vendor_type_id === null ? undefined : String(row.vendor_type_id),
       vendor_type_name: row.vendor_type_name === null || row.vendor_type_name === undefined ? undefined : String(row.vendor_type_name),
       assigned_date: row.assigned_date === null ? undefined : String(row.assigned_date),
@@ -70,10 +71,11 @@ export class VendorRepository extends BaseRepository {
   }
 
   public async findById(vendorId: string): Promise<Vendor> {
-    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name
+    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name, vs.name AS status_name
       FROM vendors v
       LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
       WHERE v.vendor_id = ? LIMIT 1`, [vendorId]);
     if (rows.length === 0) {
       throw new NotFoundError('Vendor', vendorId);
@@ -82,10 +84,11 @@ export class VendorRepository extends BaseRepository {
   }
 
   public async findAll(): Promise<Vendor[]> {
-    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name
+    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name, vs.name AS status_name
       FROM vendors v
       LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
       ORDER BY v.vendor_name ASC`);
     return rows.map((row) => this.mapRow(row));
   }
@@ -116,10 +119,11 @@ export class VendorRepository extends BaseRepository {
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name
+    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name, vs.name AS status_name
       FROM vendors v
       LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
       ${whereClause}
       ORDER BY v.vendor_name ASC`, params);
     return rows.map((row) => this.mapRow(row));

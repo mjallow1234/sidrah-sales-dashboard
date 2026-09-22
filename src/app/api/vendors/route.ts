@@ -42,6 +42,7 @@ function mapVendorRow(row: any): Vendor {
     acquired_by_name: row.acquired_by_name === null || row.acquired_by_name === undefined ? undefined : String(row.acquired_by_name),
     vendor_type_id: row.vendor_type_id === null ? undefined : String(row.vendor_type_id),
     vendor_type_name: row.vendor_type_name === null || row.vendor_type_name === undefined ? undefined : String(row.vendor_type_name),
+    status_name: row.status_name === null || row.status_name === undefined ? undefined : String(row.status_name),
     assigned_date: row.assigned_date === null ? undefined : formatDateValue(row.assigned_date),
     assigned_by: row.assigned_by === null ? undefined : String(row.assigned_by),
     date_created: formatDateValue(row.date_created),
@@ -101,9 +102,10 @@ export async function GET(request: NextRequest) {
     const [countRows] = await dbQuery<{ total: number }[]>(countSql, params);
     const total = countRows.length > 0 ? Number(countRows[0].total) : 0;
 
-    let sql = `SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, v.created_by, v.updated_by
+    let sql = `SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by
       FROM vendors v LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
       ${whereClause}
       ORDER BY v.vendor_id ASC`;
 
@@ -141,8 +143,8 @@ export async function POST(request: NextRequest) {
     }
     const vendor = await createVendor({
       ...payload,
-      acquired_by: isAgentRole(session.role) ? session.userId : payload.acquired_by,
-      acquired_by_eligible: !isAgentRole(session.role),
+      acquired_by: payload.acquired_by,
+      acquired_by_eligible: true,
       assigned_by: payload.sales_rep_id ? session.userId || 'system' : payload.assigned_by,
       created_by: session.userId,
       updated_by: session.userId,

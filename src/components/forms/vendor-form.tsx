@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { NotificationBanner } from '@/components/ui/notification';
 import { useCreateVendorMutation, useSalesRepsQuery, useUpdateVendorMutation } from '@/lib/hooks/queries';
-import { useAcquiredByAgentsQuery, useVendorTypesQuery } from '@/lib/hooks/vendorManagementQueries';
+import { useAcquiredByAgentsQuery, useVendorStatusesQuery, useVendorTypesQuery } from '@/lib/hooks/vendorManagementQueries';
 import type { SalesRep, Vendor } from '@/lib/types';
 
 const vendorSchema = z.object({
@@ -15,7 +15,7 @@ const vendorSchema = z.object({
   sales_rep_id: z.string().optional(),
   acquired_by: z.string().optional(),
   vendor_type_id: z.string().optional(),
-  status: z.enum(['active', 'inactive']),
+  status: z.string().min(1, 'Vendor status is required'),
 });
 
 interface VendorFormProps {
@@ -38,8 +38,9 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
   const [userRole, setUserRole] = useState<string | null>(null);
   const canAssignVendor = userRole === 'supervisor' || userRole === 'admin' || userRole === 'super_admin';
   const salesRepsQuery = useSalesRepsQuery(canAssignVendor);
-  const acquiredByAgentsQuery = useAcquiredByAgentsQuery(canAssignVendor);
+  const acquiredByAgentsQuery = useAcquiredByAgentsQuery(true);
   const vendorTypesQuery = useVendorTypesQuery(true);
+  const vendorStatusesQuery = useVendorStatusesQuery(true);
   const createMutation = useCreateVendorMutation();
   const updateMutation = useUpdateVendorMutation();
 
@@ -50,6 +51,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     : [];
   const acquiringAgents = acquiredByAgentsQuery.data ?? [];
   const vendorTypes = vendorTypesQuery.data ?? [];
+  const vendorStatuses = vendorStatusesQuery.data ?? [];
   const acquiringOptions = useMemo(() => {
     if (!initialValues?.acquired_by || !initialValues.acquired_by_name || acquiringAgents.some((agent) => agent.acquired_by_id === initialValues.acquired_by)) {
       return acquiringAgents;
@@ -96,7 +98,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
         if (canAssignVendor && formState.sales_rep_id) {
           creationPayload.sales_rep_id = formState.sales_rep_id;
         }
-        if (canAssignVendor && formState.acquired_by) {
+        if (formState.acquired_by) {
           creationPayload.acquired_by = formState.acquired_by;
         }
         if (formState.vendor_type_id) creationPayload.vendor_type_id = formState.vendor_type_id;
@@ -192,23 +194,20 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
             </select>
           </label>
         ) : null}
-        {showSalesRepSelect ? (
-          <label className="block text-sm text-slate-700">
-            Acquired By
-            <select
-              value={formState.acquired_by}
-              onChange={(event) => handleChange('acquired_by', event.target.value)}
-              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
-            >
-              <option value="">Not specified</option>
-              {acquiringOptions.map((agent) => (
-                <option key={agent.acquired_by_id} value={agent.acquired_by_id} disabled={!agent.is_active}>{agent.name}</option>
-              ))}
-            </select>
-          </label>
-        ) : (
-          <p className="text-sm text-slate-700"><span className="font-medium">Acquired By:</span> authenticated agent</p>
-        )}
+        <label className="block text-sm text-slate-700">
+          Acquired By
+          <select
+            value={formState.acquired_by}
+            onChange={(event) => handleChange('acquired_by', event.target.value)}
+            className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+          >
+            <option value="">Not specified</option>
+            {acquiringOptions.map((agent) => (
+              <option key={agent.acquired_by_id} value={agent.acquired_by_id} disabled={!agent.is_active}>{agent.name}</option>
+            ))}
+          </select>
+          <span className="mt-1 block text-xs text-slate-500">Independent of the sales representative and the user recording this vendor.</span>
+        </label>
         <label className="block text-sm text-slate-700">
           Status
           <select
@@ -216,8 +215,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
             onChange={(event) => handleChange('status', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           >
-            <option value="active">Active</option>
-            <option value="inactive">Inactive</option>
+            {vendorStatuses.map((status) => <option key={status.status_id} value={status.status_id}>{status.name}</option>)}
           </select>
         </label>
       </div>

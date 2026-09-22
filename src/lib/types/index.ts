@@ -24,7 +24,8 @@ export interface Vendor {
   assigned_by?: string;
   date_created: string;
   last_updated?: string;
-  status: 'active' | 'inactive';
+  status: string;
+  status_name?: string;
   created_by?: string;
   updated_by?: string;
 }
@@ -142,6 +143,12 @@ export interface DeliveryPreparationSummaryItem {
 
 export interface VendorType {
   vendor_type_id: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface VendorStatus {
+  status_id: string;
   name: string;
   is_active: boolean;
 }

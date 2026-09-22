@@ -18,12 +18,13 @@ test('vendor create and edit flows persist acquired_by separately', () => {
   const form = read('src/components/forms/vendor-form.tsx');
   const client = read('src/lib/api/vendors.ts');
   const route = read('src/app/api/vendors/route.ts');
-  assert.match(service, /Invalid Acquired By name/);
+  assert.match(service, /This Acquired By name is not available for selection/);
   assert.match(service, /acquired_by: acquiredBy/);
   assert.match(form, /Acquired By/);
   assert.match(form, /acquired_by/);
   assert.match(client, /acquired_by\?: string/);
-  assert.match(route, /acquired_by: isAgentRole\(session\.role\) \? session\.userId : payload\.acquired_by/);
+  assert.match(route, /acquired_by: payload\.acquired_by/);
+  assert.doesNotMatch(route, /acquired_by: isAgentRole\(session\.role\)/);
 });
 
 test('vendor responses expose the acquired-by agent name without changing assignments', () => {

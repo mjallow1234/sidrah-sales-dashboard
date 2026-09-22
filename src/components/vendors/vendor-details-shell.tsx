@@ -123,6 +123,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
               <p className="mt-1 text-sm text-slate-600">{vendor.location} • {vendor.phone}</p>
               <p className="mt-1 text-sm text-slate-600">Acquired By: {vendor.acquired_by_name || 'Not specified'}</p>
               <p className="mt-1 text-sm text-slate-600">Vendor Type: {vendor.vendor_type_name || 'Not specified'}</p>
+              <p className="mt-1 text-sm text-slate-600">Status: {vendor.status_name || vendor.status}</p>
             </div>
             {canEditVendor ? (
               <Link

@@ -41,6 +41,18 @@ test('Acquired By names are standalone and removal preserves historical vendor v
   assert.match(form, /acquired_by/);
 });
 
+test('Acquired By is optional and never defaults to the authenticated agent', () => {
+  const form = read('src/components/forms/vendor-form.tsx');
+  const route = read('src/app/api/vendors/route.ts');
+  const service = read('src/services/vendorService.ts');
+  assert.match(form, /Acquired By/);
+  assert.match(form, /option value=""\>Not specified/);
+  assert.doesNotMatch(form, /authenticated agent/);
+  assert.match(route, /acquired_by: payload\.acquired_by/);
+  assert.doesNotMatch(route, /session\.userId.*acquired_by/);
+  assert.doesNotMatch(service, /SELECT user_id, name FROM app_users/);
+});
+
 test('vendor forms and displays use dynamic vendor types and preserve Acquired By independently', () => {
   const form = read('src/components/forms/vendor-form.tsx');
   const list = read('src/components/vendors/vendor-list.tsx');

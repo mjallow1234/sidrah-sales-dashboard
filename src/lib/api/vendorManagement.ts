@@ -1,4 +1,4 @@
-import type { AcquiredByAgent, VendorType } from '@/lib/types';
+import type { AcquiredByAgent, VendorStatus, VendorType } from '@/lib/types';
 
 async function parseResponse<T>(response: Response, fallback: string): Promise<T> {
   const json = await response.json().catch(() => null);
@@ -8,6 +8,10 @@ async function parseResponse<T>(response: Response, fallback: string): Promise<T
 
 export async function getVendorTypes(): Promise<VendorType[]> {
   return parseResponse<VendorType[]>(await fetch('/api/vendor-types'), 'Unable to load vendor types.');
+}
+
+export async function getVendorStatuses(): Promise<VendorStatus[]> {
+  return parseResponse<VendorStatus[]>(await fetch('/api/vendor-statuses'), 'Unable to load vendor statuses.');
 }
 
 export async function createVendorType(name: string): Promise<VendorType> {

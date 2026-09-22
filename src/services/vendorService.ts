@@ -144,20 +144,7 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
         [acquiredBy],
       );
       if ((nameRows as unknown[]).length === 0) {
-        if (payload.acquired_by_eligible === true) {
-          throw new ValidationError('This Acquired By name is not available for selection.');
-        }
-        const [agentRows] = await connection.execute(
-          "SELECT user_id, name FROM app_users WHERE user_id = ? AND role = 'agent' LIMIT 1",
-          [acquiredBy],
-        );
-        if ((agentRows as any[]).length === 0) {
-          throw new ValidationError('Invalid Acquired By name.');
-        }
-        await connection.execute(
-          'INSERT INTO acquired_by_names (acquired_by_id, name, is_active) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE is_active = 1, name = VALUES(name)',
-          [acquiredBy, String((agentRows as any[])[0].name)],
-        );
+        throw new ValidationError('This Acquired By name is not available for selection.');
       }
     }
 
@@ -170,6 +157,13 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
         throw new ValidationError('Invalid vendor type.');
       }
     }
+
+    const status = typeof payload.status === 'string' && payload.status !== '' ? payload.status : 'active';
+    const [statusRows] = await connection.execute(
+      'SELECT status_id FROM vendor_statuses WHERE status_id = ? AND is_active = 1 LIMIT 1',
+      [status],
+    );
+    if ((statusRows as unknown[]).length === 0) throw new ValidationError('Invalid vendor status.');
 
     const sequence = await sequenceRepository.incrementAndGetCurrentValue('Vendors');
     const vendorId = `${sequence.prefix}${String(sequence.next_value).padStart(3, '0')}`;
@@ -191,7 +185,7 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
       vendor_type_id: vendorTypeId,
       assigned_date: assignedDate ?? undefined,
       assigned_by: assignedBy ?? undefined,
-      status: typeof payload.status === 'string' && payload.status !== '' ? payload.status : 'active',
+      status,
       date_created: typeof payload.date_created === 'string' && payload.date_created !== '' ? payload.date_created : nowDate,
       last_updated: nowDateTime,
       created_by: createdBy ?? undefined,
@@ -292,6 +286,14 @@ export async function updateVendor(vendorId: string, payload: Record<string, unk
     if ((typeRows as unknown[]).length === 0) {
       throw new ValidationError('Invalid vendor type.');
     }
+  }
+
+  if (updates.status !== undefined) {
+    const [statusRows] = await getPool().query(
+      'SELECT status_id FROM vendor_statuses WHERE status_id = ? AND is_active = 1 LIMIT 1',
+      [updates.status],
+    );
+    if ((statusRows as unknown[]).length === 0) throw new ValidationError('Invalid vendor status.');
   }
 
   updates.last_updated = new Date().toISOString().slice(0, 19).replace('T', ' ');
