@@ -70,6 +70,10 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     return true;
   }
 
+  if (pathname === '/vendor-types' || pathname.startsWith('/vendor-types/') || pathname === '/acquired-by' || pathname.startsWith('/acquired-by/')) {
+    return isAdminRole(role);
+  }
+
   if (pathname.startsWith('/vendors')) {
     return true;
   }
@@ -119,6 +123,10 @@ export function canViewLink(role: string | undefined, href: string): boolean {
   }
 
   if (href.startsWith('/users')) {
+    return isAdminRole(role);
+  }
+
+  if (href === '/vendor-types' || href.startsWith('/vendor-types/') || href === '/acquired-by' || href.startsWith('/acquired-by/')) {
     return isAdminRole(role);
   }
 

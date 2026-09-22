@@ -61,6 +61,8 @@ export async function createVendor(payload: {
   location: string;
   status: string;
   sales_rep_id?: string;
+  acquired_by?: string;
+  vendor_type_id?: string;
 }): Promise<Vendor> {
   const response = await fetch('/api/vendors', {
     method: 'POST',
@@ -82,6 +84,8 @@ export async function updateVendor(id: string, payload: Partial<{
   phone: string;
   location: string;
   sales_rep_id?: string | null;
+  acquired_by?: string | null;
+  vendor_type_id?: string | null;
   status: string;
 }>): Promise<Vendor> {
   const response = await fetch(`/api/vendors/${encodeURIComponent(id)}`, {

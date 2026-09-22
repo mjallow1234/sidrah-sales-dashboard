@@ -9,6 +9,8 @@ export interface CreateVendorPayload {
   phone: string;
   location: string;
   sales_rep_id?: string;
+  acquired_by?: string;
+  vendor_type_id?: string | null;
   assigned_date?: string;
   assigned_by?: string;
   status: string;
@@ -23,6 +25,8 @@ export interface UpdateVendorPayload {
   phone?: string;
   location?: string;
   sales_rep_id?: string | null;
+  acquired_by?: string | null;
+  vendor_type_id?: string | null;
   assigned_date?: string | null;
   assigned_by?: string | null;
   status?: string;
@@ -51,6 +55,10 @@ export class VendorRepository extends BaseRepository {
       location: String(row.location),
       sales_rep: row.sales_rep || undefined,
       sales_rep_id: row.sales_rep_id === null ? undefined : String(row.sales_rep_id),
+      acquired_by: row.acquired_by === null ? undefined : String(row.acquired_by),
+      acquired_by_name: row.acquired_by_name === null || row.acquired_by_name === undefined ? undefined : String(row.acquired_by_name),
+      vendor_type_id: row.vendor_type_id === null ? undefined : String(row.vendor_type_id),
+      vendor_type_name: row.vendor_type_name === null || row.vendor_type_name === undefined ? undefined : String(row.vendor_type_name),
       assigned_date: row.assigned_date === null ? undefined : String(row.assigned_date),
       assigned_by: row.assigned_by === null ? undefined : String(row.assigned_by),
       date_created: String(row.date_created),
@@ -62,7 +70,11 @@ export class VendorRepository extends BaseRepository {
   }
 
   public async findById(vendorId: string): Promise<Vendor> {
-    const [rows] = await this.execute<any[]>('SELECT * FROM vendors WHERE vendor_id = ? LIMIT 1', [vendorId]);
+    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name
+      FROM vendors v
+      LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
+      LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      WHERE v.vendor_id = ? LIMIT 1`, [vendorId]);
     if (rows.length === 0) {
       throw new NotFoundError('Vendor', vendorId);
     }
@@ -70,7 +82,11 @@ export class VendorRepository extends BaseRepository {
   }
 
   public async findAll(): Promise<Vendor[]> {
-    const [rows] = await this.execute<any[]>('SELECT * FROM vendors ORDER BY vendor_name ASC');
+    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name
+      FROM vendors v
+      LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
+      LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      ORDER BY v.vendor_name ASC`);
     return rows.map((row) => this.mapRow(row));
   }
 
@@ -79,28 +95,33 @@ export class VendorRepository extends BaseRepository {
     const params: Record<string, unknown> = {};
 
     if (criteria.vendor_id) {
-      filters.push('vendor_id = :vendor_id');
+      filters.push('v.vendor_id = :vendor_id');
       params.vendor_id = criteria.vendor_id;
     }
     if (criteria.vendor_name) {
-      filters.push('vendor_name LIKE :vendor_name');
+      filters.push('v.vendor_name LIKE :vendor_name');
       params.vendor_name = `%${criteria.vendor_name}%`;
     }
     if (criteria.phone) {
-      filters.push('phone = :phone');
+      filters.push('v.phone = :phone');
       params.phone = criteria.phone;
     }
     if (criteria.sales_rep_id) {
-      filters.push('sales_rep_id = :sales_rep_id');
+      filters.push('v.sales_rep_id = :sales_rep_id');
       params.sales_rep_id = criteria.sales_rep_id;
     }
     if (criteria.status) {
-      filters.push('status = :status');
+      filters.push('v.status = :status');
       params.status = criteria.status;
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const [rows] = await this.execute<any[]>(`SELECT * FROM vendors ${whereClause} ORDER BY vendor_name ASC`, params);
+    const [rows] = await this.execute<any[]>(`SELECT v.*, acquired_name.name AS acquired_by_name, vt.name AS vendor_type_name
+      FROM vendors v
+      LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
+      LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      ${whereClause}
+      ORDER BY v.vendor_name ASC`, params);
     return rows.map((row) => this.mapRow(row));
   }
 
@@ -112,6 +133,8 @@ export class VendorRepository extends BaseRepository {
         phone,
         location,
         sales_rep_id,
+        acquired_by,
+        vendor_type_id,
         assigned_date,
         assigned_by,
         date_created,
@@ -125,6 +148,8 @@ export class VendorRepository extends BaseRepository {
         :phone,
         :location,
         :sales_rep_id,
+        :acquired_by,
+        :vendor_type_id,
         :assigned_date,
         :assigned_by,
         :date_created,
@@ -139,6 +164,8 @@ export class VendorRepository extends BaseRepository {
         phone: payload.phone,
         location: payload.location,
         sales_rep_id: payload.sales_rep_id ?? null,
+        acquired_by: payload.acquired_by ?? null,
+        vendor_type_id: payload.vendor_type_id ?? null,
         assigned_date: payload.assigned_date ?? null,
         assigned_by: payload.assigned_by ?? null,
         date_created: payload.date_created,
@@ -171,6 +198,14 @@ export class VendorRepository extends BaseRepository {
     if (updates.sales_rep_id !== undefined) {
       fields.push('sales_rep_id = :sales_rep_id');
       params.sales_rep_id = updates.sales_rep_id;
+    }
+    if (updates.acquired_by !== undefined) {
+      fields.push('acquired_by = :acquired_by');
+      params.acquired_by = updates.acquired_by;
+    }
+    if (updates.vendor_type_id !== undefined) {
+      fields.push('vendor_type_id = :vendor_type_id');
+      params.vendor_type_id = updates.vendor_type_id;
     }
     if (updates.assigned_date !== undefined) {
       fields.push('assigned_date = :assigned_date');

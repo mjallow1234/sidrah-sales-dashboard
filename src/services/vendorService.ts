@@ -28,6 +28,18 @@ function validateVendorPayload(payload: Record<string, unknown>): void {
     }
   }
 
+  if (payload.acquired_by !== undefined && payload.acquired_by !== null && payload.acquired_by !== '') {
+    if (typeof payload.acquired_by !== 'string') {
+      throw new ValidationError('acquired_by must be a string.');
+    }
+  }
+
+  if (payload.vendor_type_id !== undefined && payload.vendor_type_id !== null && payload.vendor_type_id !== '') {
+    if (typeof payload.vendor_type_id !== 'string') {
+      throw new ValidationError('vendor_type_id must be a string.');
+    }
+  }
+
   if (payload.assigned_date !== undefined && payload.assigned_date !== null && payload.assigned_date !== '') {
     if (typeof payload.assigned_date !== 'string' || Number.isNaN(Date.parse(payload.assigned_date))) {
       throw new ValidationError('assigned_date must be a valid date.');
@@ -109,6 +121,12 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
     const salesRepId = typeof payload.sales_rep_id === 'string' && payload.sales_rep_id !== ''
       ? payload.sales_rep_id
       : null;
+    const acquiredBy = typeof payload.acquired_by === 'string' && payload.acquired_by !== ''
+      ? payload.acquired_by
+      : null;
+    const vendorTypeId = typeof payload.vendor_type_id === 'string' && payload.vendor_type_id !== ''
+      ? payload.vendor_type_id
+      : null;
 
     if (salesRepId) {
       const [salesRepRows] = await connection.execute(
@@ -117,6 +135,39 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
       );
       if ((salesRepRows as unknown[]).length === 0) {
         throw new ValidationError('Invalid sales_rep_id.');
+      }
+    }
+
+    if (acquiredBy) {
+      const [nameRows] = await connection.execute(
+        'SELECT acquired_by_id FROM acquired_by_names WHERE acquired_by_id = ? AND is_active = 1 LIMIT 1',
+        [acquiredBy],
+      );
+      if ((nameRows as unknown[]).length === 0) {
+        if (payload.acquired_by_eligible === true) {
+          throw new ValidationError('This Acquired By name is not available for selection.');
+        }
+        const [agentRows] = await connection.execute(
+          "SELECT user_id, name FROM app_users WHERE user_id = ? AND role = 'agent' LIMIT 1",
+          [acquiredBy],
+        );
+        if ((agentRows as any[]).length === 0) {
+          throw new ValidationError('Invalid Acquired By name.');
+        }
+        await connection.execute(
+          'INSERT INTO acquired_by_names (acquired_by_id, name, is_active) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE is_active = 1, name = VALUES(name)',
+          [acquiredBy, String((agentRows as any[])[0].name)],
+        );
+      }
+    }
+
+    if (vendorTypeId) {
+      const [typeRows] = await connection.execute(
+        'SELECT vendor_type_id FROM vendor_types WHERE vendor_type_id = ? AND is_active = 1 LIMIT 1',
+        [vendorTypeId],
+      );
+      if ((typeRows as unknown[]).length === 0) {
+        throw new ValidationError('Invalid vendor type.');
       }
     }
 
@@ -136,6 +187,8 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
       phone: String(payload.phone),
       location: String(payload.location),
       sales_rep_id: salesRepId ?? undefined,
+      acquired_by: acquiredBy ?? undefined,
+      vendor_type_id: vendorTypeId,
       assigned_date: assignedDate ?? undefined,
       assigned_by: assignedBy ?? undefined,
       status: typeof payload.status === 'string' && payload.status !== '' ? payload.status : 'active',
@@ -197,6 +250,14 @@ export async function updateVendor(vendorId: string, payload: Record<string, unk
       ? null
       : String(payload.sales_rep_id);
   }
+  if (payload.acquired_by !== undefined) {
+    updates.acquired_by = payload.acquired_by === null || payload.acquired_by === ''
+      ? null
+      : String(payload.acquired_by);
+  }
+  if (payload.vendor_type_id !== undefined) {
+    updates.vendor_type_id = payload.vendor_type_id === null || payload.vendor_type_id === '' ? null : String(payload.vendor_type_id);
+  }
   if (payload.status !== undefined) updates.status = String(payload.status);
 
   if (updates.sales_rep_id !== undefined && updates.sales_rep_id !== null) {
@@ -206,6 +267,30 @@ export async function updateVendor(vendorId: string, payload: Record<string, unk
     );
     if ((salesRepRows as unknown[]).length === 0) {
       throw new ValidationError('Invalid sales_rep_id.');
+    }
+  }
+
+  if (updates.acquired_by !== undefined && updates.acquired_by !== null) {
+    const [nameRows] = await getPool().query(
+      'SELECT acquired_by_id, is_active FROM acquired_by_names WHERE acquired_by_id = ? LIMIT 1',
+      [updates.acquired_by],
+    );
+    if ((nameRows as any[]).length === 0 || !Boolean((nameRows as any[])[0].is_active)) {
+      const [currentRows] = await getPool().query<any[]>('SELECT acquired_by FROM vendors WHERE vendor_id = ? LIMIT 1', [vendorId]);
+      const isExistingAssignment = currentRows.length > 0 && currentRows[0].acquired_by === updates.acquired_by;
+      if (!isExistingAssignment) {
+        throw new ValidationError('This Acquired By name is not available for selection.');
+      }
+    }
+  }
+
+  if (updates.vendor_type_id !== undefined && updates.vendor_type_id !== null) {
+    const [typeRows] = await getPool().query(
+      'SELECT vendor_type_id FROM vendor_types WHERE vendor_type_id = ? AND is_active = 1 LIMIT 1',
+      [updates.vendor_type_id],
+    );
+    if ((typeRows as unknown[]).length === 0) {
+      throw new ValidationError('Invalid vendor type.');
     }
   }
 

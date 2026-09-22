@@ -62,6 +62,8 @@ export function VendorList() {
                 <div>
                   <p className="font-semibold text-slate-900">{vendor.vendor_name ?? vendor.vendor_id}</p>
                   <p className="mt-1 text-sm text-slate-600">{vendor.location ?? ''}{vendor.location && vendor.phone ? ' • ' : ''}{vendor.phone ?? ''}</p>
+                  <p className="mt-1 text-sm text-slate-600">Acquired By: {vendor.acquired_by_name || 'Not specified'}</p>
+                  <p className="mt-1 text-sm text-slate-600">Vendor Type: {vendor.vendor_type_name || 'Not specified'}</p>
                 </div>
                 <span className="rounded-full bg-sidrah-50 px-3 py-1 text-xs font-semibold text-sidrah-700">
                   {vendor.vendor_id}

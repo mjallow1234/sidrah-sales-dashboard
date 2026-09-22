@@ -38,6 +38,10 @@ function mapVendorRow(row: any): Vendor {
     location: String(row.location),
     sales_rep: undefined,
     sales_rep_id: row.sales_rep_id === null ? undefined : String(row.sales_rep_id),
+    acquired_by: row.acquired_by === null ? undefined : String(row.acquired_by),
+    acquired_by_name: row.acquired_by_name === null || row.acquired_by_name === undefined ? undefined : String(row.acquired_by_name),
+    vendor_type_id: row.vendor_type_id === null ? undefined : String(row.vendor_type_id),
+    vendor_type_name: row.vendor_type_name === null || row.vendor_type_name === undefined ? undefined : String(row.vendor_type_name),
     assigned_date: row.assigned_date === null ? undefined : formatDateValue(row.assigned_date),
     assigned_by: row.assigned_by === null ? undefined : String(row.assigned_by),
     date_created: formatDateValue(row.date_created),
@@ -73,31 +77,35 @@ export async function GET(request: NextRequest) {
 
     if (isAgentRole(session.role)) {
       if (session.sales_rep_id) {
-        filters.push('(sales_rep_id IS NULL OR sales_rep_id = :session_sales_rep_id)');
+        filters.push('(v.sales_rep_id IS NULL OR v.sales_rep_id = :session_sales_rep_id)');
         params.session_sales_rep_id = session.sales_rep_id;
       }
     } else if (salesRepId) {
-      filters.push('sales_rep_id = :sales_rep_id');
+      filters.push('v.sales_rep_id = :sales_rep_id');
       params.sales_rep_id = salesRepId;
     }
 
     if (status) {
-      filters.push('status = :status');
+      filters.push('v.status = :status');
       params.status = status;
     }
 
     if (search && String(search).trim() !== '') {
       const normalizedSearch = `%${String(search).trim()}%`;
-      filters.push('(vendor_id LIKE :search OR vendor_name LIKE :search OR phone LIKE :search OR location LIKE :search)');
+      filters.push('(v.vendor_id LIKE :search OR v.vendor_name LIKE :search OR v.phone LIKE :search OR v.location LIKE :search)');
       params.search = normalizedSearch;
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const countSql = `SELECT COUNT(*) AS total FROM vendors ${whereClause}`;
+    const countSql = `SELECT COUNT(*) AS total FROM vendors v ${whereClause}`;
     const [countRows] = await dbQuery<{ total: number }[]>(countSql, params);
     const total = countRows.length > 0 ? Number(countRows[0].total) : 0;
 
-    let sql = `SELECT vendor_id, vendor_name, phone, location, sales_rep_id, assigned_date, assigned_by, date_created, last_updated, status, created_by, updated_by FROM vendors ${whereClause} ORDER BY vendor_id ASC`;
+    let sql = `SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, v.created_by, v.updated_by
+      FROM vendors v LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
+      LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
+      ${whereClause}
+      ORDER BY v.vendor_id ASC`;
 
     if (page !== undefined && pageSize !== undefined) {
       params.limit = pageSize;
@@ -133,6 +141,8 @@ export async function POST(request: NextRequest) {
     }
     const vendor = await createVendor({
       ...payload,
+      acquired_by: isAgentRole(session.role) ? session.userId : payload.acquired_by,
+      acquired_by_eligible: !isAgentRole(session.role),
       assigned_by: payload.sales_rep_id ? session.userId || 'system' : payload.assigned_by,
       created_by: session.userId,
       updated_by: session.userId,

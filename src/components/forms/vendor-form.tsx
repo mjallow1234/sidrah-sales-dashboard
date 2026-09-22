@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { NotificationBanner } from '@/components/ui/notification';
 import { useCreateVendorMutation, useSalesRepsQuery, useUpdateVendorMutation } from '@/lib/hooks/queries';
+import { useAcquiredByAgentsQuery, useVendorTypesQuery } from '@/lib/hooks/vendorManagementQueries';
 import type { SalesRep, Vendor } from '@/lib/types';
 
 const vendorSchema = z.object({
@@ -12,6 +13,8 @@ const vendorSchema = z.object({
   phone: z.string().min(1, 'Phone is required'),
   location: z.string().min(1, 'Location is required'),
   sales_rep_id: z.string().optional(),
+  acquired_by: z.string().optional(),
+  vendor_type_id: z.string().optional(),
   status: z.enum(['active', 'inactive']),
 });
 
@@ -27,12 +30,16 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     phone: initialValues?.phone ?? '',
     location: initialValues?.location ?? '',
     sales_rep_id: initialValues?.sales_rep_id ?? '',
+    acquired_by: initialValues?.acquired_by ?? '',
+    vendor_type_id: initialValues?.vendor_type_id ?? '',
     status: initialValues?.status ?? 'active',
   });
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const canAssignVendor = userRole === 'supervisor' || userRole === 'admin' || userRole === 'super_admin';
   const salesRepsQuery = useSalesRepsQuery(canAssignVendor);
+  const acquiredByAgentsQuery = useAcquiredByAgentsQuery(canAssignVendor);
+  const vendorTypesQuery = useVendorTypesQuery(true);
   const createMutation = useCreateVendorMutation();
   const updateMutation = useUpdateVendorMutation();
 
@@ -41,6 +48,14 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     : Array.isArray((salesRepsQuery.data as any)?.items)
     ? (salesRepsQuery.data as any).items
     : [];
+  const acquiringAgents = acquiredByAgentsQuery.data ?? [];
+  const vendorTypes = vendorTypesQuery.data ?? [];
+  const acquiringOptions = useMemo(() => {
+    if (!initialValues?.acquired_by || !initialValues.acquired_by_name || acquiringAgents.some((agent) => agent.acquired_by_id === initialValues.acquired_by)) {
+      return acquiringAgents;
+    }
+    return [{ acquired_by_id: initialValues.acquired_by, name: `${initialValues.acquired_by_name} (inactive)`, is_active: false }, ...acquiringAgents];
+  }, [acquiringAgents, initialValues?.acquired_by, initialValues?.acquired_by_name]);
 
   const showSalesRepSelect = canAssignVendor;
 
@@ -69,6 +84,8 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
           location: string;
           status: string;
           sales_rep_id?: string;
+          acquired_by?: string;
+          vendor_type_id?: string;
         } = {
           vendor_name: formState.vendor_name,
           phone: formState.phone,
@@ -79,10 +96,14 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
         if (canAssignVendor && formState.sales_rep_id) {
           creationPayload.sales_rep_id = formState.sales_rep_id;
         }
+        if (canAssignVendor && formState.acquired_by) {
+          creationPayload.acquired_by = formState.acquired_by;
+        }
+        if (formState.vendor_type_id) creationPayload.vendor_type_id = formState.vendor_type_id;
 
         await createMutation.mutateAsync(creationPayload);
         setNotification({ type: 'success', message: 'Vendor created successfully' });
-        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: '', status: 'active' });
+        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: '', acquired_by: '', vendor_type_id: '', status: 'active' });
       }
       onSuccess?.();
     } catch (error) {
@@ -145,6 +166,13 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           />
         </label>
+        <label className="block text-sm text-slate-700">
+          Vendor Type
+          <select value={formState.vendor_type_id} onChange={(event) => handleChange('vendor_type_id', event.target.value)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
+            <option value="">Not specified</option>
+            {vendorTypes.map((type) => <option key={type.vendor_type_id} value={type.vendor_type_id}>{type.name}</option>)}
+          </select>
+        </label>
         {showSalesRepSelect ? (
           <label className="block text-sm text-slate-700">
             Sales rep
@@ -164,6 +192,23 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
             </select>
           </label>
         ) : null}
+        {showSalesRepSelect ? (
+          <label className="block text-sm text-slate-700">
+            Acquired By
+            <select
+              value={formState.acquired_by}
+              onChange={(event) => handleChange('acquired_by', event.target.value)}
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+            >
+              <option value="">Not specified</option>
+              {acquiringOptions.map((agent) => (
+                <option key={agent.acquired_by_id} value={agent.acquired_by_id} disabled={!agent.is_active}>{agent.name}</option>
+              ))}
+            </select>
+          </label>
+        ) : (
+          <p className="text-sm text-slate-700"><span className="font-medium">Acquired By:</span> authenticated agent</p>
+        )}
         <label className="block text-sm text-slate-700">
           Status
           <select

@@ -16,6 +16,10 @@ export interface Vendor {
   sales_rep?: string;
   sales_rep_id?: string;
   sales_rep_name?: string;
+  acquired_by?: string;
+  acquired_by_name?: string;
+  vendor_type_id?: string;
+  vendor_type_name?: string;
   assigned_date?: string;
   assigned_by?: string;
   date_created: string;
@@ -134,6 +138,19 @@ export interface DeliveryPreparationSummaryItem {
   unit: string;
   quantity: number;
   request_count: number;
+}
+
+export interface VendorType {
+  vendor_type_id: string;
+  name: string;
+  is_active: boolean;
+}
+
+export interface AcquiredByAgent {
+  acquired_by_id: string;
+  name: string;
+  is_active: boolean;
+  date_added?: string;
 }
 
 export interface DeliveryPreparationSummary {

@@ -22,6 +22,8 @@ export function VendorCard({ vendor, salesReps }: VendorCardProps) {
       <p className="mt-4 text-sm text-slate-700">
         Sales rep: {getSalesRepDisplayName(vendor.sales_rep_id, salesReps)}
       </p>
+      <p className="mt-1 text-sm text-slate-700">Acquired By: {vendor.acquired_by_name || 'Not specified'}</p>
+      <p className="mt-1 text-sm text-slate-700">Vendor Type: {vendor.vendor_type_name || 'Not specified'}</p>
     </div>
   );
 }
