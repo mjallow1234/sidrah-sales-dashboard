@@ -28,6 +28,10 @@ function formatCurrency(value: number) {
   return `GMD ${value.toLocaleString()}`;
 }
 
+function samePerson(first?: string, second?: string) {
+  return Boolean(first?.trim() && second?.trim()) && first!.trim().toLocaleLowerCase() === second!.trim().toLocaleLowerCase();
+}
+
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-2xl bg-slate-50 px-3 py-3">
@@ -93,7 +97,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Supplied</p><p className="mt-1 font-medium text-slate-800">{transaction.stock_added}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Cash</p><p className="mt-1 font-medium text-slate-800">{formatCurrency(transaction.cash_collected)}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Recorded By</p><p className="mt-1 truncate font-medium text-slate-800">{actor}</p></div>
-                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Sales Representative</p><p className="mt-1 truncate font-medium text-slate-800">{salesRepresentative}</p></div>
+                  {Boolean(transaction.sales_rep_name?.trim()) && !samePerson(transaction.actor, transaction.sales_rep_name) ? <div><p className="text-xs uppercase tracking-wide text-slate-500">Sales Representative</p><p className="mt-1 truncate font-medium text-slate-800">{salesRepresentative}</p></div> : null}
                 </div>
                 <div className="mt-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
               </button>
@@ -115,8 +119,8 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
               <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
               <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Vendor unavailable — historical record'} />
-              <Detail label="Actor" value={selectedTransaction.actor || 'Actor unavailable — historical record'} />
-              <Detail label="Sales Representative" value={selectedTransaction.sales_rep_name || 'Sales representative unavailable — historical record'} />
+              <Detail label="Recorded By" value={selectedTransaction.actor || 'Actor unavailable — historical record'} />
+              {Boolean(selectedTransaction.sales_rep_name?.trim()) && !samePerson(selectedTransaction.actor, selectedTransaction.sales_rep_name) ? <Detail label="Sales Representative" value={selectedTransaction.sales_rep_name || 'Sales representative unavailable — historical record'} /> : null}
               <Detail label="Product" value={selectedTransaction.product_name || 'Product unavailable — historical record'} />
               <Detail label="Quantity supplied" value={String(selectedTransaction.stock_added)} />
               <Detail label="Cash collected" value={formatCurrency(selectedTransaction.cash_collected)} />
