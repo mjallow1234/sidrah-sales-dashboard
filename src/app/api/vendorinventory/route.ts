@@ -82,7 +82,26 @@ export async function GET(request: NextRequest) {
       params.product_id = productId;
     }
 
-    const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
+    const eligibilityClause = `(
+      current_stock > 0
+      OR total_stock_received > 0
+      OR total_stock_sold > 0
+      OR EXISTS (
+        SELECT 1
+        FROM admin_stock_movements asm
+        WHERE asm.product_id = vendor_inventory.product_id
+          AND asm.movement_type IN ('transfer', 'retrieval')
+          AND (asm.source_vendor_id = vendor_inventory.vendor_id OR asm.destination_vendor_id = vendor_inventory.vendor_id)
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM visit_logs vl
+        WHERE vl.vendor_id = vendor_inventory.vendor_id
+          AND vl.product_id = vendor_inventory.product_id
+      )
+    )`;
+    filters.push(eligibilityClause);
+    const whereClause = `WHERE ${filters.join(' AND ')}`;
     const sql = `SELECT vendor_inventory_id, vendor_id, product_id, current_stock, total_stock_received, total_stock_sold, average_unit_value, created_at, updated_at,
       (
         SELECT vl.stock_added
