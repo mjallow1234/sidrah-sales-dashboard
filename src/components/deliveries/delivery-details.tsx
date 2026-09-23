@@ -31,6 +31,13 @@ const statusClassNames: Record<string, string> = {
   delivered: 'bg-emerald-100 text-emerald-700',
 };
 
+const priorityLabels: Record<string, string> = {
+  low: 'Low',
+  normal: 'Normal',
+  high: 'High',
+  urgent: 'Urgent',
+};
+
 export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const authQuery = useAuthQuery();
   const { data: delivery, isLoading, isError } = useDeliveryQuery(deliveryId);
@@ -105,6 +112,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
                 {statusLabels[delivery.status] ?? delivery.status}
               </span>
             </div>
+            <div>Priority: <span className="font-semibold">{priorityLabels[delivery.priority] ?? 'Normal'}</span></div>
             <div>Created: {new Date(delivery.date_created).toLocaleString()}</div>
             <div>Created by: {delivery.created_by_name || 'Unknown user'}</div>
             <div>Assigned to: {assignedToLabel}</div>

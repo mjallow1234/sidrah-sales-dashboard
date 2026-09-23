@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getPool, transaction } from '@/lib/db';
-import type { DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
+import type { DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord, DeliveryStatus } from '@/lib/types';
 import type { AppUserRole } from '@/lib/authorization';
 import { DeliveryRepository, type CreateDeliveryPayload, type DeliverySearchFilters } from '@/repositories/DeliveryRepository';
 import { ProductRepository } from '@/repositories/ProductRepository';
@@ -76,6 +76,17 @@ export interface CreateDeliveryRequest {
   delivery_address: string;
   items: DeliveryItem[];
   notes?: string;
+  priority?: unknown;
+}
+
+const deliveryPriorities: readonly DeliveryPriority[] = ['low', 'normal', 'high', 'urgent'];
+
+function validatePriority(value: unknown): DeliveryPriority {
+  if (value === undefined || value === null || value === '') return 'normal';
+  if (typeof value !== 'string' || !deliveryPriorities.includes(value as DeliveryPriority)) {
+    throw new HttpError(400, 'Priority must be Low, Normal, High, or Urgent.');
+  }
+  return value as DeliveryPriority;
 }
 
 export async function createDelivery(payload: CreateDeliveryRequest, createdBy: string): Promise<DeliveryRecord> {
@@ -85,6 +96,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   const deliveryAddress = validateRequiredString(payload.delivery_address, 'Delivery address');
   const items = await validateItems(payload.items, productRepository);
   const notes = typeof payload.notes === 'string' && payload.notes.trim() !== '' ? payload.notes.trim() : undefined;
+  const priority = validatePriority(payload.priority);
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
@@ -99,6 +111,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
     items,
     notes,
     status: 'pending',
+    priority,
     created_by: createdBy,
     claimed_by: null,
     claimed_at: null,

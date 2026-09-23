@@ -1,4 +1,4 @@
-import type { DeliveryActivity, DeliveryActivityType, DeliveryItem, DeliveryPreparationSummary, DeliveryRecord, DeliveryStatus } from '@/lib/types';
+import type { DeliveryActivity, DeliveryActivityType, DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord, DeliveryStatus } from '@/lib/types';
 import type { RepositoryDbClient } from './types';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError } from './errors';
@@ -11,6 +11,7 @@ export interface CreateDeliveryPayload {
   items: DeliveryItem[];
   notes?: string;
   status: DeliveryStatus;
+  priority: DeliveryPriority;
   created_by: string;
   claimed_by?: string | null;
   claimed_at?: string | null;
@@ -71,6 +72,7 @@ export class DeliveryRepository extends BaseRepository {
       items: this.parseItems(row.items),
       notes: row.notes === null ? undefined : String(row.notes),
       status: String(row.status) as DeliveryRecord['status'],
+      priority: String(row.priority || 'normal') as DeliveryPriority,
       created_by: String(row.created_by),
       created_by_name: this.resolveUserName(row.created_by, row.created_by_name),
       date_created: String(row.date_created),
@@ -204,6 +206,7 @@ export class DeliveryRepository extends BaseRepository {
         items,
         notes,
         status,
+        priority,
         created_by,
         claimed_by,
         claimed_at,
@@ -219,6 +222,7 @@ export class DeliveryRepository extends BaseRepository {
         :items,
         :notes,
         :status,
+        :priority,
         :created_by,
         :claimed_by,
         :claimed_at,
@@ -235,6 +239,7 @@ export class DeliveryRepository extends BaseRepository {
         items: JSON.stringify(payload.items),
         notes: payload.notes ?? null,
         status: payload.status,
+        priority: payload.priority,
         created_by: payload.created_by,
         claimed_by: payload.claimed_by ?? null,
         claimed_at: payload.claimed_at ?? null,

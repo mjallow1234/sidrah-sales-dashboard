@@ -20,6 +20,7 @@ export function DeliveryForm() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [notes, setNotes] = useState('');
+  const [priority, setPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
   const [items, setItems] = useState<DeliveryLineItem[]>([{ ...initialItem }]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -84,12 +85,14 @@ export function DeliveryForm() {
         delivery_address: deliveryAddress,
         items: payloadItems,
         notes: notes || undefined,
+        priority,
       });
       setSuccessMessage('Delivery request created successfully.');
       setVendorId('');
       setCustomerPhone('');
       setDeliveryAddress('');
       setNotes('');
+      setPriority('normal');
       setItems([{ ...initialItem }]);
     } catch (error: unknown) {
       setErrorMessage(error instanceof Error ? error.message : 'Unable to create delivery request.');
@@ -141,6 +144,20 @@ export function DeliveryForm() {
           onChange={(event) => setDeliveryAddress(event.target.value)}
           className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
         />
+      </label>
+
+      <label className="block text-sm text-slate-700">
+        Priority
+        <select
+          value={priority}
+          onChange={(event) => setPriority(event.target.value as typeof priority)}
+          className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+        >
+          <option value="low">Low</option>
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+          <option value="urgent">Urgent</option>
+        </select>
       </label>
 
       <div className="space-y-4">

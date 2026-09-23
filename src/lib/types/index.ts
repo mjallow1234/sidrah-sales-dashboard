@@ -131,6 +131,7 @@ export type OverallAssessment = 'Healthy' | 'Watch' | 'At Risk' | 'Insufficient 
 export type TrendDirection = 'up' | 'down' | 'flat' | 'insufficient_data';
 
 export type DeliveryStatus = 'pending' | 'ongoing' | 'delivered' | 'cancelled';
+export type DeliveryPriority = 'low' | 'normal' | 'high' | 'urgent';
 
 export interface DeliveryPreparationSummaryItem {
   product_id: string;
@@ -182,6 +183,7 @@ export interface DeliveryRecord {
   items: DeliveryItem[];
   notes?: string;
   status: DeliveryStatus;
+  priority: DeliveryPriority;
   created_by: string;
   created_by_name?: string;
   date_created: string;

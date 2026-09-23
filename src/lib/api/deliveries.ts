@@ -1,4 +1,4 @@
-import type { DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryRecord } from '@/lib/types';
+import type { DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord } from '@/lib/types';
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, options);
@@ -52,6 +52,7 @@ export async function createDelivery(payload: {
   delivery_address: string;
   items: DeliveryItem[];
   notes?: string;
+  priority?: DeliveryPriority;
 }) {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>('/api/deliveries', {
     method: 'POST',

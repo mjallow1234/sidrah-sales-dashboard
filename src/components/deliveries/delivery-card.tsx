@@ -18,6 +18,13 @@ const statusClassNames: Record<DeliveryRecord['status'], string> = {
   cancelled: 'bg-slate-200 text-slate-700',
 };
 
+const priorityLabels: Record<DeliveryRecord['priority'], string> = {
+  low: 'Low',
+  normal: 'Normal',
+  high: 'High',
+  urgent: 'Urgent',
+};
+
 function formatRequestedAt(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
@@ -35,6 +42,11 @@ export function DeliveryCard({ delivery }: { delivery: DeliveryRecord }) {
           <h2 className="min-w-0 break-words text-lg font-semibold text-slate-900">{delivery.customer_name}</h2>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${statusClassNames[delivery.status]}`}>
             {statusLabels[delivery.status]}
+          </span>
+        </div>
+        <div className="mt-2">
+          <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+            Priority: {priorityLabels[delivery.priority] ?? 'Normal'}
           </span>
         </div>
 
