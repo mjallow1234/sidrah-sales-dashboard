@@ -8,6 +8,7 @@ import { DeliveryCard } from './delivery-card';
 
 const statusOptions = [
   { value: '', label: 'All' },
+  { value: 'pending,ongoing', label: 'Pending & Ongoing' },
   { value: 'pending', label: 'Pending' },
   { value: 'ongoing', label: 'Ongoing' },
   { value: 'delivered', label: 'Delivered' },
@@ -15,7 +16,7 @@ const statusOptions = [
 ];
 
 export function DeliveryList() {
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState('pending,ongoing');
   const { data: deliveries = [], isLoading, isError } = useDeliveriesQuery(status ? { status } : undefined);
   const { data: auth, isLoading: authLoading } = useAuthQuery();
 

@@ -13,8 +13,11 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const statusParam = request.nextUrl.searchParams.get('status') ?? undefined;
-    const status = statusParam && validStatuses.includes(statusParam as DeliveryStatus) ? (statusParam as DeliveryStatus) : undefined;
+    const statusParam = request.nextUrl.searchParams.get('status') ?? '';
+    const requestedStatuses = statusParam.split(',').map((value) => value.trim()).filter(Boolean);
+    const status = requestedStatuses.length > 0 && requestedStatuses.every((value) => validStatuses.includes(value as DeliveryStatus))
+      ? requestedStatuses.length === 1 ? requestedStatuses[0] as DeliveryStatus : requestedStatuses as DeliveryStatus[]
+      : undefined;
     const deliveries = await getDeliveries(status, session.role === 'delivery' ? session.userId : undefined);
     return Response.json({ status: 'success', data: deliveries ?? [] });
   } catch (error: unknown) {

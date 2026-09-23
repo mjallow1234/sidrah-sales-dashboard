@@ -22,7 +22,7 @@ export interface CreateDeliveryPayload {
 }
 
 export interface DeliverySearchFilters {
-  status?: DeliveryStatus;
+  status?: DeliveryStatus | DeliveryStatus[];
   deliveryUserId?: string;
 }
 
@@ -115,23 +115,29 @@ export class DeliveryRepository extends BaseRepository {
   public async findAll(filters: DeliverySearchFilters = {}): Promise<DeliveryRecord[]> {
     const conditions: string[] = [];
     const params: Record<string, unknown> = {};
+    const statuses = filters.status ? (Array.isArray(filters.status) ? filters.status : [filters.status]) : [];
+    const statusCondition = statuses.length === 1
+      ? 'd.status = :status'
+      : statuses.length > 1
+        ? `d.status IN (${statuses.map((_, index) => `:status${index}`).join(', ')})`
+        : '';
+    statuses.forEach((value, index) => { params[statuses.length === 1 ? 'status' : `status${index}`] = value; });
 
-    if (filters.deliveryUserId && filters.status) {
-      if (filters.status === 'pending') {
-        conditions.push('d.status = :status');
-        params.status = filters.status;
+    if (filters.deliveryUserId && statuses.length > 0) {
+      if (statuses.includes('pending')) {
+        conditions.push(`(d.status = :pendingStatus OR (${statusCondition} AND d.claimed_by = :deliveryUserId))`);
+        params.pendingStatus = 'pending';
+        params.deliveryUserId = filters.deliveryUserId;
       } else {
-        conditions.push('d.status = :status AND d.claimed_by = :deliveryUserId');
-        params.status = filters.status;
+        conditions.push(`${statusCondition} AND d.claimed_by = :deliveryUserId`);
         params.deliveryUserId = filters.deliveryUserId;
       }
     } else if (filters.deliveryUserId) {
       conditions.push('(d.status = :pendingStatus OR d.claimed_by = :deliveryUserId)');
       params.pendingStatus = 'pending';
       params.deliveryUserId = filters.deliveryUserId;
-    } else if (filters.status) {
-      conditions.push('d.status = :status');
-      params.status = filters.status;
+    } else if (statuses.length > 0) {
+      conditions.push(statusCondition);
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
