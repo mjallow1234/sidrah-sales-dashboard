@@ -6,7 +6,7 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { addDeliveryComment, claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
@@ -351,6 +351,18 @@ export function useCreateDeliveryMutation() {
     mutationFn: createDelivery,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
+    },
+  });
+}
+
+export function useAddDeliveryItemsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; items: DeliveryItem[] }>({
+    mutationFn: ({ deliveryId, items }) => addDeliveryItems(deliveryId, items),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery', variables.deliveryId] });
       queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
     },
   });

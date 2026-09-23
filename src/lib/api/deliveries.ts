@@ -46,6 +46,15 @@ export async function getDelivery(deliveryId: string): Promise<DeliveryRecord> {
   return result.data;
 }
 
+export async function addDeliveryItems(deliveryId: string, items: DeliveryItem[]): Promise<DeliveryRecord> {
+  const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/items`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ items }),
+  });
+  return result.data;
+}
+
 export async function createDelivery(payload: {
   customer_name: string;
   customer_phone: string;

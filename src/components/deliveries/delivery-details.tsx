@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import {
   useAuthQuery,
   useAddDeliveryCommentMutation,
+  useAddDeliveryItemsMutation,
   useCancelDeliveryMutation,
   useClaimDeliveryMutation,
   useDeliveryQuery,
@@ -12,7 +13,9 @@ import {
   useDeliveryUsersQuery,
   useMarkDeliveryDeliveredMutation,
   useReassignDeliveryMutation,
+  useProductsQuery,
 } from '@/lib/hooks/queries';
+import type { DeliveryItem } from '@/lib/types';
 
 interface DeliveryDetailsProps {
   deliveryId: string;
@@ -47,6 +50,8 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const reassignMutation = useReassignDeliveryMutation();
   const cancelMutation = useCancelDeliveryMutation();
   const addCommentMutation = useAddDeliveryCommentMutation();
+  const addItemsMutation = useAddDeliveryItemsMutation();
+  const { data: products = [], isLoading: productsLoading, isError: productsError } = useProductsQuery();
 
   const currentUserId = authQuery.data?.userId ?? '';
   const currentRole = authQuery.data?.role;
@@ -60,6 +65,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const canMarkDelivered = canDeliverSelf || canCompleteAsAdmin;
   const canReassign = isAdminOrSupervisor && isActionable;
   const canCancel = isAdminOrSupervisor && isActionable;
+  const canAddItems = (currentRole === 'agent' || isAdminOrSupervisor) && isActionable;
 
   const { data: deliveryUsers = [] } = useDeliveryUsersQuery(canReassign);
   const [reassignTarget, setReassignTarget] = useState('');
@@ -67,6 +73,8 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [actionComment, setActionComment] = useState('');
   const [standaloneComment, setStandaloneComment] = useState('');
   const [showCommentForm, setShowCommentForm] = useState(false);
+  const [showItemsForm, setShowItemsForm] = useState(false);
+  const [additionalItems, setAdditionalItems] = useState([{ product_id: '', quantity: 1 }]);
 
   const assignedToLabel = useMemo(() => {
     if (!delivery?.claimed_by) {
@@ -95,6 +103,26 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const handleCancel = () => {
     cancelMutation.mutate({ deliveryId: delivery.delivery_id, comment: actionComment });
     setShowCancelConfirm(false);
+  };
+
+  const handleAdditionalItemChange = (index: number, field: 'product_id' | 'quantity', value: string) => {
+    setAdditionalItems((current) => current.map((item, itemIndex) => itemIndex === index ? {
+      ...item,
+      [field]: field === 'quantity' ? Number(value) : value,
+    } : item));
+  };
+
+  const handleAddItems = () => {
+    const items: DeliveryItem[] = additionalItems.map((item) => {
+      const product = products.find((option) => option.product_id === item.product_id);
+      return { product_id: item.product_id, product_name: product?.product_name ?? '', sku: product?.sku, quantity: item.quantity };
+    });
+    addItemsMutation.mutate({ deliveryId: delivery.delivery_id, items }, {
+      onSuccess: () => {
+        setAdditionalItems([{ product_id: '', quantity: 1 }]);
+        setShowItemsForm(false);
+      },
+    });
   };
 
   return (
@@ -158,6 +186,35 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
           })}
         </div>
       </div>
+
+      {canAddItems ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-900">Products</h2>
+            <Button type="button" variant="secondary" onClick={() => setShowItemsForm((value) => !value)}>+ Add products</Button>
+          </div>
+          {showItemsForm ? (
+            <div className="mt-4 space-y-3 rounded-2xl border border-sidrah-100 bg-sidrah-50/40 p-4">
+              {additionalItems.map((item, index) => (
+                <div key={index} className="grid gap-3 sm:grid-cols-[1fr_9rem_auto]">
+                  <select value={item.product_id} onChange={(event) => handleAdditionalItemChange(index, 'product_id', event.target.value)} disabled={productsLoading} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                    <option value="">Select product</option>
+                    {products.map((product) => <option key={product.product_id} value={product.product_id}>{product.product_name}</option>)}
+                  </select>
+                  <input type="number" min={1} value={item.quantity} onChange={(event) => handleAdditionalItemChange(index, 'quantity', event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm" aria-label={`Quantity ${index + 1}`} />
+                  <Button type="button" variant="secondary" onClick={() => setAdditionalItems((current) => current.filter((_, itemIndex) => itemIndex !== index))} disabled={additionalItems.length === 1}>Remove</Button>
+                </div>
+              ))}
+              {productsError ? <p className="text-sm text-rose-600">Unable to load products.</p> : null}
+              {addItemsMutation.error ? <p className="text-sm text-rose-600">{addItemsMutation.error.message}</p> : null}
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setAdditionalItems((current) => [...current, { product_id: '', quantity: 1 }])}>Add another product</Button>
+                <Button type="button" onClick={handleAddItems} disabled={productsLoading || additionalItems.some((item) => !item.product_id || !Number.isFinite(item.quantity) || item.quantity <= 0) || addItemsMutation.isPending}>{addItemsMutation.isPending ? 'Adding…' : 'Add products'}</Button>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">

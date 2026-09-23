@@ -293,6 +293,39 @@ export class DeliveryRepository extends BaseRepository {
     });
   }
 
+  public async addItems(deliveryId: string, items: DeliveryItem[], updatedBy: string): Promise<DeliveryRecord> {
+    const current = await this.lockDelivery(deliveryId);
+    if (!['pending', 'ongoing'].includes(String(current.status))) {
+      throw new Error('Products can only be added to pending or ongoing deliveries.');
+    }
+
+    const mergedItems = this.parseItems(current.items);
+    for (const item of items) {
+      const existingIndex = mergedItems.findIndex((existing) => existing.product_id === item.product_id);
+      if (existingIndex >= 0) {
+        mergedItems[existingIndex] = {
+          ...mergedItems[existingIndex],
+          quantity: Number(mergedItems[existingIndex].quantity) + item.quantity,
+          product_name: item.product_name || mergedItems[existingIndex].product_name,
+          sku: item.sku || mergedItems[existingIndex].sku,
+        };
+      } else {
+        mergedItems.push(item);
+      }
+    }
+
+    const [result] = await (this.db.execute as any)(
+      `UPDATE deliveries
+       SET items = :items, updated_by = :updated_by, last_updated = NOW()
+       WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,
+      { items: JSON.stringify(mergedItems), updated_by: updatedBy, delivery_id: deliveryId }
+    );
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
+      throw new Error('Products can only be added to pending or ongoing deliveries.');
+    }
+    return this.findById(deliveryId);
+  }
+
   public async findActivity(deliveryId: string): Promise<DeliveryActivity[]> {
     const [rows] = await this.execute<any[]>(
       `SELECT a.activity_id, a.delivery_id, a.activity_type, a.previous_status, a.new_status,

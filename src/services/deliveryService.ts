@@ -161,6 +161,22 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryRecor
   return repository.findById(deliveryId);
 }
 
+export async function addDeliveryItems(deliveryId: string, value: unknown, actingUserId: string): Promise<DeliveryRecord> {
+  const productRepository = new ProductRepository(getPool());
+  const items = await validateItems(value, productRepository);
+  try {
+    return await transaction(async (connection) => new DeliveryRepository(connection).addItems(deliveryId, items, actingUserId));
+  } catch (error: unknown) {
+    if (error instanceof Error && error.message.includes('Products can only')) {
+      throw new HttpError(409, error.message);
+    }
+    if (error instanceof NotFoundError) {
+      throw new HttpError(404, error.message);
+    }
+    throw error;
+  }
+}
+
 export async function claimDelivery(deliveryId: string, deliveryUserId: string, comment?: unknown): Promise<DeliveryRecord> {
   const normalizedComment = normalizeComment(comment);
   try {
