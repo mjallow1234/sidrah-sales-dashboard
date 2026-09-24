@@ -48,7 +48,8 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'Forbidden.' }, { status: 403 });
   }
 
-  if (isApiRequest && session.role === 'delivery' && !pathname.startsWith('/api/deliveries')) {
+  const isDeliveryPaymentOptionsApi = pathname === '/api/delivery-payment-options' || pathname.startsWith('/api/delivery-payment-options/');
+  if (isApiRequest && session.role === 'delivery' && !pathname.startsWith('/api/deliveries') && !isDeliveryPaymentOptionsApi) {
     return NextResponse.json({ status: 'error', message: 'Forbidden.' }, { status: 403 });
   }
 

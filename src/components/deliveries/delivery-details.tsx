@@ -16,6 +16,7 @@ import {
   useProductsQuery,
 } from '@/lib/hooks/queries';
 import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
+import { canRecordDeliveryPayment } from '@/lib/authorization';
 import type { DeliveryItem } from '@/lib/types';
 
 interface DeliveryDetailsProps {
@@ -70,7 +71,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const canReassign = isAdminOrSupervisor && isActionable;
   const canCancel = isAdminOrSupervisor && isActionable;
   const canAddItems = (currentRole === 'agent' || isAdminOrSupervisor) && isActionable;
-  const canRecordPayment = isDeliveryUser || isAdminOrSupervisor;
+  const canRecordPayment = canRecordDeliveryPayment(currentRole);
 
   const { data: deliveryUsers = [] } = useDeliveryUsersQuery(canReassign);
   const [reassignTarget, setReassignTarget] = useState('');

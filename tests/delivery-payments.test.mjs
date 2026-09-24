@@ -19,9 +19,25 @@ assert.match(service, /amount.*greater than zero|positive/i);
 assert.match(repository, /recorded_at.*NOW|NOW\(\)/i);
 assert.match(service, /transaction\(/i);
 assert.match(paymentRoute, /session\.userId/);
-assert.match(paymentRoute, /isDeliveryRole|isAdminOrSupervisorRole/);
+assert.match(paymentRoute, /canRecordDeliveryPayment\(session\.role\)/);
+assert.doesNotMatch(paymentRoute, /isAgentRole/);
+const authorization = fs.readFileSync('src/lib/authorization.ts', 'utf8');
+assert.match(authorization, /function canRecordDeliveryPayment/);
+const canRecordPayment = (role) => {
+  const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+  return normalized === 'delivery' || normalized === 'admin' || normalized === 'supervisor' || normalized === 'super_admin';
+};
+for (const role of ['delivery', 'admin', 'supervisor', 'super_admin']) {
+  assert.equal(canRecordPayment(role), true, `${role} can record delivery payments`);
+}
+assert.equal(canRecordPayment('agent'), false, 'agents cannot record delivery payments');
+assert.equal(canRecordPayment(' Delivery '), true, 'normalized delivery role can record delivery payments');
 assert.doesNotMatch(paymentRoute, /actorUserId|recorded_by.*body/);
 assert.match(optionRoute, /isAdminRole/);
+assert.match(optionRoute, /canRecordDeliveryPayment\(session\.role\)/);
+assert.match(optionRoute, /includeInactive && !isAdminRole\(session\.role\)/);
+const middleware = fs.readFileSync('src/middleware.ts', 'utf8');
+assert.match(middleware, /isDeliveryPaymentOptionsApi/);
 assert.match(repository, /payment_method/);
 assert.match(repository, /recorded_by_name|app_users/);
 assert.match(repository, /DATE\(p\.recorded_at\)/);

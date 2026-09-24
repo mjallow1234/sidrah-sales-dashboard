@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import { isAdminOrSupervisorRole, isDeliveryRole } from '@/lib/authorization';
+import { canRecordDeliveryPayment } from '@/lib/authorization';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { getDeliveryPayments, recordDeliveryPayment } from '@/services/deliveryPaymentService';
 
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const session = await getVerifiedSession(request);
   if (!session) return unauthorizedResponse();
-  if (!isDeliveryRole(session.role) && !isAdminOrSupervisorRole(session.role)) return forbiddenResponse();
+  if (!canRecordDeliveryPayment(session.role)) return forbiddenResponse();
   try {
     const payload = await request.json().catch(() => ({}));
     return Response.json({ status: 'success', data: await recordDeliveryPayment(getDeliveryId(request), payload?.amount, payload?.payment_option_id, session.userId ?? '') }, { status: 201 });

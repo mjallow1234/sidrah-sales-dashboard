@@ -13,6 +13,11 @@ export function isDeliveryRole(role?: string): role is AppUserRole {
   return role === 'delivery';
 }
 
+export function canRecordDeliveryPayment(role?: string): boolean {
+  const normalized = typeof role === 'string' ? role.trim().toLowerCase() : '';
+  return normalized === 'delivery' || normalized === 'admin' || normalized === 'supervisor' || normalized === 'super_admin';
+}
+
 export function isAdminOrSupervisorRole(role?: string): role is AppUserRole {
   return isAdminRole(role) || isSupervisorRole(role);
 }
