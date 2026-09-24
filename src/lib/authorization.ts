@@ -51,6 +51,10 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     return false;
   }
 
+  if (pathname === '/factory/expenses' || pathname.startsWith('/factory/expenses/')) {
+    return isAdminRole(role);
+  }
+
   if (isFactoryPath(pathname)) {
     return isFactoryRole(role);
   }
@@ -117,6 +121,10 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
 export function canViewLink(role: string | undefined, href: string): boolean {
   if (!role) {
     return false;
+  }
+
+  if (href === '/factory/expenses' || href.startsWith('/factory/expenses/')) {
+    return isAdminRole(role);
   }
 
   if (isFactoryPath(href)) {

@@ -4,6 +4,7 @@ export * from './types';
 export * from './VendorRepository';
 export * from './VendorLocationRepository';
 export * from './DeliveryTrackingRepository';
+export * from './FactoryExpenseRepository';
 export * from './ProductRepository';
 export * from './InventoryRepository';
 export * from './VendorInventoryRepository';

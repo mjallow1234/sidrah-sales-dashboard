@@ -239,6 +239,49 @@ export interface DeliveryTrackingLocation {
   is_stale: boolean;
 }
 
+export type FactoryExpenseStatus = 'active' | 'voided';
+export type FactoryExpensePaymentMethod = 'Cash' | 'Bank Transfer' | 'Mobile Money' | 'Credit' | 'Other';
+
+export interface FactoryExpenseCategory {
+  category_id: string;
+  name: string;
+  category_group?: string | null;
+  is_active: boolean;
+}
+
+export interface FactoryExpense {
+  expense_id: string;
+  expense_date: string;
+  category_id: string;
+  category_name: string;
+  category_group?: string | null;
+  description?: string | null;
+  amount: number;
+  quantity?: number | null;
+  unit?: string | null;
+  unit_price?: number | null;
+  paid_to?: string | null;
+  payment_method: FactoryExpensePaymentMethod;
+  reference?: string | null;
+  notes?: string | null;
+  status: FactoryExpenseStatus;
+  recorded_by: string;
+  recorded_by_name?: string;
+  created_at: string;
+  updated_at: string;
+  voided_by?: string | null;
+  voided_by_name?: string | null;
+  voided_at?: string | null;
+  void_reason?: string | null;
+}
+
+export interface FactoryExpenseSummary {
+  today: number;
+  this_month: number;
+  total: number;
+  count: number;
+}
+
 export interface DeliveryPaymentOption {
   payment_option_id: string;
   name: string;

@@ -37,7 +37,8 @@ const navSections = [
        { label: 'Production', href: '/factory/production', icon: PlusSquare },
        { label: 'Product Movements', href: '/factory/movements', icon: ArrowRightLeft },
        { label: 'Containers', href: '/factory/containers', icon: Box },
-       { label: 'Records', href: '/factory/records', icon: ClipboardList },
+        { label: 'Records', href: '/factory/records', icon: ClipboardList },
+        { label: 'Expenses', href: '/factory/expenses', icon: ClipboardList },
       ],
   },
   {
