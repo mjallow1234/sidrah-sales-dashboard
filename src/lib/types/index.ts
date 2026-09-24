@@ -28,6 +28,32 @@ export interface Vendor {
   status_name?: string;
   created_by?: string;
   updated_by?: string;
+  location_latitude?: number | null;
+  location_longitude?: number | null;
+  location_updated_at?: string | null;
+  location_updated_by?: string | null;
+  location_updated_by_name?: string;
+  pending_location_request?: VendorLocationRequest | null;
+}
+
+export type VendorLocationRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface VendorLocationRequest {
+  request_id: string;
+  vendor_id: string;
+  vendor_name?: string;
+  proposed_latitude: number;
+  proposed_longitude: number;
+  current_latitude?: number | null;
+  current_longitude?: number | null;
+  requested_by: string;
+  requested_by_name?: string;
+  requested_at: string;
+  status: VendorLocationRequestStatus;
+  reviewed_by?: string | null;
+  reviewed_by_name?: string;
+  reviewed_at?: string | null;
+  decision_reason?: string | null;
 }
 
 export interface Product {

@@ -48,6 +48,7 @@ const navSections = [
       { label: 'Admin stock', href: '/admin-stock', icon: Truck },
       { label: 'Vendor types', href: '/vendor-types', icon: ClipboardList },
       { label: 'Acquired-By agents', href: '/acquired-by', icon: Users },
+      { label: 'Location requests', href: '/vendor-location-requests', icon: ClipboardList },
     ],
   },
   {

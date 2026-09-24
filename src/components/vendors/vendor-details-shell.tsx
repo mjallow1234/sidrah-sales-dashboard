@@ -5,6 +5,7 @@ import { useAuthQuery, useTransactionsByVendorQuery, useVendorBalanceQuery, useV
 import { TransactionTable } from '@/components/vendors/transaction-table';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
+import { VendorLocationPanel } from '@/components/vendors/vendor-location-panel';
 
 interface VendorDetailsShellProps {
   vendorId: string;
@@ -191,6 +192,8 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
           </div>
           <p className="mt-3 text-xs text-slate-500">Legacy/opening quantity is shown only where it can be derived from the existing inventory and transaction records.</p>
         </section>
+
+        <VendorLocationPanel vendorId={vendorId} />
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
           <div className="flex items-center justify-between gap-4">

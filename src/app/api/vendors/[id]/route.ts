@@ -31,6 +31,11 @@ function mapVendorRow(row: any): Vendor {
     vendor_name: String(row.vendor_name),
     phone: String(row.phone),
     location: String(row.location),
+    location_latitude: row.location_latitude === null || row.location_latitude === undefined ? null : Number(row.location_latitude),
+    location_longitude: row.location_longitude === null || row.location_longitude === undefined ? null : Number(row.location_longitude),
+    location_updated_at: row.location_updated_at === null || row.location_updated_at === undefined ? null : formatDateTimeValue(row.location_updated_at),
+    location_updated_by: row.location_updated_by === null || row.location_updated_by === undefined ? null : String(row.location_updated_by),
+    location_updated_by_name: row.location_updated_by_name === null || row.location_updated_by_name === undefined ? undefined : String(row.location_updated_by_name),
     sales_rep: undefined,
     sales_rep_id: row.sales_rep_id === null ? undefined : String(row.sales_rep_id),
     acquired_by: row.acquired_by === null ? undefined : String(row.acquired_by),
@@ -56,10 +61,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const id = getIdFromUrl(request);
-    const [rows] = await getPool().query<any[]>(`SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by
+    const [rows] = await getPool().query<any[]>(`SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.location_latitude, v.location_longitude, v.location_updated_at, v.location_updated_by, location_user.name AS location_updated_by_name, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by
       FROM vendors v LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
       LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
+      LEFT JOIN app_users location_user ON location_user.user_id = v.location_updated_by
       WHERE v.vendor_id = ? LIMIT 1`, [id]);
     if (rows.length === 0) {
       return Response.json({ status: 'error', message: 'Vendor not found.' }, { status: 404 });

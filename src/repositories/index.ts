@@ -2,6 +2,7 @@ export * from './BaseRepository';
 export * from './errors';
 export * from './types';
 export * from './VendorRepository';
+export * from './VendorLocationRepository';
 export * from './ProductRepository';
 export * from './InventoryRepository';
 export * from './VendorInventoryRepository';

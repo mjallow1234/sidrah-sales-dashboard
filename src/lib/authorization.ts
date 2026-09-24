@@ -79,6 +79,10 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     return isAdminRole(role);
   }
 
+  if (pathname === '/vendor-location-requests' || pathname.startsWith('/vendor-location-requests/')) {
+    return isAdminRole(role);
+  }
+
   if (pathname === '/delivery-payment-options' || pathname.startsWith('/delivery-payment-options/')) {
     return isAdminRole(role);
   }
@@ -136,6 +140,10 @@ export function canViewLink(role: string | undefined, href: string): boolean {
   }
 
   if (href === '/vendor-types' || href.startsWith('/vendor-types/') || href === '/acquired-by' || href.startsWith('/acquired-by/')) {
+    return isAdminRole(role);
+  }
+
+  if (href === '/vendor-location-requests' || href.startsWith('/vendor-location-requests/')) {
     return isAdminRole(role);
   }
 
