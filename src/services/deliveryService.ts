@@ -125,7 +125,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   });
 }
 
-export async function getDeliveries(status?: DeliveryStatus, deliveryUserId?: string): Promise<DeliveryRecord[]> {
+export async function getDeliveries(status?: DeliveryStatus | DeliveryStatus[], deliveryUserId?: string): Promise<DeliveryRecord[]> {
   const repository = new DeliveryRepository(getPool());
   const filters: DeliverySearchFilters = {};
   if (status) {
