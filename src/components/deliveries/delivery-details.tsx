@@ -18,6 +18,8 @@ import {
 import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
 import { canRecordDeliveryPayment } from '@/lib/authorization';
 import type { DeliveryItem } from '@/lib/types';
+import { DeliveryLocationReporter } from './delivery-location-reporter';
+import { DeliveryNavigationActions } from './delivery-navigation-actions';
 
 interface DeliveryDetailsProps {
   deliveryId: string;
@@ -170,7 +172,16 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
             ) : null}
           </div>
         </div>
+        <div className="mt-5 border-t border-slate-100 pt-5">
+          <p className="mb-2 text-sm font-semibold text-slate-900">Vendor location</p>
+          {isDeliveryUser && delivery.claimed_by === currentUserId ? <DeliveryNavigationActions latitude={delivery.vendor_location_latitude} longitude={delivery.vendor_location_longitude} /> : <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Directions are available to the assigned delivery user.</p>}
+        </div>
       </div>
+
+      <DeliveryLocationReporter
+        deliveryId={delivery.delivery_id}
+        active={isDeliveryUser && delivery.status === 'ongoing' && delivery.claimed_by === currentUserId}
+      />
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

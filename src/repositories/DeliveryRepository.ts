@@ -85,6 +85,8 @@ export class DeliveryRepository extends BaseRepository {
       cancelled_at: row.cancelled_at === null ? undefined : String(row.cancelled_at),
       cancelled_by: row.cancelled_by === null ? undefined : String(row.cancelled_by),
       cancelled_by_name: this.resolveUserName(row.cancelled_by, row.cancelled_by_name),
+      vendor_location_latitude: row.vendor_location_latitude === null || row.vendor_location_latitude === undefined ? null : Number(row.vendor_location_latitude),
+      vendor_location_longitude: row.vendor_location_longitude === null || row.vendor_location_longitude === undefined ? null : Number(row.vendor_location_longitude),
     };
   }
 
@@ -96,7 +98,17 @@ export class DeliveryRepository extends BaseRepository {
         claimer.username AS claimed_by_resolved_username,
         canceller.name AS cancelled_by_resolved_name,
         canceller.username AS cancelled_by_resolved_username
+        ,v.location_latitude AS vendor_location_latitude,
+        v.location_longitude AS vendor_location_longitude
       FROM deliveries d
+      LEFT JOIN vendors v ON v.vendor_id = (
+        SELECT v2.vendor_id
+        FROM vendors v2
+        WHERE v2.vendor_name = d.customer_name
+          AND v2.location = d.delivery_address
+        ORDER BY v2.vendor_id ASC
+        LIMIT 1
+      )
       LEFT JOIN app_users creator ON creator.user_id = d.created_by
       LEFT JOIN app_users claimer ON claimer.user_id = d.claimed_by
       LEFT JOIN app_users canceller ON canceller.user_id = d.cancelled_by

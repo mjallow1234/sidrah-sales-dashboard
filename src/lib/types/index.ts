@@ -222,6 +222,21 @@ export interface DeliveryRecord {
   cancelled_at?: string;
   cancelled_by?: string;
   cancelled_by_name?: string;
+  vendor_location_latitude?: number | null;
+  vendor_location_longitude?: number | null;
+}
+
+export interface DeliveryTrackingLocation {
+  delivery_id: string;
+  delivery_user_id: string;
+  delivery_user_name?: string;
+  delivery_user_username?: string;
+  vendor_name: string;
+  delivery_address: string;
+  latitude: number;
+  longitude: number;
+  location_updated_at: string;
+  is_stale: boolean;
 }
 
 export interface DeliveryPaymentOption {

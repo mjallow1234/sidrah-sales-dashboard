@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import type { DeliveryRecord } from '@/lib/types';
 import { useDeliveryPaymentsQuery } from '@/lib/hooks/deliveryPaymentQueries';
+import { DeliveryNavigationActions } from './delivery-navigation-actions';
 
 const statusLabels: Record<DeliveryRecord['status'], string> = {
   pending: 'Pending',
@@ -31,7 +32,7 @@ function formatRequestedAt(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-export function DeliveryCard({ delivery }: { delivery: DeliveryRecord }) {
+export function DeliveryCard({ delivery, showNavigation = false }: { delivery: DeliveryRecord; showNavigation?: boolean }) {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const paymentsQuery = useDeliveryPaymentsQuery(delivery.delivery_id);
   const visibleItems = showAllProducts ? delivery.items : delivery.items.slice(0, 3);
@@ -55,7 +56,8 @@ export function DeliveryCard({ delivery }: { delivery: DeliveryRecord }) {
         <div className="mt-5 space-y-4 text-sm">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Location</p>
-            <p className="mt-1 break-words text-slate-800">{delivery.delivery_address}</p>
+          <p className="mt-1 break-words text-slate-800">{delivery.delivery_address}</p>
+          {showNavigation && delivery.status === 'ongoing' && delivery.claimed_by ? <div className="mt-2"><DeliveryNavigationActions latitude={delivery.vendor_location_latitude} longitude={delivery.vendor_location_longitude} compact /></div> : null}
           </div>
 
           <div>

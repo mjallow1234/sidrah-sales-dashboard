@@ -4,8 +4,10 @@ import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useAuthQuery, useDeliveriesQuery, useDeliveryPreparationSummaryQuery } from '@/lib/hooks/queries';
 import { useDeliveryPaymentSummaryQuery } from '@/lib/hooks/deliveryPaymentQueries';
+import { useDeliveryTrackingQuery } from '@/lib/hooks/deliveryTrackingQueries';
 import type { DeliveryRecord } from '@/lib/types';
 import { DeliveryCard } from './delivery-card';
+import { DeliveryTrackingMap } from './delivery-tracking-map';
 
 const statusOptions = [
   { value: '', label: 'All' },
@@ -32,6 +34,7 @@ export function DeliveryList() {
   const rows = useMemo(() => deliveries, [deliveries]);
   const canCreateDelivery = !authLoading && auth?.role !== 'delivery';
   const canViewPreparationSummary = auth?.role === 'admin' || auth?.role === 'super_admin' || auth?.role === 'supervisor';
+  const trackingQuery = useDeliveryTrackingQuery(canViewPreparationSummary);
   const preparationSummary = useDeliveryPreparationSummaryQuery(canViewPreparationSummary);
   const paymentSummary = useDeliveryPaymentSummaryQuery({ date: selectedPaymentDate, location: paymentLocation || undefined, vendor: paymentVendorSearch || undefined }, canViewPreparationSummary);
   const emptyStateTitle = auth?.role === 'delivery' ? 'Currently no delivery requests available.' : 'No deliveries yet.';
@@ -73,6 +76,10 @@ export function DeliveryList() {
           )}
         </div>
       </div>
+
+      {canViewPreparationSummary ? (
+        <DeliveryTrackingMap locations={trackingQuery.data ?? []} isLoading={trackingQuery.isLoading} isError={trackingQuery.isError} />
+      ) : null}
 
       {canViewPreparationSummary ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft sm:p-6">
@@ -168,7 +175,7 @@ export function DeliveryList() {
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {rows.map((delivery) => <DeliveryCard key={delivery.delivery_id} delivery={delivery} />)}
+          {rows.map((delivery) => <DeliveryCard key={delivery.delivery_id} delivery={delivery} showNavigation={auth?.role === 'delivery'} />)}
         </div>
       )}
     </div>
