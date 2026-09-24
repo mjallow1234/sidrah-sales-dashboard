@@ -31,6 +31,22 @@ test('expense UI supports categories, filters, summaries, optional fields, and v
   assert.match(ui, /payment_method/);
 });
 
+test('expense rows expose an accessible details modal while keeping the table concise', () => {
+  const ui = read('src/components/factory/factory-expenses.tsx');
+  assert.match(ui, /role="button"/);
+  assert.match(ui, /tabIndex=\{0\}/);
+  for (const label of ['Expense details', 'Recorded at', 'Void reason', 'Close expense details']) assert.match(ui, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(ui, /lg:grid-cols-\[9rem_9rem/);
+});
+
+test('expense dates are rendered as compact calendar dates', () => {
+  const ui = read('src/components/factory/factory-expenses.tsx');
+  assert.match(ui, /const expenseDate =/);
+  assert.match(ui, /expenseDate\(expense\.expense_date\)/);
+  assert.match(ui, /timeZone: 'UTC'/);
+  assert.doesNotMatch(ui, /<td className="px-4 py-3 whitespace-nowrap">\{expense\.expense_date\}<\/td>/);
+});
+
 test('factory expenses are restricted in navigation and authorization', () => {
   const auth = read('src/lib/authorization.ts');
   const nav = read('src/components/layout/admin-layout.tsx');
