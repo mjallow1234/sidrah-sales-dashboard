@@ -83,6 +83,7 @@ const navSections = [
     links: [
       { label: 'Deliveries', href: '/deliveries', icon: Truck },
       { label: 'New delivery request', href: '/deliveries/new', icon: PlusCircle },
+      { label: 'Payment options', href: '/delivery-payment-options', icon: ClipboardList },
     ],
   },
   {

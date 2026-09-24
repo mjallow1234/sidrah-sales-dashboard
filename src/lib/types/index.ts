@@ -198,6 +198,43 @@ export interface DeliveryRecord {
   cancelled_by_name?: string;
 }
 
+export interface DeliveryPaymentOption {
+  payment_option_id: string;
+  name: string;
+  is_active: boolean;
+  date_created?: string;
+  last_updated?: string;
+}
+
+export interface DeliveryPayment {
+  payment_id: string;
+  delivery_id: string;
+  payment_option_id: string;
+  payment_method: string;
+  amount: number;
+  recorded_by: string;
+  recorded_by_name?: string;
+  recorded_at: string;
+}
+
+export interface DeliveryPaymentHistory {
+  payments: DeliveryPayment[];
+  total_amount: number;
+}
+
+export interface DeliveryPaymentSummaryEntry extends DeliveryPayment {
+  customer_name: string;
+  delivery_address: string;
+  claimed_by_name?: string;
+}
+
+export interface DeliveryPaymentSummary {
+  date: string;
+  locations: string[];
+  payments: DeliveryPaymentSummaryEntry[];
+  total_amount: number;
+}
+
 export type DeliveryActivityType = 'created' | 'claimed' | 'assigned' | 'reassigned' | 'delivered' | 'cancelled' | 'comment';
 
 export interface DeliveryActivity {

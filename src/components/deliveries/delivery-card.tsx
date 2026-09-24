@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import type { DeliveryRecord } from '@/lib/types';
+import { useDeliveryPaymentsQuery } from '@/lib/hooks/deliveryPaymentQueries';
 
 const statusLabels: Record<DeliveryRecord['status'], string> = {
   pending: 'Pending',
@@ -32,6 +33,7 @@ function formatRequestedAt(value: string) {
 
 export function DeliveryCard({ delivery }: { delivery: DeliveryRecord }) {
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const paymentsQuery = useDeliveryPaymentsQuery(delivery.delivery_id);
   const visibleItems = showAllProducts ? delivery.items : delivery.items.slice(0, 3);
   const hasMoreItems = delivery.items.length > visibleItems.length;
 
@@ -77,6 +79,13 @@ export function DeliveryCard({ delivery }: { delivery: DeliveryRecord }) {
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Requested</p>
               <p className="mt-1 break-words text-slate-800">{formatRequestedAt(delivery.date_created)}</p>
             </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Total received</p>
+            <p className="mt-1 font-semibold text-slate-900">
+              {paymentsQuery.isLoading ? 'Loading…' : `D${Number(paymentsQuery.data?.total_amount ?? 0).toLocaleString()}`}
+            </p>
           </div>
 
           {delivery.created_by_name ? (

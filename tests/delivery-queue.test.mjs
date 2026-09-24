@@ -16,6 +16,9 @@ test('delivery queue uses responsive cards with the complete first-view request 
   }
   assert.match(card, /item\.product_name/);
   assert.match(card, /item\.quantity/);
+  assert.match(card, /useDeliveryPaymentsQuery/);
+  assert.match(card, /Total received/);
+  assert.match(card, /total_amount/);
   assert.match(card, /\/deliveries\/\$\{delivery\.delivery_id\}/);
 });
 
@@ -26,4 +29,26 @@ test('delivery cards handle all statuses, unassigned requests, and larger item l
   assert.match(card, /Show all products/);
   assert.match(card, /Show fewer products/);
   assert.match(card, /aria-expanded/);
+});
+
+test('delivery preparation summary includes clickable received-payment total and breakdown', () => {
+  const list = read('src/components/deliveries/delivery-list.tsx');
+  const hooks = read('src/lib/hooks/deliveryPaymentQueries.ts');
+  assert.match(list, /useDeliveryPaymentSummaryQuery/);
+  assert.match(list, /Total Amount Received/);
+  assert.match(list, /Payment breakdown/);
+  assert.match(list, /role="dialog"/);
+  assert.match(list, /Close payment breakdown/);
+  assert.match(list, /selectedPaymentDate/);
+  assert.match(list, /All Locations/);
+  assert.match(list, /Search Vendor/);
+  assert.match(list, /payment\.delivery_address/);
+  assert.match(list, /payment\.customer_name/);
+  assert.ok(list.indexOf('Filter received payments') < list.indexOf('role="dialog"'));
+  assert.ok(list.indexOf('Payment breakdown') > list.indexOf('role="dialog"'));
+  assert.match(list, /payment\.payment_method/);
+  assert.match(list, /payment\.recorded_at/);
+  assert.match(list, /claimed_by_name/);
+  assert.match(hooks, /deliveryPayments/);
+  assert.match(hooks, /total_amount/);
 });

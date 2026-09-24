@@ -15,6 +15,7 @@ import {
   useReassignDeliveryMutation,
   useProductsQuery,
 } from '@/lib/hooks/queries';
+import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
 import type { DeliveryItem } from '@/lib/types';
 
 interface DeliveryDetailsProps {
@@ -51,12 +52,15 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const cancelMutation = useCancelDeliveryMutation();
   const addCommentMutation = useAddDeliveryCommentMutation();
   const addItemsMutation = useAddDeliveryItemsMutation();
+  const recordPaymentMutation = useRecordDeliveryPaymentMutation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProductsQuery();
 
   const currentUserId = authQuery.data?.userId ?? '';
   const currentRole = authQuery.data?.role;
   const isDeliveryUser = currentRole === 'delivery';
   const isAdminOrSupervisor = currentRole === 'admin' || currentRole === 'super_admin' || currentRole === 'supervisor';
+  const paymentOptionsQuery = useDeliveryPaymentOptionsQuery(false, Boolean(currentRole));
+  const paymentsQuery = useDeliveryPaymentsQuery(deliveryId, Boolean(currentRole));
 
   const isActionable = delivery?.status === 'pending' || delivery?.status === 'ongoing';
   const canClaim = isDeliveryUser && delivery?.status === 'pending';
@@ -66,6 +70,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const canReassign = isAdminOrSupervisor && isActionable;
   const canCancel = isAdminOrSupervisor && isActionable;
   const canAddItems = (currentRole === 'agent' || isAdminOrSupervisor) && isActionable;
+  const canRecordPayment = isDeliveryUser || isAdminOrSupervisor;
 
   const { data: deliveryUsers = [] } = useDeliveryUsersQuery(canReassign);
   const [reassignTarget, setReassignTarget] = useState('');
@@ -75,6 +80,8 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [showItemsForm, setShowItemsForm] = useState(false);
   const [additionalItems, setAdditionalItems] = useState([{ product_id: '', quantity: 1 }]);
+  const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentOptionId, setPaymentOptionId] = useState('');
 
   const assignedToLabel = useMemo(() => {
     if (!delivery?.claimed_by) {
@@ -125,6 +132,14 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
     });
   };
 
+  const handleRecordPayment = () => {
+    const amount = Number(paymentAmount);
+    if (!paymentOptionId || !Number.isFinite(amount) || amount <= 0) return;
+    recordPaymentMutation.mutate({ deliveryId: delivery.delivery_id, amount, paymentOptionId }, {
+      onSuccess: () => { setPaymentAmount(''); setPaymentOptionId(''); },
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
@@ -154,6 +169,27 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
             ) : null}
           </div>
         </div>
+      </div>
+
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Payments received</h2>
+            <p className="mt-1 text-sm text-slate-600">Total received: <span className="font-semibold">{Number(paymentsQuery.data?.total_amount ?? 0).toLocaleString()}</span></p>
+          </div>
+        </div>
+        {canRecordPayment ? (
+          <div className="mt-4 grid gap-3 rounded-2xl border border-sidrah-100 bg-sidrah-50/40 p-4 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
+            <label className="text-sm font-semibold text-slate-900">Amount received<input type="number" min="0.01" step="0.01" value={paymentAmount} onChange={(event) => setPaymentAmount(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 font-normal" /></label>
+            <label className="text-sm font-semibold text-slate-900">Payment method<select value={paymentOptionId} onChange={(event) => setPaymentOptionId(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 font-normal"><option value="">Select method</option>{(paymentOptionsQuery.data ?? []).map((option) => <option key={option.payment_option_id} value={option.payment_option_id}>{option.name}</option>)}</select></label>
+            <Button type="button" onClick={handleRecordPayment} disabled={!paymentAmount || !paymentOptionId || Number(paymentAmount) <= 0 || recordPaymentMutation.isPending}>{recordPaymentMutation.isPending ? 'Recording…' : 'Record payment'}</Button>
+            {recordPaymentMutation.error ? <p className="text-sm text-rose-600 sm:col-span-3">{recordPaymentMutation.error.message}</p> : null}
+          </div>
+        ) : null}
+        {paymentsQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading payment history…</p> : null}
+        {paymentsQuery.isError ? <p className="mt-4 text-sm text-rose-600">Unable to load payment history.</p> : null}
+        {!paymentsQuery.isLoading && !paymentsQuery.isError && (paymentsQuery.data?.payments.length ?? 0) === 0 ? <p className="mt-4 text-sm text-slate-500">No payments recorded.</p> : null}
+        <div className="mt-4 space-y-3">{(paymentsQuery.data?.payments ?? []).map((payment) => <div key={payment.payment_id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-slate-900">{Number(payment.amount).toLocaleString()} · {payment.payment_method}</span><span className="text-xs text-slate-500">{new Date(payment.recorded_at).toLocaleString()}</span></div><p className="mt-1 text-slate-600">Recorded by {payment.recorded_by_name || 'Unknown user'}</p></div>)}</div>
       </div>
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
