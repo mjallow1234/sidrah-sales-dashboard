@@ -240,12 +240,18 @@ export interface DeliveryTrackingLocation {
 }
 
 export type FactoryExpenseStatus = 'active' | 'voided';
-export type FactoryExpensePaymentMethod = 'Cash' | 'Bank Transfer' | 'Mobile Money' | 'Credit' | 'Other';
+export type FactoryExpensePaymentMethod = string;
 
 export interface FactoryExpenseCategory {
   category_id: string;
   name: string;
   category_group?: string | null;
+  is_active: boolean;
+}
+
+export interface FactoryExpensePaymentMethodOption {
+  payment_method_id: string;
+  name: string;
   is_active: boolean;
 }
 

@@ -14,6 +14,22 @@ test('expense migrations create seeded, soft-deletable categories and expenses',
   assert.match(expenses, /payment_method ENUM\('Cash','Bank Transfer','Mobile Money','Credit','Other'\)/);
 });
 
+test('payment methods are dynamically managed and historical names remain stored on expenses', () => {
+  const migration = read('db/migrations/0025_create_factory_expense_payment_methods.sql');
+  const route = read('src/app/api/factory/expenses/route.ts');
+  const repository = read('src/repositories/FactoryExpenseRepository.ts');
+  const ui = read('src/components/factory/factory-expenses.tsx');
+  assert.match(migration, /CREATE TABLE factory_expense_payment_methods/);
+  assert.match(migration, /is_active/);
+  assert.match(migration, /ALTER TABLE factory_expenses MODIFY payment_method VARCHAR/);
+  assert.match(route, /payment-methods/);
+  assert.match(repository, /listPaymentMethods/);
+  assert.match(read('src/services/factoryExpenseService.ts'), /listPaymentMethods\(false\)/);
+  assert.match(ui, /Manage payment methods/);
+  assert.match(ui, /activePaymentMethods/);
+  assert.match(ui, /Deactivate.*Reactivate/);
+});
+
 test('expense APIs are admin-only and preserve audit actor data', () => {
   const route = read('src/app/api/factory/expenses/route.ts');
   const service = read('src/services/factoryExpenseService.ts');

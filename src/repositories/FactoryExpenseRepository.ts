@@ -1,10 +1,33 @@
-import type { FactoryExpense, FactoryExpenseCategory, FactoryExpensePaymentMethod, FactoryExpenseSummary } from '@/lib/types';
+import type { FactoryExpense, FactoryExpenseCategory, FactoryExpensePaymentMethod, FactoryExpensePaymentMethodOption, FactoryExpenseSummary } from '@/lib/types';
 import { BaseRepository } from './BaseRepository';
 import { NotFoundError } from './errors';
 
 export interface ExpenseFilters { from?: string; to?: string; categoryId?: string; paymentMethod?: FactoryExpensePaymentMethod; search?: string; }
 
 export class FactoryExpenseRepository extends BaseRepository {
+  public async listPaymentMethods(includeInactive = true): Promise<FactoryExpensePaymentMethodOption[]> {
+    const [rows] = await this.execute<any[]>(`SELECT payment_method_id,name,is_active FROM factory_expense_payment_methods ${includeInactive ? '' : 'WHERE is_active = 1'} ORDER BY name ASC`);
+    return rows.map((row) => ({ payment_method_id: String(row.payment_method_id), name: String(row.name), is_active: Boolean(row.is_active) }));
+  }
+
+  public async createPaymentMethod(paymentMethodId: string, name: string): Promise<FactoryExpensePaymentMethodOption> {
+    await this.execute(`INSERT INTO factory_expense_payment_methods (payment_method_id,name,is_active) VALUES (?,?,1)`, [paymentMethodId, name]);
+    const [rows] = await this.execute<any[]>(`SELECT payment_method_id,name,is_active FROM factory_expense_payment_methods WHERE payment_method_id = ?`, [paymentMethodId]);
+    return { payment_method_id: String(rows[0].payment_method_id), name: String(rows[0].name), is_active: Boolean(rows[0].is_active) };
+  }
+
+  public async updatePaymentMethod(paymentMethodId: string, updates: { name?: string; is_active?: boolean }): Promise<FactoryExpensePaymentMethodOption> {
+    const fields: string[] = []; const values: unknown[] = [];
+    if (updates.name !== undefined) { fields.push('name = ?'); values.push(updates.name); }
+    if (updates.is_active !== undefined) { fields.push('is_active = ?'); values.push(updates.is_active); }
+    if (!fields.length) throw new Error('No payment method changes supplied.');
+    values.push(paymentMethodId);
+    const [result] = await this.execute<any>(`UPDATE factory_expense_payment_methods SET ${fields.join(', ')}, updated_at = NOW() WHERE payment_method_id = ?`, values);
+    if (!result.affectedRows) throw new NotFoundError('Expense payment method', paymentMethodId);
+    const [rows] = await this.execute<any[]>(`SELECT payment_method_id,name,is_active FROM factory_expense_payment_methods WHERE payment_method_id = ?`, [paymentMethodId]);
+    return { payment_method_id: String(rows[0].payment_method_id), name: String(rows[0].name), is_active: Boolean(rows[0].is_active) };
+  }
+
   public async listCategories(includeInactive = true): Promise<FactoryExpenseCategory[]> {
     const [rows] = await this.execute<any[]>(`SELECT category_id,name,category_group,is_active FROM factory_expense_categories ${includeInactive ? '' : 'WHERE is_active = 1'} ORDER BY name ASC`);
     return rows.map((row) => ({ category_id: String(row.category_id), name: String(row.name), category_group: row.category_group == null ? null : String(row.category_group), is_active: Boolean(row.is_active) }));
