@@ -6,7 +6,7 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, decideAccountabilityTransfer, getAccountabilityAgents, getAccountabilityTransfers, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, initiateAccountabilityTransfer, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
@@ -372,6 +372,24 @@ export function useRecordAccountabilityCollectionMutation() {
 export function useRecordAccountabilityReturnMutation() {
   const client = useQueryClient();
   return useMutation({ mutationFn: ({ deliveryId, payload }: { deliveryId: string; payload: Parameters<typeof recordAccountabilityReturn>[1] }) => recordAccountabilityReturn(deliveryId, payload), onSuccess: (_data, variables) => { client.invalidateQueries({ queryKey: ['deliveryAccountability', variables.deliveryId] }); client.invalidateQueries({ queryKey: ['delivery', variables.deliveryId] }); } });
+}
+
+export function useAccountabilityAgentsQuery(enabled = true) {
+  return useQuery({ queryKey: ['accountabilityAgents'], queryFn: getAccountabilityAgents, enabled, staleTime: 60 * 1000 });
+}
+
+export function useAccountabilityTransfersQuery(enabled = true) {
+  return useQuery({ queryKey: ['accountabilityTransfers'], queryFn: getAccountabilityTransfers, enabled, staleTime: 15 * 1000 });
+}
+
+export function useInitiateAccountabilityTransferMutation() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ deliveryId, payload }: { deliveryId: string; payload: Parameters<typeof initiateAccountabilityTransfer>[1] }) => initiateAccountabilityTransfer(deliveryId, payload), onSuccess: () => { client.invalidateQueries({ queryKey: ['accountabilityTransfers'] }); client.invalidateQueries({ queryKey: ['deliveryAccountability'] }); client.invalidateQueries({ queryKey: ['delivery'] }); } });
+}
+
+export function useDecideAccountabilityTransferMutation() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ transferId, action, reason }: { transferId: string; action: 'accept' | 'reject' | 'cancel'; reason?: string }) => decideAccountabilityTransfer(transferId, action, reason), onSuccess: () => { client.invalidateQueries({ queryKey: ['accountabilityTransfers'] }); client.invalidateQueries({ queryKey: ['deliveryAccountability'] }); client.invalidateQueries({ queryKey: ['delivery'] }); } });
 }
 
 export function useAddDeliveryItemsMutation() {

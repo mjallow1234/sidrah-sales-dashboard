@@ -280,6 +280,33 @@ export interface AgentAccountabilityDetail {
   events: AgentAccountabilityEvent[];
 }
 
+export type AgentAccountabilityTransferStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
+
+export interface AgentAccountabilityTransfer {
+  transfer_id: string;
+  operation_id: string;
+  case_id: string;
+  delivery_id: string;
+  vendor_id: string;
+  from_agent_user_id: string;
+  from_agent_name?: string;
+  to_agent_user_id: string;
+  to_agent_name?: string;
+  vendor_name?: string;
+  requested_amount: number;
+  accepted_amount?: number;
+  status: AgentAccountabilityTransferStatus;
+  reason?: string;
+  initiated_by: string;
+  initiated_by_name?: string;
+  initiated_at: string;
+  decided_by?: string;
+  decided_by_name?: string;
+  decided_at?: string;
+  decision_reason?: string;
+  current_remaining_value: number;
+}
+
 export interface DeliveryTrackingLocation {
   delivery_id: string;
   delivery_user_id: string;

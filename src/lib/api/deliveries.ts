@@ -1,4 +1,4 @@
-import type { AgentAccountabilityDetail, DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord } from '@/lib/types';
+import type { AgentAccountabilityDetail, AgentAccountabilityTransfer, DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord } from '@/lib/types';
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, options);
@@ -58,6 +58,26 @@ export async function recordAccountabilityCollection(deliveryId: string, payload
 
 export async function recordAccountabilityReturn(deliveryId: string, payload: { product_id: string; quantity: number; operation_id?: string; reason?: string }): Promise<AgentAccountabilityDetail | null> {
   const result = await fetchJson<{ status: string; data: AgentAccountabilityDetail | null }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/accountability/returns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return result.data;
+}
+
+export async function getAccountabilityAgents(): Promise<Array<{ user_id: string; name: string }>> {
+  const result = await fetchJson<{ status: string; data: Array<{ user_id: string; name: string }> }>('/api/accountability/agents');
+  return result.data;
+}
+
+export async function getAccountabilityTransfers(): Promise<AgentAccountabilityTransfer[]> {
+  const result = await fetchJson<{ status: string; data: AgentAccountabilityTransfer[] }>('/api/accountability/transfers');
+  return result.data;
+}
+
+export async function initiateAccountabilityTransfer(deliveryId: string, payload: { to_agent_user_id: string; operation_id?: string; reason?: string }): Promise<AgentAccountabilityTransfer | null> {
+  const result = await fetchJson<{ status: string; data: AgentAccountabilityTransfer | null }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/accountability/transfers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return result.data;
+}
+
+export async function decideAccountabilityTransfer(transferId: string, action: 'accept' | 'reject' | 'cancel', reason?: string): Promise<AgentAccountabilityTransfer | null> {
+  const result = await fetchJson<{ status: string; data: AgentAccountabilityTransfer | null }>(`/api/accountability/transfers/${encodeURIComponent(transferId)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, reason }) });
   return result.data;
 }
 

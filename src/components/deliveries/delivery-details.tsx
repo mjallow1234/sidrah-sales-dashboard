@@ -13,6 +13,10 @@ import {
   useDeliveryAccountabilityQuery,
   useRecordAccountabilityCollectionMutation,
   useRecordAccountabilityReturnMutation,
+  useAccountabilityAgentsQuery,
+  useAccountabilityTransfersQuery,
+  useInitiateAccountabilityTransferMutation,
+  useDecideAccountabilityTransferMutation,
   useDeliveryUsersQuery,
   useMarkDeliveryDeliveredMutation,
   useReassignDeliveryMutation,
@@ -82,6 +86,10 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const canAddItems = (currentRole === 'agent' || isAdminOrSupervisor) && isActionable;
   const canRecordPayment = canRecordDeliveryPayment(currentRole);
   const canViewAccountability = currentRole === 'agent' || isAdminOrSupervisor;
+  const accountabilityAgentsQuery = useAccountabilityAgentsQuery(currentRole === 'agent' && canViewAccountability);
+  const accountabilityTransfersQuery = useAccountabilityTransfersQuery(canViewAccountability);
+  const initiateTransferMutation = useInitiateAccountabilityTransferMutation();
+  const decideTransferMutation = useDecideAccountabilityTransferMutation();
 
   const { data: deliveryUsers = [] } = useDeliveryUsersQuery(canReassign);
   const [reassignTarget, setReassignTarget] = useState('');
@@ -99,6 +107,8 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [accountabilityReturnProduct, setAccountabilityReturnProduct] = useState('');
   const [accountabilityReturnQuantity, setAccountabilityReturnQuantity] = useState('');
   const [accountabilityReturnReason, setAccountabilityReturnReason] = useState('');
+  const [transferRecipient, setTransferRecipient] = useState('');
+  const [transferReason, setTransferReason] = useState('');
 
   const assignedToLabel = useMemo(() => {
     if (!delivery?.claimed_by) {
@@ -167,6 +177,17 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
     const quantity = Number(accountabilityReturnQuantity);
     if (!accountabilityReturnProduct || !Number.isFinite(quantity) || quantity <= 0) return;
     returnMutation.mutate({ deliveryId: delivery.delivery_id, payload: { product_id: accountabilityReturnProduct, quantity, operation_id: `AAR_${crypto.randomUUID()}`, reason: accountabilityReturnReason || undefined } }, { onSuccess: () => { setAccountabilityReturnQuantity(''); setAccountabilityReturnReason(''); } });
+  };
+
+  const currentTransfer = (accountabilityTransfersQuery.data ?? []).find((transfer) => transfer.delivery_id === delivery.delivery_id && transfer.status === 'pending');
+  const handleInitiateTransfer = () => {
+    if (!transferRecipient || !window.confirm(`Transfer the current accountability to ${accountabilityAgentsQuery.data?.find((agent) => agent.user_id === transferRecipient)?.name ?? 'the selected agent'}?`)) return;
+    initiateTransferMutation.mutate({ deliveryId: delivery.delivery_id, payload: { to_agent_user_id: transferRecipient, operation_id: `AAT_${crypto.randomUUID()}`, reason: transferReason || undefined } }, { onSuccess: () => { setTransferRecipient(''); setTransferReason(''); } });
+  };
+
+  const handleTransferDecision = (action: 'accept' | 'reject' | 'cancel') => {
+    if (!currentTransfer || !window.confirm(action === 'accept' ? `You are accepting responsibility for D${Number(currentTransfer.current_remaining_value).toLocaleString()}. Continue?` : `${action[0].toUpperCase()}${action.slice(1)} this transfer?`)) return;
+    decideTransferMutation.mutate({ transferId: currentTransfer.transfer_id, action });
   };
 
   return (
@@ -242,13 +263,20 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
               </div>
             </div>
           ) : null}
+          <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+            <p className="font-semibold text-slate-900">Accountability transfers</p>
+            {currentTransfer ? <div className="mt-2 text-sm text-slate-700"><p>{currentTransfer.from_agent_name || 'Agent'} → {currentTransfer.to_agent_name || 'Agent'} · D{Number(currentTransfer.current_remaining_value).toLocaleString()}</p><p className="text-xs text-slate-500">Status: {currentTransfer.status === 'pending' ? 'Awaiting acknowledgement' : currentTransfer.status}</p><div className="mt-3 flex flex-wrap gap-2">{currentTransfer.to_agent_user_id === currentUserId || isAdminOrSupervisor ? <><Button type="button" onClick={() => handleTransferDecision('accept')} disabled={decideTransferMutation.isPending}>Accept</Button><Button type="button" variant="secondary" onClick={() => handleTransferDecision('reject')} disabled={decideTransferMutation.isPending}>Reject</Button></> : null}{currentTransfer.from_agent_user_id === currentUserId || isAdminOrSupervisor ? <Button type="button" variant="secondary" onClick={() => handleTransferDecision('cancel')} disabled={decideTransferMutation.isPending}>Cancel</Button> : null}</div></div> : <p className="mt-2 text-sm text-slate-600">No pending transfer for this accountability.</p>}
+            {currentRole === 'agent' && delivery.accountable_agent_user_id === currentUserId && delivery.accountability_status === 'active' && !currentTransfer ? <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end"><label className="text-sm font-semibold text-slate-900">Transfer to<select value={transferRecipient} onChange={(event) => setTransferRecipient(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 font-normal"><option value="">Select active agent</option>{(accountabilityAgentsQuery.data ?? []).filter((agent) => agent.user_id !== currentUserId).map((agent) => <option key={agent.user_id} value={agent.user_id}>{agent.name}</option>)}</select></label><input value={transferReason} onChange={(event) => setTransferReason(event.target.value)} placeholder="Reason (optional)" className="rounded-2xl border border-slate-200 bg-white px-3 py-2" /><Button type="button" onClick={handleInitiateTransfer} disabled={!transferRecipient || initiateTransferMutation.isPending}>Transfer accountability</Button></div> : null}
+            {initiateTransferMutation.error ? <p className="mt-2 text-sm text-rose-600">{initiateTransferMutation.error.message}</p> : null}
+            {decideTransferMutation.error ? <p className="mt-2 text-sm text-rose-600">{decideTransferMutation.error.message}</p> : null}
+          </div>
           {accountabilityQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading accountability history…</p> : null}
           {accountabilityQuery.isError ? <p className="mt-4 text-sm text-rose-600">Unable to load accountability history.</p> : null}
           {accountabilityQuery.data?.events.length ? (
             <div className="mt-4 space-y-2">
               {accountabilityQuery.data.events.map((event) => (
                 <div key={event.event_id} className="rounded-2xl bg-white px-4 py-3 text-sm">
-                  <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-slate-900">{event.event_type === 'pending_delivery' ? 'Pending delivery' : 'Delivery activated'}</span><span className="text-slate-600">D{event.amount_delta.toLocaleString()}</span></div>
+                  <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-slate-900">{event.event_type === 'pending_delivery' ? 'Pending delivery' : event.event_type === 'delivery_activation' ? 'Delivery activated' : event.event_type === 'cash_collection' ? 'Cash collection' : event.event_type === 'stock_return' ? 'Stock returned' : event.event_type === 'transfer_out' ? 'Transfer to another agent' : event.event_type === 'transfer_in' ? 'Transfer accepted' : event.event_type}</span><span className="text-slate-600">{event.amount_delta < 0 ? '-' : '+'}D{Math.abs(event.amount_delta).toLocaleString()}</span></div>
                   <p className="mt-1 text-xs text-slate-500">{new Date(event.occurred_at).toLocaleString()} · Recorded by {event.recorded_by_name || 'Unknown user'}</p>
                 </div>
               ))}
