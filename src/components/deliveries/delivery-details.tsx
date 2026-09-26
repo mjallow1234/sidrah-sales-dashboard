@@ -11,12 +11,14 @@ import {
   useDeliveryQuery,
   useDeliveryActivityQuery,
   useDeliveryAccountabilityQuery,
+  useRecordAccountabilityCollectionMutation,
+  useRecordAccountabilityReturnMutation,
   useDeliveryUsersQuery,
   useMarkDeliveryDeliveredMutation,
   useReassignDeliveryMutation,
   useProductsQuery,
 } from '@/lib/hooks/queries';
-import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
+import { useAccountabilityPaymentOptionsQuery, useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
 import { canRecordDeliveryPayment } from '@/lib/authorization';
 import type { DeliveryItem } from '@/lib/types';
 import { DeliveryLocationReporter } from './delivery-location-reporter';
@@ -64,8 +66,11 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const isDeliveryUser = currentRole === 'delivery';
   const isAdminOrSupervisor = currentRole === 'admin' || currentRole === 'super_admin' || currentRole === 'supervisor';
   const paymentOptionsQuery = useDeliveryPaymentOptionsQuery(false, Boolean(currentRole));
+  const accountabilityPaymentOptionsQuery = useAccountabilityPaymentOptionsQuery(currentRole === 'agent' || isAdminOrSupervisor);
   const paymentsQuery = useDeliveryPaymentsQuery(deliveryId, Boolean(currentRole));
   const accountabilityQuery = useDeliveryAccountabilityQuery(deliveryId, currentRole === 'agent' || isAdminOrSupervisor);
+  const collectionMutation = useRecordAccountabilityCollectionMutation();
+  const returnMutation = useRecordAccountabilityReturnMutation();
 
   const isActionable = delivery?.status === 'pending' || delivery?.status === 'ongoing';
   const canClaim = isDeliveryUser && delivery?.status === 'pending';
@@ -88,6 +93,12 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [additionalItems, setAdditionalItems] = useState([{ product_id: '', quantity: 1 }]);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentOptionId, setPaymentOptionId] = useState('');
+  const [accountabilityCollectionAmount, setAccountabilityCollectionAmount] = useState('');
+  const [accountabilityCollectionOption, setAccountabilityCollectionOption] = useState('');
+  const [accountabilityCollectionReason, setAccountabilityCollectionReason] = useState('');
+  const [accountabilityReturnProduct, setAccountabilityReturnProduct] = useState('');
+  const [accountabilityReturnQuantity, setAccountabilityReturnQuantity] = useState('');
+  const [accountabilityReturnReason, setAccountabilityReturnReason] = useState('');
 
   const assignedToLabel = useMemo(() => {
     if (!delivery?.claimed_by) {
@@ -146,6 +157,18 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
     });
   };
 
+  const handleAccountabilityCollection = () => {
+    const amount = Number(accountabilityCollectionAmount);
+    if (!accountabilityCollectionOption || !Number.isFinite(amount) || amount <= 0) return;
+    collectionMutation.mutate({ deliveryId: delivery.delivery_id, payload: { amount, payment_option_id: accountabilityCollectionOption, operation_id: `AAC_${crypto.randomUUID()}`, reason: accountabilityCollectionReason || undefined } }, { onSuccess: () => { setAccountabilityCollectionAmount(''); setAccountabilityCollectionReason(''); } });
+  };
+
+  const handleAccountabilityReturn = () => {
+    const quantity = Number(accountabilityReturnQuantity);
+    if (!accountabilityReturnProduct || !Number.isFinite(quantity) || quantity <= 0) return;
+    returnMutation.mutate({ deliveryId: delivery.delivery_id, payload: { product_id: accountabilityReturnProduct, quantity, operation_id: `AAR_${crypto.randomUUID()}`, reason: accountabilityReturnReason || undefined } }, { onSuccess: () => { setAccountabilityReturnQuantity(''); setAccountabilityReturnReason(''); } });
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
@@ -191,6 +214,34 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
             <p className="text-2xl font-semibold text-sidrah-700">D{Number(delivery.accountability_status === 'active' ? delivery.accountability_active_value ?? 0 : delivery.accountability_pending_value ?? 0).toLocaleString()}</p>
           </div>
           <p className="mt-2 text-sm text-slate-600">Accountable agent: <span className="font-semibold text-slate-900">{delivery.accountable_agent_name || 'Unknown user'}</span></p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl bg-white p-4"><p className="text-xs uppercase tracking-[0.15em] text-slate-500">Cash collected</p><p className="mt-1 text-xl font-semibold text-slate-900">D{Number(delivery.accountability_cash_collected ?? accountabilityQuery.data?.cash_collected ?? 0).toLocaleString()}</p></div>
+            <div className="rounded-2xl bg-white p-4"><p className="text-xs uppercase tracking-[0.15em] text-slate-500">Stock returned</p><p className="mt-1 text-xl font-semibold text-slate-900">D{Number(delivery.accountability_stock_returned ?? accountabilityQuery.data?.stock_returned ?? 0).toLocaleString()}</p></div>
+            <div className="rounded-2xl bg-white p-4"><p className="text-xs uppercase tracking-[0.15em] text-slate-500">Remaining accountability</p><p className="mt-1 text-xl font-semibold text-slate-900">D{Number(delivery.accountability_remaining_value ?? accountabilityQuery.data?.remaining_value ?? delivery.accountability_active_value ?? 0).toLocaleString()}</p></div>
+          </div>
+          {delivery.accountability_status === 'active' ? (
+            <div className="mt-4 grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="font-semibold text-slate-900">Record accountability collection</p>
+                <p className="mt-1 text-xs text-slate-500">Reduces Agent Accountability only. Vendor Balance is unchanged.</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <input type="number" min="0.01" step="0.01" value={accountabilityCollectionAmount} onChange={(event) => setAccountabilityCollectionAmount(event.target.value)} placeholder="Amount" className="rounded-2xl border border-slate-200 px-3 py-2" />
+                  <select value={accountabilityCollectionOption} onChange={(event) => setAccountabilityCollectionOption(event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2"><option value="">Payment method</option>{(accountabilityPaymentOptionsQuery.data ?? []).map((option) => <option key={option.payment_option_id} value={option.payment_option_id}>{option.name}</option>)}</select>
+                </div>
+                <input value={accountabilityCollectionReason} onChange={(event) => setAccountabilityCollectionReason(event.target.value)} placeholder="Reason (optional)" className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2" />
+                <Button type="button" className="mt-3" onClick={handleAccountabilityCollection} disabled={collectionMutation.isPending || !accountabilityCollectionAmount || !accountabilityCollectionOption}>{collectionMutation.isPending ? 'Recording…' : 'Record collection'}</Button>
+                {collectionMutation.error ? <p className="mt-2 text-sm text-rose-600">{collectionMutation.error.message}</p> : null}
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="font-semibold text-slate-900">Return stock</p>
+                <p className="mt-1 text-xs text-slate-500">Reduces Agent Accountability only. Vendor Balance is unchanged.</p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2"><select value={accountabilityReturnProduct} onChange={(event) => setAccountabilityReturnProduct(event.target.value)} className="rounded-2xl border border-slate-200 px-3 py-2"><option value="">Product</option>{delivery.items.filter((item) => item.product_id).map((item) => <option key={item.product_id} value={item.product_id}>{item.product_name}</option>)}</select><input type="number" min="0.001" step="0.001" value={accountabilityReturnQuantity} onChange={(event) => setAccountabilityReturnQuantity(event.target.value)} placeholder="Quantity" className="rounded-2xl border border-slate-200 px-3 py-2" /></div>
+                <input value={accountabilityReturnReason} onChange={(event) => setAccountabilityReturnReason(event.target.value)} placeholder="Reason (optional)" className="mt-3 w-full rounded-2xl border border-slate-200 px-3 py-2" />
+                <Button type="button" className="mt-3" onClick={handleAccountabilityReturn} disabled={returnMutation.isPending || !accountabilityReturnProduct || !accountabilityReturnQuantity}>{returnMutation.isPending ? 'Recording…' : 'Return stock'}</Button>
+                {returnMutation.error ? <p className="mt-2 text-sm text-rose-600">{returnMutation.error.message}</p> : null}
+              </div>
+            </div>
+          ) : null}
           {accountabilityQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading accountability history…</p> : null}
           {accountabilityQuery.isError ? <p className="mt-4 text-sm text-rose-600">Unable to load accountability history.</p> : null}
           {accountabilityQuery.data?.events.length ? (

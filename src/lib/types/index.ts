@@ -230,6 +230,9 @@ export interface DeliveryRecord {
   accountability_status?: 'pending' | 'active' | 'closed' | 'voided';
   accountability_pending_value?: number;
   accountability_active_value?: number;
+  accountability_cash_collected?: number;
+  accountability_stock_returned?: number;
+  accountability_remaining_value?: number;
 }
 
 export type AgentAccountabilityEventType = 'pending_delivery' | 'delivery_activation' | 'cash_collection' | 'stock_return' | 'transfer_out' | 'transfer_in' | 'cash_handover' | 'correction' | 'reversal';
@@ -255,6 +258,11 @@ export interface AgentAccountabilityEvent {
   occurred_at: string;
   recorded_by: string;
   recorded_by_name?: string;
+  payment_option_id?: string;
+  payment_method?: string;
+  source_payment_id?: string;
+  collector_user_id?: string;
+  collector_name?: string;
 }
 
 export interface AgentAccountabilityDetail {
@@ -266,6 +274,9 @@ export interface AgentAccountabilityDetail {
   status: 'pending' | 'active' | 'closed' | 'voided';
   pending_value: number;
   active_value: number;
+  cash_collected: number;
+  stock_returned: number;
+  remaining_value: number;
   events: AgentAccountabilityEvent[];
 }
 

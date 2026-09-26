@@ -1,11 +1,15 @@
 'use client';
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createDeliveryPaymentOption, getDeliveryPaymentOptions, getDeliveryPayments, getDeliveryPaymentSummary, recordDeliveryPayment, updateDeliveryPaymentOption } from '@/lib/api/deliveryPayments';
+import { createDeliveryPaymentOption, getAccountabilityPaymentOptions, getDeliveryPaymentOptions, getDeliveryPayments, getDeliveryPaymentSummary, recordDeliveryPayment, updateDeliveryPaymentOption } from '@/lib/api/deliveryPayments';
 import type { DeliveryRecord } from '@/lib/types';
 
 export function useDeliveryPaymentOptionsQuery(includeInactive = false, enabled = true) {
   return useQuery({ queryKey: ['deliveryPaymentOptions', includeInactive], queryFn: () => getDeliveryPaymentOptions(includeInactive), enabled, staleTime: 60 * 1000 });
+}
+
+export function useAccountabilityPaymentOptionsQuery(enabled = true) {
+  return useQuery({ queryKey: ['accountabilityPaymentOptions'], queryFn: getAccountabilityPaymentOptions, enabled, staleTime: 60 * 1000 });
 }
 
 export function useCreateDeliveryPaymentOptionMutation() {

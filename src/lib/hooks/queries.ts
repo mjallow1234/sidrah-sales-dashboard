@@ -6,7 +6,7 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
@@ -362,6 +362,16 @@ export function useDeliveryAccountabilityQuery(deliveryId?: string, enabled = tr
     queryFn: () => getDeliveryAccountability(deliveryId ?? ''),
     enabled: enabled && !!deliveryId,
   });
+}
+
+export function useRecordAccountabilityCollectionMutation() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ deliveryId, payload }: { deliveryId: string; payload: Parameters<typeof recordAccountabilityCollection>[1] }) => recordAccountabilityCollection(deliveryId, payload), onSuccess: (_data, variables) => { client.invalidateQueries({ queryKey: ['deliveryAccountability', variables.deliveryId] }); client.invalidateQueries({ queryKey: ['delivery', variables.deliveryId] }); } });
+}
+
+export function useRecordAccountabilityReturnMutation() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ deliveryId, payload }: { deliveryId: string; payload: Parameters<typeof recordAccountabilityReturn>[1] }) => recordAccountabilityReturn(deliveryId, payload), onSuccess: (_data, variables) => { client.invalidateQueries({ queryKey: ['deliveryAccountability', variables.deliveryId] }); client.invalidateQueries({ queryKey: ['delivery', variables.deliveryId] }); } });
 }
 
 export function useAddDeliveryItemsMutation() {

@@ -94,6 +94,9 @@ export class DeliveryRepository extends BaseRepository {
       accountability_status: row.accountability_status === null || row.accountability_status === undefined ? undefined : String(row.accountability_status) as DeliveryRecord['accountability_status'],
       accountability_pending_value: row.accountability_pending_value === null || row.accountability_pending_value === undefined ? undefined : Number(row.accountability_pending_value),
       accountability_active_value: row.accountability_active_value === null || row.accountability_active_value === undefined ? undefined : Number(row.accountability_active_value),
+      accountability_cash_collected: row.accountability_cash_collected === null || row.accountability_cash_collected === undefined ? undefined : Number(row.accountability_cash_collected),
+      accountability_stock_returned: row.accountability_stock_returned === null || row.accountability_stock_returned === undefined ? undefined : Number(row.accountability_stock_returned),
+      accountability_remaining_value: row.accountability_remaining_value === null || row.accountability_remaining_value === undefined ? undefined : Number(row.accountability_remaining_value),
     };
   }
 
@@ -109,7 +112,10 @@ export class DeliveryRepository extends BaseRepository {
         ac.status AS accountability_status,
         accountability_agent.name AS accountable_agent_name,
         (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'pending') AS accountability_pending_value,
-        (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted') AS accountability_active_value
+        (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted' AND e.event_type = 'delivery_activation') AS accountability_active_value,
+        (SELECT COALESCE(-SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted' AND e.event_type = 'cash_collection') AS accountability_cash_collected,
+        (SELECT COALESCE(-SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted' AND e.event_type = 'stock_return') AS accountability_stock_returned,
+        (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted') AS accountability_remaining_value
         ,v.location_latitude AS vendor_location_latitude,
         v.location_longitude AS vendor_location_longitude
       FROM deliveries d

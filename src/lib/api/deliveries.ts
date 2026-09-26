@@ -51,6 +51,16 @@ export async function getDeliveryAccountability(deliveryId: string): Promise<Age
   return result.data;
 }
 
+export async function recordAccountabilityCollection(deliveryId: string, payload: { amount: number; payment_option_id: string; operation_id?: string; source_payment_id?: string; reason?: string }): Promise<AgentAccountabilityDetail | null> {
+  const result = await fetchJson<{ status: string; data: AgentAccountabilityDetail | null }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/accountability/collections`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return result.data;
+}
+
+export async function recordAccountabilityReturn(deliveryId: string, payload: { product_id: string; quantity: number; operation_id?: string; reason?: string }): Promise<AgentAccountabilityDetail | null> {
+  const result = await fetchJson<{ status: string; data: AgentAccountabilityDetail | null }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/accountability/returns`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+  return result.data;
+}
+
 export async function addDeliveryItems(deliveryId: string, items: DeliveryItem[]): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/items`, {
     method: 'POST',

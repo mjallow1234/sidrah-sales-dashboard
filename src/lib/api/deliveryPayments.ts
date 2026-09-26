@@ -10,6 +10,10 @@ export async function getDeliveryPaymentOptions(includeInactive = false): Promis
   return parse<DeliveryPaymentOption[]>(await fetch(`/api/delivery-payment-options${includeInactive ? '?includeInactive=1' : ''}`), 'Unable to load payment options.');
 }
 
+export async function getAccountabilityPaymentOptions(): Promise<DeliveryPaymentOption[]> {
+  return parse<DeliveryPaymentOption[]>(await fetch('/api/accountability/payment-options'), 'Unable to load accountability payment options.');
+}
+
 export async function createDeliveryPaymentOption(name: string): Promise<DeliveryPaymentOption> {
   return parse<DeliveryPaymentOption>(await fetch('/api/delivery-payment-options', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }), 'Unable to add payment option.');
 }
