@@ -203,6 +203,7 @@ export interface DeliveryItem {
 
 export interface DeliveryRecord {
   delivery_id: string;
+  vendor_id?: string;
   customer_name: string;
   customer_phone: string;
   delivery_address: string;
@@ -224,6 +225,48 @@ export interface DeliveryRecord {
   cancelled_by_name?: string;
   vendor_location_latitude?: number | null;
   vendor_location_longitude?: number | null;
+  accountable_agent_user_id?: string;
+  accountable_agent_name?: string;
+  accountability_status?: 'pending' | 'active' | 'closed' | 'voided';
+  accountability_pending_value?: number;
+  accountability_active_value?: number;
+}
+
+export type AgentAccountabilityEventType = 'pending_delivery' | 'delivery_activation' | 'cash_collection' | 'stock_return' | 'transfer_out' | 'transfer_in' | 'cash_handover' | 'correction' | 'reversal';
+
+export interface AgentAccountabilityEvent {
+  event_id: string;
+  operation_id: string;
+  case_id: string;
+  event_type: AgentAccountabilityEventType;
+  event_status: 'pending' | 'posted' | 'reversed';
+  agent_user_id: string;
+  agent_name?: string;
+  vendor_id: string;
+  delivery_id?: string;
+  product_id?: string;
+  product_name?: string;
+  quantity?: number;
+  unit_value?: number;
+  amount_delta: number;
+  currency: string;
+  source_reference?: string;
+  reason?: string;
+  occurred_at: string;
+  recorded_by: string;
+  recorded_by_name?: string;
+}
+
+export interface AgentAccountabilityDetail {
+  case_id: string;
+  delivery_id: string;
+  vendor_id: string;
+  accountable_agent_user_id: string;
+  accountable_agent_name?: string;
+  status: 'pending' | 'active' | 'closed' | 'voided';
+  pending_value: number;
+  active_value: number;
+  events: AgentAccountabilityEvent[];
 }
 
 export interface DeliveryTrackingLocation {

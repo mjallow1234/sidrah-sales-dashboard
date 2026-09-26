@@ -1,4 +1,4 @@
-import type { DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord } from '@/lib/types';
+import type { AgentAccountabilityDetail, DeliveryActivity, DeliveryItem, DeliveryPreparationSummary, DeliveryPriority, DeliveryRecord } from '@/lib/types';
 
 async function fetchJson<T>(path: string, options: RequestInit = {}): Promise<T> {
   const response = await fetch(path, options);
@@ -46,6 +46,11 @@ export async function getDelivery(deliveryId: string): Promise<DeliveryRecord> {
   return result.data;
 }
 
+export async function getDeliveryAccountability(deliveryId: string): Promise<AgentAccountabilityDetail | null> {
+  const result = await fetchJson<{ status: string; data: AgentAccountabilityDetail | null }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/accountability`);
+  return result.data;
+}
+
 export async function addDeliveryItems(deliveryId: string, items: DeliveryItem[]): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/items`, {
     method: 'POST',
@@ -56,6 +61,7 @@ export async function addDeliveryItems(deliveryId: string, items: DeliveryItem[]
 }
 
 export async function createDelivery(payload: {
+  vendor_id: string;
   customer_name: string;
   customer_phone: string;
   delivery_address: string;

@@ -10,6 +10,7 @@ import {
   useClaimDeliveryMutation,
   useDeliveryQuery,
   useDeliveryActivityQuery,
+  useDeliveryAccountabilityQuery,
   useDeliveryUsersQuery,
   useMarkDeliveryDeliveredMutation,
   useReassignDeliveryMutation,
@@ -64,6 +65,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const isAdminOrSupervisor = currentRole === 'admin' || currentRole === 'super_admin' || currentRole === 'supervisor';
   const paymentOptionsQuery = useDeliveryPaymentOptionsQuery(false, Boolean(currentRole));
   const paymentsQuery = useDeliveryPaymentsQuery(deliveryId, Boolean(currentRole));
+  const accountabilityQuery = useDeliveryAccountabilityQuery(deliveryId, currentRole === 'agent' || isAdminOrSupervisor);
 
   const isActionable = delivery?.status === 'pending' || delivery?.status === 'ongoing';
   const canClaim = isDeliveryUser && delivery?.status === 'pending';
@@ -74,6 +76,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const canCancel = isAdminOrSupervisor && isActionable;
   const canAddItems = (currentRole === 'agent' || isAdminOrSupervisor) && isActionable;
   const canRecordPayment = canRecordDeliveryPayment(currentRole);
+  const canViewAccountability = currentRole === 'agent' || isAdminOrSupervisor;
 
   const { data: deliveryUsers = [] } = useDeliveryUsersQuery(canReassign);
   const [reassignTarget, setReassignTarget] = useState('');
@@ -177,6 +180,31 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
           {isDeliveryUser && delivery.claimed_by === currentUserId ? <DeliveryNavigationActions latitude={delivery.vendor_location_latitude} longitude={delivery.vendor_location_longitude} /> : <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Directions are available to the assigned delivery user.</p>}
         </div>
       </div>
+
+      {canViewAccountability && delivery.accountability_status ? (
+        <section className="rounded-3xl border border-sidrah-100 bg-sidrah-50/60 p-6 shadow-soft">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-sidrah-600">Agent Accountability</p>
+              <h2 className="mt-2 text-lg font-semibold text-slate-900">{delivery.accountability_status === 'active' ? 'Active stock accountability' : 'Pending delivery accountability'}</h2>
+            </div>
+            <p className="text-2xl font-semibold text-sidrah-700">D{Number(delivery.accountability_status === 'active' ? delivery.accountability_active_value ?? 0 : delivery.accountability_pending_value ?? 0).toLocaleString()}</p>
+          </div>
+          <p className="mt-2 text-sm text-slate-600">Accountable agent: <span className="font-semibold text-slate-900">{delivery.accountable_agent_name || 'Unknown user'}</span></p>
+          {accountabilityQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading accountability history…</p> : null}
+          {accountabilityQuery.isError ? <p className="mt-4 text-sm text-rose-600">Unable to load accountability history.</p> : null}
+          {accountabilityQuery.data?.events.length ? (
+            <div className="mt-4 space-y-2">
+              {accountabilityQuery.data.events.map((event) => (
+                <div key={event.event_id} className="rounded-2xl bg-white px-4 py-3 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-slate-900">{event.event_type === 'pending_delivery' ? 'Pending delivery' : 'Delivery activated'}</span><span className="text-slate-600">D{event.amount_delta.toLocaleString()}</span></div>
+                  <p className="mt-1 text-xs text-slate-500">{new Date(event.occurred_at).toLocaleString()} · Recorded by {event.recorded_by_name || 'Unknown user'}</p>
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </section>
+      ) : null}
 
       <DeliveryLocationReporter
         deliveryId={delivery.delivery_id}

@@ -6,6 +6,7 @@ import { DeliveryRepository, type CreateDeliveryPayload, type DeliverySearchFilt
 import { ProductRepository } from '@/repositories/ProductRepository';
 import { AppUserRepository } from '@/repositories/AppUserRepository';
 import { NotFoundError } from '@/repositories/errors';
+import { AgentAccountabilityRepository, type AccountabilityLine } from '@/repositories/AgentAccountabilityRepository';
 
 class HttpError extends Error {
   public readonly status: number;
@@ -27,12 +28,13 @@ function validateRequiredString(value: unknown, fieldName: string): string {
   return value.trim();
 }
 
-async function validateItems(value: unknown, productRepository: ProductRepository): Promise<DeliveryItem[]> {
+async function validateItems(value: unknown, productRepository: ProductRepository): Promise<{ items: DeliveryItem[]; valuationLines: AccountabilityLine[] }> {
   if (!Array.isArray(value) || value.length === 0) {
     throw new HttpError(400, 'At least one delivery item is required.');
   }
 
   const items: DeliveryItem[] = [];
+  const valuationLines: AccountabilityLine[] = [];
   for (let index = 0; index < value.length; index += 1) {
     const item = value[index];
     if (typeof item !== 'object' || item === null) {
@@ -65,12 +67,17 @@ async function validateItems(value: unknown, productRepository: ProductRepositor
       sku: product.sku,
       quantity,
     });
+    const unitValue = Number(product.default_unit_price);
+    if (!Number.isFinite(unitValue) || unitValue < 0) throw new HttpError(400, `Item ${index + 1}: product has an invalid unit value.`);
+    valuationLines.push({ product_id: product.product_id, quantity, unit_value: unitValue, amount: quantity * unitValue });
   }
 
-  return items;
+  return { items, valuationLines };
 }
 
 export interface CreateDeliveryRequest {
+  vendor_id?: unknown;
+  accountability_agent_user_id?: string;
   customer_name: string;
   customer_phone: string;
   delivery_address: string;
@@ -94,7 +101,8 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   const customerName = validateRequiredString(payload.customer_name, 'Customer name');
   const customerPhone = validateRequiredString(payload.customer_phone, 'Customer phone');
   const deliveryAddress = validateRequiredString(payload.delivery_address, 'Delivery address');
-  const items = await validateItems(payload.items, productRepository);
+  const { items, valuationLines } = await validateItems(payload.items, productRepository);
+  const vendorId = validateRequiredString(payload.vendor_id, 'Vendor');
   const notes = typeof payload.notes === 'string' && payload.notes.trim() !== '' ? payload.notes.trim() : undefined;
   const priority = validatePriority(payload.priority);
 
@@ -103,8 +111,11 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   const deliveryId = buildId('DLV');
   return transaction(async (connection) => {
     const repository = new DeliveryRepository(connection);
+    const [vendorRows] = await connection.execute<any[]>('SELECT vendor_id FROM vendors WHERE vendor_id = ? LIMIT 1', [vendorId]);
+    if (!vendorRows.length) throw new HttpError(400, 'Selected vendor does not exist.');
     const result = await repository.create({
     delivery_id: deliveryId,
+    vendor_id: vendorId,
     customer_name: customerName,
     customer_phone: customerPhone,
     delivery_address: deliveryAddress,
@@ -121,6 +132,13 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
     updated_by: createdBy,
     });
     await repository.createActivity({ activity_id: buildId('DA'), delivery_id: deliveryId, activity_type: 'created', new_status: 'pending', actor_user_id: createdBy });
+    if (payload.accountability_agent_user_id) {
+      await new AgentAccountabilityRepository(connection).createPendingCase({
+        case_id: buildId('AAC'), delivery_id: deliveryId, vendor_id: vendorId,
+        accountable_agent_user_id: payload.accountability_agent_user_id, created_by: createdBy,
+        lines: valuationLines, occurred_at: now,
+      });
+    }
     return result;
   });
 }
@@ -163,9 +181,13 @@ export async function getDeliveryById(deliveryId: string): Promise<DeliveryRecor
 
 export async function addDeliveryItems(deliveryId: string, value: unknown, actingUserId: string): Promise<DeliveryRecord> {
   const productRepository = new ProductRepository(getPool());
-  const items = await validateItems(value, productRepository);
+  const { items, valuationLines } = await validateItems(value, productRepository);
   try {
-    return await transaction(async (connection) => new DeliveryRepository(connection).addItems(deliveryId, items, actingUserId));
+    return await transaction(async (connection) => {
+      const result = await new DeliveryRepository(connection).addItems(deliveryId, items, actingUserId);
+      await new AgentAccountabilityRepository(connection).appendPendingLines(deliveryId, valuationLines, actingUserId, new Date().toISOString().slice(0, 19).replace('T', ' '));
+      return result;
+    });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('Products can only')) {
       throw new HttpError(409, error.message);
@@ -195,7 +217,11 @@ export async function claimDelivery(deliveryId: string, deliveryUserId: string, 
 export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: string, comment?: unknown): Promise<DeliveryRecord> {
   const normalizedComment = normalizeComment(comment);
   try {
-    return await transaction(async (connection) => new DeliveryRepository(connection).deliver(deliveryId, deliveryUserId, deliveryUserId, buildId('DA'), normalizedComment));
+    return await transaction(async (connection) => {
+      const result = await new DeliveryRepository(connection).deliver(deliveryId, deliveryUserId, deliveryUserId, buildId('DA'), normalizedComment);
+      await new AgentAccountabilityRepository(connection).activateDelivery(deliveryId, deliveryUserId, new Date().toISOString().slice(0, 19).replace('T', ' '));
+      return result;
+    });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('cannot be marked')) {
       throw new HttpError(409, error.message);
@@ -210,7 +236,11 @@ export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: 
 export async function completeDeliveryAsAdmin(deliveryId: string, actingUserId: string, comment?: unknown): Promise<DeliveryRecord> {
   const normalizedComment = normalizeComment(comment);
   try {
-    return await transaction(async (connection) => new DeliveryRepository(connection).completeAsAdmin(deliveryId, actingUserId, buildId('DA'), normalizedComment));
+    return await transaction(async (connection) => {
+      const result = await new DeliveryRepository(connection).completeAsAdmin(deliveryId, actingUserId, buildId('DA'), normalizedComment);
+      await new AgentAccountabilityRepository(connection).activateDelivery(deliveryId, actingUserId, new Date().toISOString().slice(0, 19).replace('T', ' '));
+      return result;
+    });
   } catch (error: unknown) {
     if (error instanceof Error && error.message.includes('cannot be marked')) {
       throw new HttpError(409, error.message);
@@ -267,6 +297,10 @@ export async function cancelDelivery(deliveryId: string, actingUserId: string, c
     }
     throw error;
   }
+}
+
+export async function getDeliveryAccountability(deliveryId: string) {
+  return new AgentAccountabilityRepository(getPool()).findByDelivery(deliveryId);
 }
 
 export async function getDeliveryActivity(deliveryId: string) {

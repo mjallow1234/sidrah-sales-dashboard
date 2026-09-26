@@ -36,7 +36,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const payload = await request.json();
-    const result = await createDelivery(payload, session.userId ?? '');
+    const result = await createDelivery({
+      ...payload,
+      accountability_agent_user_id: session.role === 'agent' ? session.userId : undefined,
+    }, session.userId ?? '');
     return Response.json({ status: 'success', data: result });
   } catch (error: unknown) {
     if (error instanceof Error && 'status' in error) {

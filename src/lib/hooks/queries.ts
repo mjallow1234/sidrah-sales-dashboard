@@ -6,7 +6,7 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, getDelivery, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, markDeliveryDelivered, reassignDelivery, cancelDelivery, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
@@ -353,6 +353,14 @@ export function useCreateDeliveryMutation() {
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
       queryClient.invalidateQueries({ queryKey: ['deliveryPreparationSummary'] });
     },
+  });
+}
+
+export function useDeliveryAccountabilityQuery(deliveryId?: string, enabled = true) {
+  return useQuery({
+    queryKey: ['deliveryAccountability', deliveryId],
+    queryFn: () => getDeliveryAccountability(deliveryId ?? ''),
+    enabled: enabled && !!deliveryId,
   });
 }
 

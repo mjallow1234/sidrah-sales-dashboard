@@ -80,6 +80,7 @@ export function DeliveryForm() {
 
     try {
       await createMutation.mutateAsync({
+        vendor_id: vendorId,
         customer_name: selectedVendor.vendor_name,
         customer_phone: customerPhone,
         delivery_address: deliveryAddress,

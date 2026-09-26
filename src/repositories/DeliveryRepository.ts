@@ -5,6 +5,7 @@ import { NotFoundError } from './errors';
 
 export interface CreateDeliveryPayload {
   delivery_id: string;
+  vendor_id?: string | null;
   customer_name: string;
   customer_phone: string;
   delivery_address: string;
@@ -66,6 +67,7 @@ export class DeliveryRepository extends BaseRepository {
   private mapRow(row: any): DeliveryRecord {
     return {
       delivery_id: String(row.delivery_id),
+      vendor_id: row.vendor_id === null || row.vendor_id === undefined ? undefined : String(row.vendor_id),
       customer_name: String(row.customer_name),
       customer_phone: String(row.customer_phone),
       delivery_address: String(row.delivery_address),
@@ -87,6 +89,11 @@ export class DeliveryRepository extends BaseRepository {
       cancelled_by_name: this.resolveUserName(row.cancelled_by, row.cancelled_by_name),
       vendor_location_latitude: row.vendor_location_latitude === null || row.vendor_location_latitude === undefined ? null : Number(row.vendor_location_latitude),
       vendor_location_longitude: row.vendor_location_longitude === null || row.vendor_location_longitude === undefined ? null : Number(row.vendor_location_longitude),
+      accountable_agent_user_id: row.accountable_agent_user_id === null || row.accountable_agent_user_id === undefined ? undefined : String(row.accountable_agent_user_id),
+      accountable_agent_name: row.accountable_agent_name === null || row.accountable_agent_name === undefined ? undefined : String(row.accountable_agent_name),
+      accountability_status: row.accountability_status === null || row.accountability_status === undefined ? undefined : String(row.accountability_status) as DeliveryRecord['accountability_status'],
+      accountability_pending_value: row.accountability_pending_value === null || row.accountability_pending_value === undefined ? undefined : Number(row.accountability_pending_value),
+      accountability_active_value: row.accountability_active_value === null || row.accountability_active_value === undefined ? undefined : Number(row.accountability_active_value),
     };
   }
 
@@ -98,20 +105,27 @@ export class DeliveryRepository extends BaseRepository {
         claimer.username AS claimed_by_resolved_username,
         canceller.name AS cancelled_by_resolved_name,
         canceller.username AS cancelled_by_resolved_username
+        ,ac.accountable_agent_user_id,
+        ac.status AS accountability_status,
+        accountability_agent.name AS accountable_agent_name,
+        (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'pending') AS accountability_pending_value,
+        (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted') AS accountability_active_value
         ,v.location_latitude AS vendor_location_latitude,
         v.location_longitude AS vendor_location_longitude
       FROM deliveries d
-      LEFT JOIN vendors v ON v.vendor_id = (
+      LEFT JOIN vendors v ON v.vendor_id = COALESCE(d.vendor_id, (
         SELECT v2.vendor_id
         FROM vendors v2
         WHERE v2.vendor_name = d.customer_name
           AND v2.location = d.delivery_address
         ORDER BY v2.vendor_id ASC
         LIMIT 1
-      )
+      ))
       LEFT JOIN app_users creator ON creator.user_id = d.created_by
       LEFT JOIN app_users claimer ON claimer.user_id = d.claimed_by
       LEFT JOIN app_users canceller ON canceller.user_id = d.cancelled_by
+      LEFT JOIN agent_accountability_cases ac ON ac.delivery_id = d.delivery_id
+      LEFT JOIN app_users accountability_agent ON accountability_agent.user_id = ac.accountable_agent_user_id
       ${whereClause}`;
   }
 
@@ -121,6 +135,7 @@ export class DeliveryRepository extends BaseRepository {
       created_by_name: row.created_by_resolved_name || row.created_by_resolved_username,
       claimed_by_name: row.claimed_by_resolved_name || row.claimed_by_resolved_username,
       cancelled_by_name: row.cancelled_by_resolved_name || row.cancelled_by_resolved_username,
+      accountable_agent_name: row.accountable_agent_name ? String(row.accountable_agent_name) : undefined,
     });
   }
 
@@ -218,6 +233,7 @@ export class DeliveryRepository extends BaseRepository {
     await (this.db.execute as any)(
       `INSERT INTO deliveries (
         delivery_id,
+        vendor_id,
         customer_name,
         customer_phone,
         delivery_address,
@@ -234,6 +250,7 @@ export class DeliveryRepository extends BaseRepository {
         updated_by
       ) VALUES (
         :delivery_id,
+        :vendor_id,
         :customer_name,
         :customer_phone,
         :delivery_address,
@@ -251,6 +268,7 @@ export class DeliveryRepository extends BaseRepository {
       )`,
       {
         delivery_id: payload.delivery_id,
+        vendor_id: payload.vendor_id ?? null,
         customer_name: payload.customer_name,
         customer_phone: payload.customer_phone,
         delivery_address: payload.delivery_address,
