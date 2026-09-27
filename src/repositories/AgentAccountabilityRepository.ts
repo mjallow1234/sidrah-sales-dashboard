@@ -36,11 +36,14 @@ export interface AccountabilityTransferRecord {
 
 export class AgentAccountabilityRepository extends BaseRepository {
   public async getAgentBreakdown(agentUserId: string): Promise<{
-    assignments: Array<{ assignment_id: string; vendor_id: string; vendor_name: string; starting_balance: number; current_balance: number; assigned_at: string; assigned_by: string; status: string }>;
+    assignments: Array<{ assignment_id: string; vendor_id: string; vendor_name: string; starting_balance: number; current_balance: number; pending_cash: number; assigned_at: string; assigned_by: string; status: string }>;
     events: Array<{ event_id: string; event_type: string; amount_delta: number; vendor_id: string; vendor_name: string; delivery_id?: string; source_visit_id?: string; payment_method?: string; occurred_at: string; event_status: string }>;
     handovers: Array<{ handover_id: string; amount: number; expected_amount: number; variance: number; status: string; company_receiver?: string; handover_at: string; allocations: Array<{ collection_event_id: string; amount: number; vendor_id: string; vendor_name: string; delivery_id?: string; source_visit_id?: string; collection_amount: number }> }>;
   }> {
-    const [assignmentRows] = await this.db.execute<any[]>(`SELECT a.assignment_id, a.vendor_id, v.vendor_name, a.starting_balance, vb.balance_owed AS current_balance, a.assigned_at, a.assigned_by, a.status FROM agent_vendor_accountability_assignments a JOIN vendors v ON v.vendor_id = a.vendor_id LEFT JOIN vendor_balances vb ON vb.vendor_id = a.vendor_id WHERE a.agent_user_id = :agent_user_id ORDER BY a.assigned_at DESC`, { agent_user_id: agentUserId });
+    const [assignmentRows] = await this.db.execute<any[]>(`SELECT a.assignment_id, a.vendor_id, v.vendor_name, a.starting_balance, vb.balance_owed AS current_balance,
+GREATEST(0, COALESCE((SELECT SUM(-ce.amount_delta) FROM agent_accountability_events ce WHERE ce.vendor_id = a.vendor_id AND ce.source_visit_id IS NOT NULL AND ce.event_type = 'cash_collection' AND ce.event_status = 'posted'), 0)
+      - COALESCE((SELECT SUM(ha.amount) FROM agent_cash_handover_allocations ha WHERE ha.vendor_id = a.vendor_id), 0)) AS pending_cash,
+      a.assigned_at, a.assigned_by, a.status FROM agent_vendor_accountability_assignments a JOIN vendors v ON v.vendor_id = a.vendor_id LEFT JOIN vendor_balances vb ON vb.vendor_id = a.vendor_id WHERE a.agent_user_id = :agent_user_id ORDER BY a.assigned_at DESC`, { agent_user_id: agentUserId });
     const [eventRows] = await this.db.execute<any[]>(`SELECT e.event_id, e.event_type, e.amount_delta, e.vendor_id, v.vendor_name, e.delivery_id, e.source_visit_id, e.payment_method, e.occurred_at, e.event_status FROM agent_accountability_events e JOIN vendors v ON v.vendor_id = e.vendor_id WHERE e.agent_user_id = :agent_user_id ORDER BY e.occurred_at ASC, e.event_id ASC`, { agent_user_id: agentUserId });
     const [handoverRows] = await this.db.execute<any[]>(`SELECT h.handover_id, h.amount, h.cash_collected_at_record, h.variance, h.status, h.company_receiver, h.handover_at, a.collection_event_id, a.amount AS allocated_amount, ce.amount_delta AS collection_delta, ce.vendor_id, v.vendor_name, ce.delivery_id, ce.source_visit_id FROM agent_cash_handovers h LEFT JOIN agent_cash_handover_allocations a ON a.handover_id = h.handover_id LEFT JOIN agent_accountability_events ce ON ce.event_id = a.collection_event_id LEFT JOIN vendors v ON v.vendor_id = ce.vendor_id WHERE h.agent_user_id = :agent_user_id ORDER BY h.handover_at DESC, h.handover_id DESC`, { agent_user_id: agentUserId });
     const handoverMap = new Map<string, any>();
@@ -51,7 +54,7 @@ export class AgentAccountabilityRepository extends BaseRepository {
       handoverMap.set(id, existing);
     }
     return {
-      assignments: (assignmentRows ?? []).map((row) => ({ assignment_id: String(row.assignment_id), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name), starting_balance: Number(row.starting_balance), current_balance: Number(row.current_balance ?? 0), assigned_at: String(row.assigned_at), assigned_by: String(row.assigned_by), status: String(row.status) })),
+      assignments: (assignmentRows ?? []).map((row) => ({ assignment_id: String(row.assignment_id), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name), starting_balance: Number(row.starting_balance), current_balance: Number(row.current_balance ?? 0), pending_cash: Math.max(0, Number(row.pending_cash ?? 0)), assigned_at: String(row.assigned_at), assigned_by: String(row.assigned_by), status: String(row.status) })),
       events: (eventRows ?? []).map((row) => ({ event_id: String(row.event_id), event_type: String(row.event_type), amount_delta: Number(row.amount_delta), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name), delivery_id: row.delivery_id ? String(row.delivery_id) : undefined, source_visit_id: row.source_visit_id ? String(row.source_visit_id) : undefined, payment_method: row.payment_method ? String(row.payment_method) : undefined, occurred_at: String(row.occurred_at), event_status: String(row.event_status) })),
       handovers: [...handoverMap.values()],
     };
@@ -239,7 +242,9 @@ export class AgentAccountabilityRepository extends BaseRepository {
         event_id: `AAC_VISIT_${input.visit_id}`,
         operation_id: input.operation_id,
         case_id: accountabilityCase?.case_id ?? null,
-        agent_user_id: accountabilityCase.accountable_agent_user_id,
+        // Cash accountability belongs to the authenticated user who physically
+        // collected the money. A delivery case is optional context for visits.
+        agent_user_id: input.collector_user_id,
         vendor_id: input.vendor_id,
         delivery_id: accountabilityCase?.delivery_id ?? null,
         amount_delta: -input.amount,
@@ -315,8 +320,14 @@ export class AgentAccountabilityRepository extends BaseRepository {
   }>> {
     const [rows] = await this.db.execute<any[]>(`SELECT u.user_id AS agent_user_id, u.name AS agent_name,
       COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'pending_delivery' AND e.event_status = 'pending'), 0) AS pending_stock_accountability,
-      COALESCE((SELECT SUM(vb.balance_owed) FROM agent_vendor_accountability_assignments a JOIN vendor_balances vb ON vb.vendor_id = a.vendor_id WHERE a.agent_user_id = u.user_id AND a.status = 'active'), 0) AS active_stock_accountability,
-      COALESCE((SELECT SUM(vb.balance_owed) FROM agent_vendor_accountability_assignments a JOIN vendor_balances vb ON vb.vendor_id = a.vendor_id WHERE a.agent_user_id = u.user_id AND a.status = 'active'), 0) AS stock_accountability,
+      COALESCE((SELECT SUM(vb.balance_owed +
+GREATEST(0, COALESCE((SELECT SUM(-ce.amount_delta) FROM agent_accountability_events ce WHERE ce.vendor_id = a.vendor_id AND ce.source_visit_id IS NOT NULL AND ce.event_type = 'cash_collection' AND ce.event_status = 'posted'), 0)
+        - COALESCE((SELECT SUM(ha.amount) FROM agent_cash_handover_allocations ha WHERE ha.vendor_id = a.vendor_id), 0)))
+        FROM agent_vendor_accountability_assignments a JOIN vendor_balances vb ON vb.vendor_id = a.vendor_id WHERE a.agent_user_id = u.user_id AND a.status = 'active'), 0) AS active_stock_accountability,
+      COALESCE((SELECT SUM(vb.balance_owed +
+GREATEST(0, COALESCE((SELECT SUM(-ce.amount_delta) FROM agent_accountability_events ce WHERE ce.vendor_id = a.vendor_id AND ce.source_visit_id IS NOT NULL AND ce.event_type = 'cash_collection' AND ce.event_status = 'posted'), 0)
+        - COALESCE((SELECT SUM(ha.amount) FROM agent_cash_handover_allocations ha WHERE ha.vendor_id = a.vendor_id), 0)))
+        FROM agent_vendor_accountability_assignments a JOIN vendor_balances vb ON vb.vendor_id = a.vendor_id WHERE a.agent_user_id = u.user_id AND a.status = 'active'), 0) AS stock_accountability,
       COALESCE((SELECT -SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'stock_return' AND e.event_status = 'posted'), 0) AS stock_returned,
       COALESCE((SELECT -SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'cash_collection' AND e.event_status = 'posted'), 0) AS cash_collected,
       COALESCE((SELECT SUM(h.amount) FROM agent_cash_handovers h WHERE h.agent_user_id = u.user_id), 0) AS cash_handed_over,

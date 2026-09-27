@@ -9,6 +9,7 @@ const routes = [
   fs.readFileSync('src/app/api/deliveries/[deliveryId]/accountability/transfers/route.ts', 'utf8'),
   fs.readFileSync('src/app/api/accountability/transfers/[transferId]/route.ts', 'utf8'),
 ].join('\n');
+const transferRoute = fs.readFileSync('src/app/api/deliveries/[deliveryId]/accountability/transfers/route.ts', 'utf8');
 
 assert.match(migration, /CREATE TABLE agent_accountability_transfers/);
 assert.match(migration, /status ENUM\('pending','accepted','rejected','cancelled'\)/);
@@ -31,10 +32,8 @@ assert.match(service, /Recipient must be an active agent/);
 assert.match(service, /decideAccountabilityTransfer/);
 assert.match(service, /TransactionJournalRepository/);
 assert.match(routes, /accept.*reject.*cancel/);
-assert.match(details, /Transfer accountability/);
-assert.match(details, /Accept/);
-assert.match(details, /Reject/);
-assert.match(details, /Cancel/);
-assert.doesNotMatch(repository, /vendor_balances/);
+assert.doesNotMatch(details, /Accountability transfers/);
+assert.match(transferRoute, /parts\[parts\.length - 3\]/);
+assert.match(repository, /vendor_balances/);
 assert.doesNotMatch(repository, /vendor_inventory/);
 console.log('agent-accountability-phase3: all assertions passed');

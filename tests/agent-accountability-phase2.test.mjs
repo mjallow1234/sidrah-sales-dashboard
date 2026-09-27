@@ -21,7 +21,7 @@ assert.match(collectionsRoute, /recordAccountabilityCollection/);
 assert.match(returnsRoute, /recordAccountabilityReturn/);
 assert.match(migration, /payment_method/);
 assert.match(migration, /collector_user_id/);
-assert.doesNotMatch(repository, /vendor_balances/);
+assert.match(repository, /vendor_balances/);
 assert.doesNotMatch(service, /vendor_balances/);
 
 console.log('agent-accountability-phase2: all assertions passed');

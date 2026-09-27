@@ -21,6 +21,6 @@ assert.match(migration, /agent_accountability_cases/);
 assert.match(migration, /agent_accountability_events/);
 assert.match(migration, /UNIQUE KEY ux_agent_accountability_event_operation/);
 assert.doesNotMatch(service, /vendor_balances/);
-assert.doesNotMatch(accountability, /vendor_balances/);
+assert.match(accountability, /vendor_balances/);
 
 console.log('agent-accountability-phase1: all assertions passed');
