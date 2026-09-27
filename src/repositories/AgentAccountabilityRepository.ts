@@ -40,14 +40,15 @@ export class AgentAccountabilityRepository extends BaseRepository {
     delivery_id: string;
     vendor_id: string;
     accountable_agent_user_id: string;
+    assignment_id?: string;
     created_by: string;
     lines: AccountabilityLine[];
     occurred_at: string;
   }): Promise<void> {
     await this.db.execute(
-      `INSERT INTO agent_accountability_cases (case_id, delivery_id, vendor_id, accountable_agent_user_id, status, created_by)
-       VALUES (:case_id, :delivery_id, :vendor_id, :agent_user_id, 'pending', :created_by)`,
-      { case_id: input.case_id, delivery_id: input.delivery_id, vendor_id: input.vendor_id, agent_user_id: input.accountable_agent_user_id, created_by: input.created_by },
+      `INSERT INTO agent_accountability_cases (case_id, delivery_id, vendor_id, assignment_id, accountable_agent_user_id, status, created_by)
+       VALUES (:case_id, :delivery_id, :vendor_id, :assignment_id, :agent_user_id, 'pending', :created_by)`,
+      { case_id: input.case_id, delivery_id: input.delivery_id, vendor_id: input.vendor_id, assignment_id: input.assignment_id ?? null, agent_user_id: input.accountable_agent_user_id, created_by: input.created_by },
     );
 
     for (const [index, line] of input.lines.entries()) {
@@ -161,20 +162,20 @@ export class AgentAccountabilityRepository extends BaseRepository {
 
   public async createCollection(input: {
     operation_id: string; delivery_id: string; amount: number; payment_option_id: string; payment_method: string;
-    source_payment_id?: string; collector_user_id: string; recorded_by: string; occurred_at: string; reason?: string;
+    source_payment_id?: string; source_visit_id?: string; collector_user_id: string; recorded_by: string; occurred_at: string; reason?: string;
   }): Promise<void> {
     const [existing] = await this.db.execute<any[]>(`SELECT event_id FROM agent_accountability_events WHERE operation_id = :operation_id LIMIT 1`, { operation_id: input.operation_id });
     if (existing?.length) return;
     const accountabilityCase = await this.lockActiveCase(input.delivery_id);
-    const [remainingRows] = await this.db.execute<any[]>(`SELECT COALESCE(SUM(amount_delta), 0) AS remaining_value FROM agent_accountability_events WHERE case_id = :case_id AND event_status = 'posted'`, { case_id: accountabilityCase.case_id });
+    const [remainingRows] = await this.db.execute<any[]>(`SELECT COALESCE(SUM(amount_delta), 0) AS remaining_value FROM agent_accountability_events WHERE case_id = :case_id AND event_status = 'posted' AND event_type IN ('delivery_activation','stock_return','cash_handover','transfer_out','transfer_in')`, { case_id: accountabilityCase.case_id });
     if (input.amount > Number(remainingRows[0]?.remaining_value ?? 0) + 0.0001) throw new Error('Collection exceeds the remaining accountability for this delivery.');
     await this.db.execute(
       `INSERT INTO agent_accountability_events
         (event_id, operation_id, case_id, event_type, event_status, agent_user_id, vendor_id, delivery_id,
-         amount_delta, currency, payment_option_id, payment_method, source_payment_id, reason, occurred_at,
+         amount_delta, currency, payment_option_id, payment_method, source_payment_id, source_visit_id, reason, occurred_at,
          recorded_by, collector_user_id, source_reference, metadata)
        VALUES (:event_id, :operation_id, :case_id, 'cash_collection', 'posted', :agent_user_id, :vendor_id, :delivery_id,
-         :amount_delta, 'GMD', :payment_option_id, :payment_method, :source_payment_id, :reason, :occurred_at,
+         :amount_delta, 'GMD', :payment_option_id, :payment_method, :source_payment_id, :source_visit_id, :reason, :occurred_at,
          :recorded_by, :collector_user_id, :source_reference, :metadata)`,
       {
         event_id: `AAC_${input.operation_id.replace(/[^A-Za-z0-9]/g, '').slice(-20)}`,
@@ -182,8 +183,53 @@ export class AgentAccountabilityRepository extends BaseRepository {
         agent_user_id: accountabilityCase.accountable_agent_user_id, vendor_id: accountabilityCase.vendor_id,
         delivery_id: input.delivery_id, amount_delta: -input.amount, payment_option_id: input.payment_option_id,
         payment_method: input.payment_method, source_payment_id: input.source_payment_id ?? null, reason: input.reason ?? null,
+        source_visit_id: input.source_visit_id ?? null,
         occurred_at: input.occurred_at, recorded_by: input.recorded_by, collector_user_id: input.collector_user_id,
         source_reference: input.source_payment_id ?? input.delivery_id, metadata: JSON.stringify({ phase: 'cash_collection' }),
+      },
+    );
+  }
+
+  public async createVisitCollection(input: {
+    operation_id: string; visit_id: string; vendor_id: string; amount: number;
+    payment_method: string; collector_user_id: string; recorded_by: string; occurred_at: string;
+  }): Promise<void> {
+    const [existing] = await this.db.execute<any[]>(
+      `SELECT event_id FROM agent_accountability_events WHERE source_visit_id = :visit_id OR operation_id = :operation_id LIMIT 1`,
+      { visit_id: input.visit_id, operation_id: input.operation_id },
+    );
+    if (existing?.length || input.amount <= 0) return;
+    const [cases] = await this.db.execute<any[]>(
+      `SELECT c.* FROM agent_accountability_cases c
+       WHERE c.vendor_id = :vendor_id AND c.accountable_agent_user_id = :agent_user_id AND c.status = 'active'
+       LIMIT 2 FOR UPDATE`,
+      { vendor_id: input.vendor_id, agent_user_id: input.collector_user_id },
+    );
+    if (cases?.length !== 1) return;
+    const accountabilityCase = cases[0];
+    await this.db.execute(
+      `INSERT INTO agent_accountability_events
+        (event_id, operation_id, case_id, event_type, event_status, agent_user_id, vendor_id, delivery_id,
+         amount_delta, currency, payment_method, source_visit_id, occurred_at, recorded_by, collector_user_id,
+         source_reference, metadata)
+       VALUES (:event_id, :operation_id, :case_id, 'cash_collection', 'posted', :agent_user_id, :vendor_id, :delivery_id,
+         :amount_delta, 'GMD', :payment_method, :source_visit_id, :occurred_at, :recorded_by, :collector_user_id,
+         :source_reference, :metadata)`,
+      {
+        event_id: `AAC_VISIT_${input.visit_id}`,
+        operation_id: input.operation_id,
+        case_id: accountabilityCase.case_id,
+        agent_user_id: accountabilityCase.accountable_agent_user_id,
+        vendor_id: input.vendor_id,
+        delivery_id: accountabilityCase.delivery_id,
+        amount_delta: -input.amount,
+        payment_method: input.payment_method,
+        source_visit_id: input.visit_id,
+        occurred_at: input.occurred_at,
+        recorded_by: input.recorded_by,
+        collector_user_id: input.collector_user_id,
+        source_reference: input.visit_id,
+        metadata: JSON.stringify({ phase: 'cash_collection', source: 'visit_logs' }),
       },
     );
   }
@@ -232,13 +278,72 @@ export class AgentAccountabilityRepository extends BaseRepository {
   }
 
   private async currentCaseValue(caseId: string): Promise<number> {
-    const [rows] = await this.db.execute<any[]>(`SELECT COALESCE(SUM(amount_delta), 0) AS remaining_value FROM agent_accountability_events WHERE case_id = :case_id AND event_status = 'posted'`, { case_id: caseId });
+    const [rows] = await this.db.execute<any[]>(`SELECT COALESCE(SUM(amount_delta), 0) AS remaining_value FROM agent_accountability_events WHERE case_id = :case_id AND event_status = 'posted' AND event_type IN ('delivery_activation','stock_return','cash_handover','transfer_out','transfer_in')`, { case_id: caseId });
     return Number(rows[0]?.remaining_value ?? 0);
   }
 
   public async listActiveAgents(): Promise<Array<{ user_id: string; name: string }>> {
     const [rows] = await this.db.execute<any[]>(`SELECT user_id, name FROM app_users WHERE role = 'agent' AND status = 'active' ORDER BY name ASC`);
     return (rows ?? []).map((row) => ({ user_id: String(row.user_id), name: String(row.name) }));
+  }
+
+  public async listManagementSummary(): Promise<Array<{
+    agent_user_id: string; agent_name: string; total_accountability: number; pending_stock_accountability: number;
+    active_stock_accountability: number; stock_accountability: number; stock_returned: number; cash_collected: number;
+    cash_handed_over: number; cash_outstanding: number; cash_status: 'outstanding' | 'reconciled' | 'excess'; active_case_count: number;
+    status: 'outstanding' | 'reconciled' | 'excess';
+  }>> {
+    const [rows] = await this.db.execute<any[]>(`SELECT u.user_id AS agent_user_id, u.name AS agent_name,
+      COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'pending_delivery' AND e.event_status = 'pending'), 0) AS pending_stock_accountability,
+      COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'delivery_activation' AND e.event_status = 'posted'), 0) AS active_stock_accountability,
+      COALESCE((SELECT SUM(a.starting_balance) FROM agent_vendor_accountability_assignments a WHERE a.agent_user_id = u.user_id AND a.status = 'active'), 0)
+        + COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type IN ('delivery_activation','stock_return','cash_handover','transfer_out','transfer_in') AND e.event_status = 'posted'), 0) AS stock_accountability,
+      COALESCE((SELECT -SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'stock_return' AND e.event_status = 'posted'), 0) AS stock_returned,
+      COALESCE((SELECT -SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.agent_user_id = u.user_id AND e.event_type = 'cash_collection' AND e.event_status = 'posted'), 0) AS cash_collected,
+      COALESCE((SELECT SUM(h.amount) FROM agent_cash_handovers h WHERE h.agent_user_id = u.user_id), 0) AS cash_handed_over,
+      (SELECT COUNT(*) FROM agent_accountability_cases c WHERE c.accountable_agent_user_id = u.user_id AND c.status = 'active') AS active_case_count
+      FROM app_users u WHERE u.role = 'agent' ORDER BY u.name ASC`);
+    return (rows ?? []).map((row) => {
+      const stock = Number(row.stock_accountability ?? 0);
+      const pendingStock = Number(row.pending_stock_accountability ?? 0);
+      const activeStock = Number(row.active_stock_accountability ?? 0);
+      const returnedStock = Number(row.stock_returned ?? 0);
+      const collected = Number(row.cash_collected ?? 0);
+      const handed = Number(row.cash_handed_over ?? 0);
+      const outstanding = collected - handed;
+      const total = stock;
+      return {
+        agent_user_id: String(row.agent_user_id), agent_name: String(row.agent_name), total_accountability: total,
+        pending_stock_accountability: pendingStock, active_stock_accountability: activeStock, stock_accountability: stock,
+        stock_returned: returnedStock, cash_collected: collected, cash_handed_over: handed, cash_outstanding: outstanding,
+        cash_status: outstanding > 0.0001 ? 'outstanding' : outstanding < -0.0001 ? 'excess' : 'reconciled',
+        active_case_count: Number(row.active_case_count ?? 0),
+        status: total > 0.0001 ? 'outstanding' : total < -0.0001 ? 'excess' : 'reconciled',
+      };
+    });
+  }
+
+  public async listCasesForAgent(agentUserId: string): Promise<Array<{
+    case_id: string; delivery_id: string; vendor_id: string; vendor_name: string; delivery_date: string;
+    accountable_agent_user_id: string; accountable_agent_name?: string; status: 'pending' | 'active' | 'closed' | 'voided';
+    original_value: number; cash_collected: number; stock_returned: number; remaining_value: number;
+  }>> {
+    const [rows] = await this.db.execute<any[]>(`SELECT c.case_id, c.delivery_id, c.vendor_id, v.vendor_name,
+      d.date_created AS delivery_date, c.accountable_agent_user_id, au.name AS accountable_agent_name, c.status,
+      COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND ((c.status = 'pending' AND e.event_type = 'pending_delivery' AND e.event_status = 'pending') OR (c.status <> 'pending' AND e.event_type = 'delivery_activation' AND e.event_status = 'posted'))), 0) AS original_value,
+      COALESCE(-(SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_type = 'cash_collection' AND e.event_status = 'posted'), 0) AS cash_collected,
+      COALESCE(-(SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_type = 'stock_return' AND e.event_status = 'posted'), 0) AS stock_returned,
+      COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_status = 'posted' AND e.event_type IN ('delivery_activation','stock_return','cash_handover','transfer_out','transfer_in')), 0) AS remaining_value
+      FROM agent_accountability_cases c JOIN vendors v ON v.vendor_id = c.vendor_id JOIN deliveries d ON d.delivery_id = c.delivery_id
+      LEFT JOIN app_users au ON au.user_id = c.accountable_agent_user_id
+      WHERE c.accountable_agent_user_id = :agent_user_id ORDER BY d.date_created DESC, c.case_id DESC`, { agent_user_id: agentUserId });
+    return (rows ?? []).map((row) => ({
+      case_id: String(row.case_id), delivery_id: String(row.delivery_id), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name),
+      delivery_date: String(row.delivery_date), accountable_agent_user_id: String(row.accountable_agent_user_id),
+      accountable_agent_name: row.accountable_agent_name ? String(row.accountable_agent_name) : undefined,
+      status: String(row.status) as 'pending' | 'active' | 'closed' | 'voided', original_value: Number(row.original_value ?? 0),
+      cash_collected: Number(row.cash_collected ?? 0), stock_returned: Number(row.stock_returned ?? 0), remaining_value: Number(row.remaining_value ?? 0),
+    }));
   }
 
   public async initiateTransfer(input: {
@@ -302,7 +407,7 @@ export class AgentAccountabilityRepository extends BaseRepository {
 
   private transferQuery(condition: string): string {
     return `SELECT t.*, fa.name AS from_agent_name, ta.name AS to_agent_name, v.vendor_name AS vendor_name, ib.name AS initiated_by_name, db.name AS decided_by_name,
-      COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = t.case_id AND e.event_status = 'posted'), 0) AS current_remaining_value
+      COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = t.case_id AND e.event_status = 'posted' AND e.event_type IN ('delivery_activation','stock_return','cash_handover','transfer_out','transfer_in')), 0) AS current_remaining_value
       FROM agent_accountability_transfers t
       LEFT JOIN app_users fa ON fa.user_id = t.from_agent_user_id
       LEFT JOIN app_users ta ON ta.user_id = t.to_agent_user_id
@@ -322,7 +427,7 @@ export class AgentAccountabilityRepository extends BaseRepository {
           COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_status = 'posted' AND e.event_type = 'delivery_activation'), 0) AS active_value,
           COALESCE(-(SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_status = 'posted' AND e.event_type = 'cash_collection'), 0) AS cash_collected,
           COALESCE(-(SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_status = 'posted' AND e.event_type = 'stock_return'), 0) AS stock_returned,
-          COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_status = 'posted'), 0) AS remaining_value
+          COALESCE((SELECT SUM(e.amount_delta) FROM agent_accountability_events e WHERE e.case_id = c.case_id AND e.event_status = 'posted' AND e.event_type IN ('delivery_activation','stock_return','cash_handover','transfer_out','transfer_in')), 0) AS remaining_value
        FROM agent_accountability_cases c
        LEFT JOIN app_users u ON u.user_id = c.accountable_agent_user_id
        WHERE c.delivery_id = :delivery_id LIMIT 1`,
@@ -367,6 +472,7 @@ export class AgentAccountabilityRepository extends BaseRepository {
         source_payment_id: event.source_payment_id ? String(event.source_payment_id) : undefined,
         collector_user_id: event.collector_user_id ? String(event.collector_user_id) : undefined,
         collector_name: event.collector_name ? String(event.collector_name) : undefined,
+        source_visit_id: event.source_visit_id ? String(event.source_visit_id) : undefined,
       })),
     };
   }

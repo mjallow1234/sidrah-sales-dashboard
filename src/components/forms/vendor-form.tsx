@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { NotificationBanner } from '@/components/ui/notification';
 import { useCreateVendorMutation, useSalesRepsQuery, useUpdateVendorMutation } from '@/lib/hooks/queries';
+import { useAppUsersQuery } from '@/lib/hooks/userQueries';
 import { useAcquiredByAgentsQuery, useVendorStatusesQuery, useVendorTypesQuery } from '@/lib/hooks/vendorManagementQueries';
 import type { SalesRep, Vendor } from '@/lib/types';
 
@@ -33,6 +34,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     acquired_by: initialValues?.acquired_by ?? '',
     vendor_type_id: initialValues?.vendor_type_id ?? '',
     status: initialValues?.status ?? 'active',
+    accountable_agent_user_id: '',
   });
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
@@ -41,6 +43,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
   const acquiredByAgentsQuery = useAcquiredByAgentsQuery(true);
   const vendorTypesQuery = useVendorTypesQuery(true);
   const vendorStatusesQuery = useVendorStatusesQuery(true);
+  const appUsersQuery = useAppUsersQuery(canAssignVendor);
   const createMutation = useCreateVendorMutation();
   const updateMutation = useUpdateVendorMutation();
 
@@ -52,6 +55,7 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
   const acquiringAgents = acquiredByAgentsQuery.data ?? [];
   const vendorTypes = vendorTypesQuery.data ?? [];
   const vendorStatuses = vendorStatusesQuery.data ?? [];
+  const accountableAgents = (appUsersQuery.data ?? []).filter((user) => user.role === 'agent' && user.status === 'active');
   const acquiringOptions = useMemo(() => {
     if (!initialValues?.acquired_by || !initialValues.acquired_by_name || acquiringAgents.some((agent) => agent.acquired_by_id === initialValues.acquired_by)) {
       return acquiringAgents;
@@ -78,6 +82,9 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
     try {
       if (vendorId) {
         await updateMutation.mutateAsync({ id: vendorId, payload: formState });
+        if (formState.accountable_agent_user_id) {
+          await fetch(`/api/vendors/${encodeURIComponent(vendorId)}/accountability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_user_id: formState.accountable_agent_user_id }) });
+        }
         setNotification({ type: 'success', message: 'Vendor updated successfully' });
       } else {
         const creationPayload: {
@@ -103,9 +110,12 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
         }
         if (formState.vendor_type_id) creationPayload.vendor_type_id = formState.vendor_type_id;
 
-        await createMutation.mutateAsync(creationPayload);
+        const created = await createMutation.mutateAsync(creationPayload);
+        if (formState.accountable_agent_user_id && created?.vendor_id) {
+          await fetch(`/api/vendors/${encodeURIComponent(created.vendor_id)}/accountability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_user_id: formState.accountable_agent_user_id }) });
+        }
         setNotification({ type: 'success', message: 'Vendor created successfully' });
-        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: '', acquired_by: '', vendor_type_id: '', status: 'active' });
+        setFormState({ vendor_name: '', phone: '', location: '', sales_rep_id: '', acquired_by: '', vendor_type_id: '', status: 'active', accountable_agent_user_id: '' });
       }
       onSuccess?.();
     } catch (error) {
@@ -136,6 +146,17 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!vendorId || !canAssignVendor) return;
+    fetch(`/api/vendors/${encodeURIComponent(vendorId)}/accountability`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => {
+        const active = Array.isArray(payload?.data) ? payload.data.find((item: any) => item.status === 'active') : null;
+        if (active) setFormState((current) => ({ ...current, accountable_agent_user_id: String(active.agent_user_id) }));
+      })
+      .catch(() => undefined);
+  }, [vendorId, canAssignVendor]);
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit}>
@@ -208,6 +229,16 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
           </select>
           <span className="mt-1 block text-xs text-slate-500">Independent of the sales representative and the user recording this vendor.</span>
         </label>
+        {showSalesRepSelect ? (
+          <label className="block text-sm text-slate-700">
+            Accountable agent
+            <select value={formState.accountable_agent_user_id} onChange={(event) => handleChange('accountable_agent_user_id', event.target.value)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
+              <option value="">No accountability assignment</option>
+              {accountableAgents.map((agent) => <option key={agent.user_id} value={agent.user_id}>{agent.name}</option>)}
+            </select>
+            <span className="mt-1 block text-xs text-slate-500">Snapshots the current vendor balance; independent of Sales Representative.</span>
+          </label>
+        ) : null}
         <label className="block text-sm text-slate-700">
           Status
           <select

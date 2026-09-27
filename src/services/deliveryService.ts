@@ -7,6 +7,7 @@ import { ProductRepository } from '@/repositories/ProductRepository';
 import { AppUserRepository } from '@/repositories/AppUserRepository';
 import { NotFoundError } from '@/repositories/errors';
 import { AgentAccountabilityRepository, type AccountabilityLine } from '@/repositories/AgentAccountabilityRepository';
+import { VendorAccountabilityAssignmentRepository } from '@/repositories/VendorAccountabilityAssignmentRepository';
 
 class HttpError extends Error {
   public readonly status: number;
@@ -132,10 +133,12 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
     updated_by: createdBy,
     });
     await repository.createActivity({ activity_id: buildId('DA'), delivery_id: deliveryId, activity_type: 'created', new_status: 'pending', actor_user_id: createdBy });
-    if (payload.accountability_agent_user_id) {
+    const assignment = await new VendorAccountabilityAssignmentRepository(connection).findActive(vendorId);
+    const accountabilityAgent = assignment?.agent_user_id ?? payload.accountability_agent_user_id;
+    if (accountabilityAgent) {
       await new AgentAccountabilityRepository(connection).createPendingCase({
         case_id: buildId('AAC'), delivery_id: deliveryId, vendor_id: vendorId,
-        accountable_agent_user_id: payload.accountability_agent_user_id, created_by: createdBy,
+        assignment_id: assignment?.assignment_id, accountable_agent_user_id: accountabilityAgent, created_by: createdBy,
         lines: valuationLines, occurred_at: now,
       });
     }
