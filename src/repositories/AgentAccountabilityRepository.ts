@@ -35,6 +35,27 @@ export interface AccountabilityTransferRecord {
 }
 
 export class AgentAccountabilityRepository extends BaseRepository {
+  public async getAgentBreakdown(agentUserId: string): Promise<{
+    assignments: Array<{ assignment_id: string; vendor_id: string; vendor_name: string; starting_balance: number; assigned_at: string; assigned_by: string; status: string }>;
+    events: Array<{ event_id: string; event_type: string; amount_delta: number; vendor_id: string; vendor_name: string; delivery_id?: string; source_visit_id?: string; payment_method?: string; occurred_at: string; event_status: string }>;
+    handovers: Array<{ handover_id: string; amount: number; expected_amount: number; variance: number; status: string; company_receiver?: string; handover_at: string; allocations: Array<{ collection_event_id: string; amount: number; vendor_id: string; vendor_name: string; delivery_id?: string; source_visit_id?: string; collection_amount: number }> }>;
+  }> {
+    const [assignmentRows] = await this.db.execute<any[]>(`SELECT a.assignment_id, a.vendor_id, v.vendor_name, a.starting_balance, a.assigned_at, a.assigned_by, a.status FROM agent_vendor_accountability_assignments a JOIN vendors v ON v.vendor_id = a.vendor_id WHERE a.agent_user_id = :agent_user_id ORDER BY a.assigned_at DESC`, { agent_user_id: agentUserId });
+    const [eventRows] = await this.db.execute<any[]>(`SELECT e.event_id, e.event_type, e.amount_delta, e.vendor_id, v.vendor_name, e.delivery_id, e.source_visit_id, e.payment_method, e.occurred_at, e.event_status FROM agent_accountability_events e JOIN vendors v ON v.vendor_id = e.vendor_id WHERE e.agent_user_id = :agent_user_id ORDER BY e.occurred_at ASC, e.event_id ASC`, { agent_user_id: agentUserId });
+    const [handoverRows] = await this.db.execute<any[]>(`SELECT h.handover_id, h.amount, h.cash_collected_at_record, h.variance, h.status, h.company_receiver, h.handover_at, a.collection_event_id, a.amount AS allocated_amount, ce.amount_delta AS collection_delta, ce.vendor_id, v.vendor_name, ce.delivery_id, ce.source_visit_id FROM agent_cash_handovers h LEFT JOIN agent_cash_handover_allocations a ON a.handover_id = h.handover_id LEFT JOIN agent_accountability_events ce ON ce.event_id = a.collection_event_id LEFT JOIN vendors v ON v.vendor_id = ce.vendor_id WHERE h.agent_user_id = :agent_user_id ORDER BY h.handover_at DESC, h.handover_id DESC`, { agent_user_id: agentUserId });
+    const handoverMap = new Map<string, any>();
+    for (const row of handoverRows ?? []) {
+      const id = String(row.handover_id);
+      const existing = handoverMap.get(id) ?? { handover_id: id, amount: Number(row.amount), expected_amount: Number(row.cash_collected_at_record), variance: Number(row.variance), status: String(row.status), company_receiver: row.company_receiver ? String(row.company_receiver) : undefined, handover_at: String(row.handover_at), allocations: [] };
+      if (row.collection_event_id) existing.allocations.push({ collection_event_id: String(row.collection_event_id), amount: Number(row.allocated_amount), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name), delivery_id: row.delivery_id ? String(row.delivery_id) : undefined, source_visit_id: row.source_visit_id ? String(row.source_visit_id) : undefined, collection_amount: Math.abs(Number(row.collection_delta ?? 0)) });
+      handoverMap.set(id, existing);
+    }
+    return {
+      assignments: (assignmentRows ?? []).map((row) => ({ assignment_id: String(row.assignment_id), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name), starting_balance: Number(row.starting_balance), assigned_at: String(row.assigned_at), assigned_by: String(row.assigned_by), status: String(row.status) })),
+      events: (eventRows ?? []).map((row) => ({ event_id: String(row.event_id), event_type: String(row.event_type), amount_delta: Number(row.amount_delta), vendor_id: String(row.vendor_id), vendor_name: String(row.vendor_name), delivery_id: row.delivery_id ? String(row.delivery_id) : undefined, source_visit_id: row.source_visit_id ? String(row.source_visit_id) : undefined, payment_method: row.payment_method ? String(row.payment_method) : undefined, occurred_at: String(row.occurred_at), event_status: String(row.event_status) })),
+      handovers: [...handoverMap.values()],
+    };
+  }
   public async createPendingCase(input: {
     case_id: string;
     delivery_id: string;

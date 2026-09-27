@@ -40,7 +40,7 @@ function isElevated(role: AppUserRole | undefined): boolean {
 async function authorizeCase(deliveryId: string, actorUserId: string, role: AppUserRole | undefined) {
   const detail = await getDeliveryAccountability(deliveryId);
   if (!detail) throw new AccountabilityHttpError(404, 'No accountability case exists for this delivery.');
-  if (!isElevated(role) && !(role === 'agent' && detail.accountable_agent_user_id === actorUserId)) throw new AccountabilityHttpError(403, 'You are not allowed to change this accountability case.');
+  if (!isElevated(role)) throw new AccountabilityHttpError(403, 'You are not allowed to change this accountability case.');
   if (detail.status !== 'active') throw new AccountabilityHttpError(409, 'Accountability is not active for this delivery.');
   return detail;
 }
@@ -90,6 +90,21 @@ export async function listAccountabilityAgents() {
   return new AgentAccountabilityRepository(getPool()).listActiveAgents();
 }
 
+export async function listAccountabilityManagementSummary(role?: AppUserRole) {
+  if (!canOversee(role)) throw new AccountabilityHttpError(403, 'Only management users can view accountability.');
+  return new AgentAccountabilityRepository(getPool()).listManagementSummary();
+}
+
+export async function listAccountabilityCases(agentUserId: string, role?: AppUserRole) {
+  if (!canOversee(role)) throw new AccountabilityHttpError(403, 'Only management users can view accountability cases.');
+  return new AgentAccountabilityRepository(getPool()).listCasesForAgent(agentUserId);
+}
+
+export async function getAccountabilityBreakdown(agentUserId: string, role?: AppUserRole) {
+  if (!canOversee(role)) throw new AccountabilityHttpError(403, 'Only management users can view accountability breakdowns.');
+  return new AgentAccountabilityRepository(getPool()).getAgentBreakdown(agentUserId);
+}
+
 export async function listAccountabilityTransfers(actorUserId: string, role?: AppUserRole) {
   return new AgentAccountabilityRepository(getPool()).listTransfers(actorUserId, canOversee(role));
 }
@@ -97,7 +112,7 @@ export async function listAccountabilityTransfers(actorUserId: string, role?: Ap
 export async function initiateAccountabilityTransfer(input: {
   deliveryId: string; toAgentUserId: unknown; operationId?: unknown; reason?: unknown; actorUserId: string; role?: AppUserRole;
 }) {
-  if (input.role !== 'agent' && !canOversee(input.role)) throw new AccountabilityHttpError(403, 'You are not allowed to initiate accountability transfers.');
+  if (!canOversee(input.role)) throw new AccountabilityHttpError(403, 'You are not allowed to initiate accountability transfers.');
   const detail = await getDeliveryAccountability(input.deliveryId);
   if (!detail || detail.status !== 'active') throw new AccountabilityHttpError(409, 'Only active accountability can be transferred.');
   if (detail.accountable_agent_user_id !== input.actorUserId) throw new AccountabilityHttpError(403, 'Only the accountable agent can initiate this transfer.');
@@ -120,9 +135,7 @@ export async function decideAccountabilityTransfer(input: {
 }) {
   const transfer = await new AgentAccountabilityRepository(getPool()).findTransfer(input.transferId);
   if (!transfer) throw new AccountabilityHttpError(404, 'Accountability transfer was not found.');
-  const elevated = canOversee(input.role);
-  if (input.action === 'cancel' && !elevated && transfer.initiated_by !== input.actorUserId) throw new AccountabilityHttpError(403, 'Only the initiating agent can cancel this transfer.');
-  if (input.action !== 'cancel' && !elevated && transfer.to_agent_user_id !== input.actorUserId) throw new AccountabilityHttpError(403, 'Only the recipient agent can decide this transfer.');
+  if (!canOversee(input.role)) throw new AccountabilityHttpError(403, 'You are not allowed to decide accountability transfers.');
   const reason = input.reason == null ? undefined : requiredText(input.reason, 'Reason');
   return transaction(async (connection) => {
     const repository = new AgentAccountabilityRepository(connection);
