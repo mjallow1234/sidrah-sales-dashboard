@@ -11,7 +11,7 @@ const routes = [
 ].join('\n');
 const transferRoute = fs.readFileSync('src/app/api/deliveries/[deliveryId]/accountability/transfers/route.ts', 'utf8');
 
-assert.match(migration, /CREATE TABLE agent_accountability_transfers/);
+assert.match(migration, /CREATE TABLE IF NOT EXISTS agent_accountability_transfers/);
 assert.match(migration, /status ENUM\('pending','accepted','rejected','cancelled'\)/);
 assert.match(migration, /from_agent_user_id/);
 assert.match(migration, /to_agent_user_id/);

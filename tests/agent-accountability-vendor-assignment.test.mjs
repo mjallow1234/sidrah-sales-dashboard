@@ -7,7 +7,7 @@ const accountabilityRepository = fs.readFileSync('src/repositories/AgentAccounta
 const handoverRepository = fs.readFileSync('src/repositories/AgentCashHandoverRepository.ts', 'utf8');
 const deliveryService = fs.readFileSync('src/services/deliveryService.ts', 'utf8');
 
-assert.match(migration, /CREATE TABLE agent_vendor_accountability_assignments/);
+assert.match(migration, /CREATE TABLE IF NOT EXISTS agent_vendor_accountability_assignments/);
 assert.match(migration, /starting_balance DECIMAL\(18,2\)/);
 assert.match(migration, /FOREIGN KEY \(vendor_id\) REFERENCES vendors/);
 assert.match(migration, /FOREIGN KEY \(agent_user_id\) REFERENCES app_users/);
