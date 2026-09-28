@@ -12,8 +12,8 @@ const repository = fs.readFileSync('src/repositories/AgentAccountabilityReposito
 assert.match(page, /Agent Accountability/);
 assert.match(page, /Agent Accountability/);
 assert.match(page, /Cash collected/);
-assert.match(page, /Handed Over/);
-assert.match(page, /Cash Outstanding/);
+assert.match(page, /Cash handed over/);
+assert.match(page, /Cash outstanding/);
 assert.match(page, /Cash handover history/);
 assert.match(page, /Transfer history/);
 assert.match(agentPage, /Accountability cases/);
