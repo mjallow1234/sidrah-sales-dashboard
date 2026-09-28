@@ -41,7 +41,7 @@ PREPARE delivery_vendor_fk_stmt FROM @delivery_vendor_fk_sql;
 EXECUTE delivery_vendor_fk_stmt;
 DEALLOCATE PREPARE delivery_vendor_fk_stmt;
 
-CREATE TABLE agent_accountability_cases (
+CREATE TABLE IF NOT EXISTS agent_accountability_cases (
   case_id VARCHAR(32) NOT NULL,
   delivery_id VARCHAR(32) NOT NULL,
   vendor_id VARCHAR(32) NOT NULL,
@@ -62,7 +62,7 @@ CREATE TABLE agent_accountability_cases (
   CONSTRAINT fk_agent_accountability_case_created_by FOREIGN KEY (created_by) REFERENCES app_users (user_id) ON UPDATE CASCADE ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE agent_accountability_events (
+CREATE TABLE IF NOT EXISTS agent_accountability_events (
   event_id VARCHAR(32) NOT NULL,
   operation_id VARCHAR(128) NOT NULL,
   case_id VARCHAR(32) NOT NULL,

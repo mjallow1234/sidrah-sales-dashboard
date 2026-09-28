@@ -1,4 +1,4 @@
-CREATE TABLE agent_accountability_transfers (
+CREATE TABLE IF NOT EXISTS agent_accountability_transfers (
   transfer_id VARCHAR(32) NOT NULL,
   operation_id VARCHAR(128) NOT NULL,
   case_id VARCHAR(32) NOT NULL,
