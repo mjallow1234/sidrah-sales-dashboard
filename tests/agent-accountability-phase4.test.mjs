@@ -1,0 +1,32 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+
+const migration = fs.readFileSync('db/migrations/0029_add_agent_cash_handovers.sql', 'utf8');
+const repository = fs.readFileSync('src/repositories/AgentCashHandoverRepository.ts', 'utf8');
+const service = fs.readFileSync('src/services/agentCashHandoverService.ts', 'utf8');
+const route = fs.readFileSync('src/app/api/accountability/cash/route.ts', 'utf8');
+const page = fs.readFileSync('src/app/accountability/page.tsx', 'utf8');
+
+assert.match(migration, /CREATE TABLE IF NOT EXISTS agent_cash_handovers/);
+assert.match(migration, /CREATE TABLE IF NOT EXISTS agent_cash_handover_allocations/);
+assert.match(migration, /UNIQUE KEY ux_agent_cash_handover_operation/);
+assert.match(migration, /collection_event_id/);
+assert.match(repository, /cash_collection/);
+assert.match(repository, /cash_handover/);
+assert.match(repository, /FOR UPDATE/);
+assert.match(repository, /A note is required when the handover exceeds/);
+assert.match(repository, /short/);
+assert.match(repository, /excess/);
+assert.match(repository, /agent_cash_handover_allocations/);
+assert.match(service, /Only management users can record company handovers/);
+assert.match(service, /admin.*super_admin.*supervisor/);
+assert.match(service, /TransactionJournalRepository/);
+assert.match(route, /export async function GET/);
+assert.match(route, /export async function POST/);
+assert.match(route, /CashHandoverHttpError/);
+assert.match(page, /Cash collected/);
+assert.match(page, /Cash handed over/);
+assert.match(page, /Cash outstanding/);
+assert.doesNotMatch(repository, /vendor_balances/);
+assert.doesNotMatch(repository, /vendor_inventory/);
+console.log('agent-accountability-phase4: all assertions passed');

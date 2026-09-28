@@ -7,6 +7,7 @@ import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository'
 import { VisitRepository } from '@/repositories/VisitRepository';
 import { TransactionJournalRepository } from '@/repositories/TransactionJournalRepository';
 import { OperationIdempotencyRepository } from '@/repositories/OperationIdempotencyRepository';
+import { AgentAccountabilityRepository } from '@/repositories/AgentAccountabilityRepository';
 import { isAgentRole } from '@/lib/authorization';
 
 export interface CreateVisitPayload {
@@ -507,6 +508,18 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       created_by: payload.actor_user_id,
       updated_by: payload.actor_user_id,
     }) as unknown as Record<string, unknown>;
+    if (cashCollected > 0 && payload.actor_user_id && isAgentRole(payload.actor_role)) {
+      await new AgentAccountabilityRepository(connection).createVisitCollection({
+        operation_id: `AAC_VISIT_${visitId}`,
+        visit_id: visitId,
+        vendor_id: vendorId,
+        amount: cashCollected,
+        payment_method: paymentMethod,
+        collector_user_id: payload.actor_user_id,
+        recorded_by: payload.actor_user_id,
+        occurred_at: nowDateTime,
+      });
+    }
     await idempotencyRepo.markCompleted(clientTransactionId, visitId, nowDateTime);
     await journalRepo.create({
       transaction_id: transactionId,

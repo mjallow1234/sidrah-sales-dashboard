@@ -261,6 +261,7 @@ export interface AgentAccountabilityEvent {
   payment_option_id?: string;
   payment_method?: string;
   source_payment_id?: string;
+  source_visit_id?: string;
   collector_user_id?: string;
   collector_name?: string;
 }
@@ -305,6 +306,53 @@ export interface AgentAccountabilityTransfer {
   decided_at?: string;
   decision_reason?: string;
   current_remaining_value: number;
+}
+
+export interface AgentAccountabilitySummary {
+  agent_user_id: string;
+  agent_name: string;
+  total_accountability: number;
+  pending_stock_accountability: number;
+  active_stock_accountability: number;
+  stock_accountability: number;
+  stock_returned: number;
+  cash_collected: number;
+  cash_handed_over: number;
+  cash_outstanding: number;
+  cash_status: 'outstanding' | 'reconciled' | 'excess';
+  active_case_count: number;
+  status: 'outstanding' | 'reconciled' | 'excess';
+}
+
+export interface AgentAccountabilityCaseSummary {
+  case_id: string;
+  delivery_id: string;
+  vendor_id: string;
+  vendor_name: string;
+  delivery_date: string;
+  accountable_agent_user_id: string;
+  accountable_agent_name?: string;
+  status: 'pending' | 'active' | 'closed' | 'voided';
+  original_value: number;
+  cash_collected: number;
+  stock_returned: number;
+  remaining_value: number;
+}
+
+export interface AgentCashHandoverRecord {
+  handover_id: string;
+  operation_id: string;
+  agent_user_id: string;
+  agent_name: string;
+  amount: number;
+  expected_amount: number;
+  variance: number;
+  status: 'reconciled' | 'short' | 'excess';
+  company_receiver?: string;
+  handover_at: string;
+  recorded_by: string;
+  recorded_by_name?: string;
+  notes?: string;
 }
 
 export interface DeliveryTrackingLocation {

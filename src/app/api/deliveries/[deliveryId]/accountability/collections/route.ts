@@ -1,5 +1,5 @@
 import type { NextRequest } from 'next/server';
-import type { AppUserRole } from '@/lib/authorization';
+import { isAdminOrSupervisorRole, type AppUserRole } from '@/lib/authorization';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { recordAccountabilityCollection, AccountabilityHttpError } from '@/services/agentAccountabilityService';
 
@@ -8,7 +8,7 @@ function getDeliveryId(request: NextRequest): string { const parts = request.nex
 export async function POST(request: NextRequest) {
   const session = await getVerifiedSession(request);
   if (!session) return unauthorizedResponse();
-  if (!['agent', 'admin', 'supervisor', 'super_admin'].includes(String(session.role))) return forbiddenResponse();
+  if (!isAdminOrSupervisorRole(session.role)) return forbiddenResponse();
   try {
     const payload = await request.json().catch(() => ({}));
     const data = await recordAccountabilityCollection({

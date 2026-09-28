@@ -89,6 +89,12 @@ const navSections = [
     ],
   },
   {
+    title: 'Accountability',
+    links: [
+      { label: 'Agent cash accountability', href: '/accountability', icon: ClipboardList },
+    ],
+  },
+  {
     title: 'Reports',
     links: [
       { label: 'Reports', href: '/reports', icon: BarChart3 },

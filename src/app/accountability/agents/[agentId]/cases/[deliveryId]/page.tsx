@@ -1,0 +1,39 @@
+'use client';
+
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { useAuthQuery, useAccountabilityTransfersQuery, useDeliveryAccountabilityQuery, useDeliveryQuery } from '@/lib/hooks/queries';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
+
+const money = (value: number) => `${value < 0 ? '-' : ''}D${Math.abs(Number(value || 0)).toLocaleString()}`;
+
+export default function AccountabilityCasePage() {
+  const params = useParams<{ agentId: string; deliveryId: string }>();
+  const agentId = typeof params.agentId === 'string' ? params.agentId : '';
+  const deliveryId = typeof params.deliveryId === 'string' ? params.deliveryId : '';
+  const auth = useAuthQuery();
+  const allowed = isAdminOrSupervisorRole(auth.data?.role);
+  const delivery = useDeliveryQuery(deliveryId);
+  const detail = useDeliveryAccountabilityQuery(deliveryId, allowed);
+  const transfers = useAccountabilityTransfersQuery(allowed);
+
+  if (!allowed) return <div className="p-6 text-slate-600">Management accountability is restricted to authorized users.</div>;
+  if (delivery.isLoading || detail.isLoading) return <div className="p-6 text-slate-600">Loading accountability case…</div>;
+  if (delivery.error || detail.error || !delivery.data || !detail.data) return <div className="p-6 text-rose-700">Unable to load this accountability case.</div>;
+
+  const record = delivery.data;
+  const account = detail.data;
+  const events = account.events ?? [];
+  const collections = events.filter((event) => event.event_type === 'cash_collection');
+  const returns = events.filter((event) => event.event_type === 'stock_return');
+  const handovers = events.filter((event) => event.event_type === 'cash_handover');
+  const caseTransfers = (transfers.data ?? []).filter((transfer) => transfer.delivery_id === deliveryId);
+  const originalValue = account.pending_value || account.active_value;
+  const lineEvents = events.filter((event) => event.event_type === (account.status === 'pending' ? 'pending_delivery' : 'delivery_activation'));
+
+  return <main className="space-y-6 p-4 sm:p-6"><div><Link href={`/accountability/agents/${encodeURIComponent(agentId)}`} className="text-sm font-semibold text-sidrah-700 hover:underline">← Back to agent</Link><p className="mt-4 text-sm uppercase tracking-[0.2em] text-sidrah-600">Accountability case</p><h1 className="mt-2 text-2xl font-semibold text-slate-900">{record.customer_name}</h1><p className="mt-1 text-sm text-slate-500">{record.delivery_id} · {record.delivery_address}</p></div><section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5"><div className="rounded-3xl border bg-white p-4"><p className="text-xs text-slate-500">Original value</p><p className="mt-2 text-xl font-semibold">{money(originalValue)}</p></div><div className="rounded-3xl border bg-white p-4"><p className="text-xs text-slate-500">Cash collected</p><p className="mt-2 text-xl font-semibold">{money(account.cash_collected)}</p></div><div className="rounded-3xl border bg-white p-4"><p className="text-xs text-slate-500">Stock returned</p><p className="mt-2 text-xl font-semibold">{money(account.stock_returned)}</p></div><div className="rounded-3xl border bg-white p-4"><p className="text-xs text-slate-500">Remaining</p><p className="mt-2 text-xl font-semibold text-rose-600">{money(account.remaining_value)}</p></div><div className="rounded-3xl border bg-white p-4"><p className="text-xs text-slate-500">Accountable agent</p><p className="mt-2 text-xl font-semibold">{account.accountable_agent_name || 'Unknown user'}</p></div></section><section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft"><h2 className="text-lg font-semibold">Original delivery</h2><div className="mt-3 grid gap-3 sm:grid-cols-2"><div><p className="text-xs text-slate-500">Date</p><p>{new Date(record.date_created).toLocaleString()}</p></div><div><p className="text-xs text-slate-500">Status</p><p className="capitalize">{record.status}</p></div></div><div className="mt-4 overflow-x-auto"><table className="min-w-full text-left text-sm"><thead><tr className="border-b bg-slate-50"><th className="px-3 py-2">Product</th><th className="px-3 py-2">Quantity</th><th className="px-3 py-2">Unit value</th><th className="px-3 py-2">Value</th></tr></thead><tbody>{lineEvents.map((event) => <tr key={event.event_id} className="border-b"><td className="px-3 py-2">{event.product_name || event.product_id || 'Product'}</td><td className="px-3 py-2">{event.quantity ?? '—'}</td><td className="px-3 py-2">{money(event.unit_value ?? 0)}</td><td className="px-3 py-2">{money(event.amount_delta)}</td></tr>)}</tbody></table></div></section><EventGroup title="Cash collections" empty="No accountability collections recorded." events={collections} render={(event) => <>{money(event.amount_delta)} · {event.payment_method || 'Payment method unavailable'} · Collector: {event.collector_name || 'Unknown'} · Recorded by: {event.recorded_by_name || 'Unknown'} · {new Date(event.occurred_at).toLocaleString()}</>} /><EventGroup title="Stock returns" empty="No stock returns recorded." events={returns} render={(event) => <>{event.product_name || event.product_id || 'Product'} · {event.quantity ?? 0} · unit {money(event.unit_value ?? 0)} · Recorded by: {event.recorded_by_name || 'Unknown'} · {new Date(event.occurred_at).toLocaleString()}</>} /><EventGroup title="Cash handovers" empty="No handover events allocated to this case." events={handovers} render={(event) => <>{money(event.amount_delta)} · Recorded by: {event.recorded_by_name || 'Unknown'} · {new Date(event.occurred_at).toLocaleString()} · {event.reason || ''}</>} /><section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft"><h2 className="text-lg font-semibold">Transfers</h2>{caseTransfers.length === 0 ? <p className="mt-3 text-sm text-slate-500">No transfers recorded.</p> : <div className="mt-3 space-y-2">{caseTransfers.map((transfer) => <div key={transfer.transfer_id} className="rounded-2xl border p-3 text-sm"><p className="font-semibold">{transfer.from_agent_name || 'Agent'} → {transfer.to_agent_name || 'Agent'} · {money(transfer.accepted_amount ?? transfer.requested_amount)}</p><p className="mt-1 text-xs text-slate-500">{transfer.status} · initiated {new Date(transfer.initiated_at).toLocaleString()} by {transfer.initiated_by_name || 'Unknown'}{transfer.decided_by_name ? ` · decided by ${transfer.decided_by_name}` : ''}</p><p className="mt-1 text-xs text-slate-500">{transfer.reason || transfer.decision_reason || ''}</p></div>)}</div>}</section><section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft"><h2 className="text-lg font-semibold">Accountability timeline</h2><div className="mt-3 space-y-2">{events.map((event) => <div key={event.event_id} className="rounded-2xl border p-3 text-sm"><div className="flex flex-wrap justify-between gap-2"><span className="font-semibold capitalize">{event.event_type.replace(/_/g, ' ')}</span><span className="font-semibold">{money(event.amount_delta)}</span></div><p className="mt-1 text-xs text-slate-500">{new Date(event.occurred_at).toLocaleString()} · Recorded by {event.recorded_by_name || 'Unknown user'}{event.reason ? ` · ${event.reason}` : ''}</p></div>)}</div></section></main>;
+}
+
+function EventGroup({ title, empty, events, render }: { title: string; empty: string; events: any[]; render: (event: any) => React.ReactNode }) {
+  return <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft"><h2 className="text-lg font-semibold">{title}</h2>{events.length === 0 ? <p className="mt-3 text-sm text-slate-500">{empty}</p> : <div className="mt-3 space-y-2">{events.map((event) => <div key={event.event_id} className="rounded-2xl border p-3 text-sm">{render(event)}{event.reason ? <p className="mt-1 text-xs text-slate-500">Reason: {event.reason}</p> : null}</div>)}</div>}</section>;
+}
