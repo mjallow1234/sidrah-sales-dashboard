@@ -13,8 +13,8 @@ function mapVisitLogToTransaction(log: any): Transaction {
     sales_rep_id: log.sales_rep_id,
     sales_rep_name: log.sales_rep_name,
     opening_stock: Number(log.opening_stock) || 0,
-    stock_sold: Number(log.stock_sold) || 0,
     stock_added: Number(log.stock_added) || 0,
+    unit_price: Number(log.unit_price) || 0,
     cash_collected: Number(log.cash_collected) || 0,
     closing_stock: Number(log.closing_stock) || 0,
     sales_rep: log.sales_rep_id || '',
@@ -47,7 +47,7 @@ async function fetchJson(path: string, options: RequestInit = {}) {
   return json;
 }
 
-export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string }): Promise<Transaction[]> {
+export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string; missingSalesRep?: boolean }): Promise<Transaction[]> {
   const query = params ? Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)

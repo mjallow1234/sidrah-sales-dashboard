@@ -1,6 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { createProduct, getProducts, getProduct, updateProduct } from '@/lib/api/products';
 import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib/api/salesreps';
 import { getStats } from '@/lib/api/stats';
@@ -36,13 +37,15 @@ export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: 
 }
 
 export function usePaginatedVendorsQuery(
-  filters?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string },
+  filters?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; location?: string; balance?: string },
   page = 1,
-  pageSize = 50
+  pageSize = 50,
+  enabled = true
 ) {
   return useQuery<PaginatedResult<Vendor>>({
     queryKey: ['vendorsPage', filters, page, pageSize],
     queryFn: () => fetchPaginatedVendors({ ...filters, page, pageSize }),
+    enabled,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -106,7 +109,7 @@ export function useVendorBalanceQuery(vendorId: string) {
   });
 }
 
-export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string }) {
+export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string; missingSalesRep?: boolean }, enabled = true) {
   return useQuery<Transaction[]>({
     queryKey: ['transactions', filters],
     queryFn: async () => {
@@ -123,12 +126,13 @@ export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?:
         sales_rep_id: log.sales_rep_id,
         sales_rep_name: log.sales_rep_name,
         opening_stock: Number(log.opening_stock) || 0,
-        stock_sold: Number(log.stock_sold) || 0,
         stock_added: Number(log.stock_added) || 0,
+        unit_price: Number(log.unit_price) || 0,
         cash_collected: Number(log.cash_collected) || 0,
         closing_stock: Number(log.closing_stock) || 0,
         sales_rep: log.sales_rep_id || '',
         actor: log.actor || '',
+        created_by: log.created_by,
         notes: log.notes || '',
         is_reversed: Boolean(log.is_reversed),
         reversed_at: log.reversed_at,
@@ -138,13 +142,15 @@ export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?:
         reversal_operation_id: log.reversal_operation_id,
       }));
     },
+    enabled,
   });
 }
 
-export function useVendorBalancesQuery() {
+export function useVendorBalancesQuery(enabled = true) {
   return useQuery({
     queryKey: ['vendorBalances'],
     queryFn: () => getVendorBalances(),
+    enabled,
   });
 }
 
@@ -155,21 +161,27 @@ export function useVendorsOwingQuery() {
   });
 }
 
-export function useProductsQuery() {
+export function useProductsQuery(filters?: { productId?: string }) {
   return useQuery({
-    queryKey: ['products'],
-    queryFn: () => getProducts(),
+    queryKey: ['products', filters],
+    queryFn: () => getProducts(filters),
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 }
 
-export function useFactoryInventoryQuery() {
-  return useQuery<FactoryInventory[]>({ queryKey: ['factoryInventory'], queryFn: getFactoryInventory });
+export function useFactoryInventoryQuery(filters?: { productId?: string }, enabled = true) {
+  const [urlFilters, setUrlFilters] = useState<{ productId?: string }>({});
+  useEffect(() => { const params = new URLSearchParams(window.location.search); setUrlFilters({ productId: params.get('productId') || undefined }); }, []);
+  const effectiveFilters = filters ?? urlFilters;
+  return useQuery<FactoryInventory[]>({ queryKey: ['factoryInventory', effectiveFilters], queryFn: () => getFactoryInventory(effectiveFilters), enabled });
 }
 
-export function useFactoryMovementsQuery() {
-  return useQuery<FactoryStockMovement[]>({ queryKey: ['factoryMovements'], queryFn: getFactoryMovements });
+export function useFactoryMovementsQuery(filters?: { startDate?: string; endDate?: string; productId?: string; movementType?: string }, enabled = true) {
+  const [urlFilters, setUrlFilters] = useState<{ startDate?: string; endDate?: string; productId?: string }>({});
+  useEffect(() => { const params = new URLSearchParams(window.location.search); setUrlFilters({ startDate: params.get('startDate') || undefined, endDate: params.get('endDate') || undefined, productId: params.get('productId') || undefined }); }, []);
+  const effectiveFilters = filters ?? urlFilters;
+  return useQuery<FactoryStockMovement[]>({ queryKey: ['factoryMovements', effectiveFilters], queryFn: () => getFactoryMovements(effectiveFilters), enabled });
 }
 export function useFactoryRevisionsQuery(eventId?: string) { return useQuery<any[]>({ queryKey: ['factoryRevisions', eventId], queryFn: () => getFactoryRevisions(eventId as string), enabled: Boolean(eventId) }); }
 
@@ -233,10 +245,11 @@ export function useSalesRepsQuery(enabled = true) {
   });
 }
 
-export function useDeliveriesQuery(filters?: { status?: string }) {
+export function useDeliveriesQuery(filters?: { status?: string; productId?: string; unassigned?: boolean }, enabled = true) {
   return useQuery<DeliveryRecord[]>({
     queryKey: ['deliveries', filters],
     queryFn: () => getDeliveries(filters),
+    enabled,
     staleTime: 5 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
@@ -303,12 +316,12 @@ export function useTransactionsByVendorQuery(vendorId: string) {
         sales_rep_id: log.sales_rep_id,
         sales_rep_name: log.sales_rep_name,
         opening_stock: Number(log.opening_stock) || 0,
-        stock_sold: Number(log.stock_sold) || 0,
         stock_added: Number(log.stock_added) || 0,
         cash_collected: Number(log.cash_collected) || 0,
         closing_stock: Number(log.closing_stock) || 0,
         sales_rep: log.sales_rep_id || '',
         actor: log.actor || '',
+        created_by: log.created_by,
         notes: log.notes || '',
         is_reversed: Boolean(log.is_reversed),
         reversed_at: log.reversed_at,

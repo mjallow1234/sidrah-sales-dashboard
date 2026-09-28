@@ -13,6 +13,7 @@ import type {
   AdminDashboardSummary,
   AdminDashboardTrendPoint,
   AdminDashboardVendorAttention,
+  AdminDashboardVendorStatus,
 } from '@/lib/types/admin-dashboard';
 import type { RepositoryDbClient } from './types';
 import { BaseRepository } from './BaseRepository';
@@ -87,6 +88,7 @@ export class AdminDashboardRepository extends BaseRepository {
       vendorCredits,
       dataQuality,
       filterOptions,
+      vendorStatuses,
     ] = await Promise.all([
       this.getSnapshot(filters),
       this.getTrends(filters),
@@ -99,6 +101,7 @@ export class AdminDashboardRepository extends BaseRepository {
       this.getVendorAttention(filters, 'credit'),
       this.getDataQuality(filters),
       this.getFilterOptions(),
+      this.getVendorStatuses(filters),
     ]);
 
     return {
@@ -120,7 +123,51 @@ export class AdminDashboardRepository extends BaseRepository {
       },
       dataQuality,
       filterOptions,
+      vendorStatuses,
     };
+  }
+
+  private async getVendorStatuses(filters: AdminDashboardFilters): Promise<AdminDashboardVendorStatus[]> {
+    const params: QueryParams = {};
+    const conditions = this.vendorConditions(filters, params);
+    const where = conditions.length ? `AND ${conditions.join(' AND ')}` : '';
+    const [rows] = await this.execute<any[]>(
+      `SELECT v.vendor_id, v.vendor_name, v.status AS stored_status_id, vs.name AS stored_status_name,
+              CASE
+                WHEN v.status = 'inactive' THEN 'inactive'
+                WHEN latest_payment.latest_payment_at IS NOT NULL
+                  AND latest_payment.latest_payment_at < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 14 DAY) THEN 'dormant'
+                WHEN latest_payment.latest_payment_at IS NOT NULL AND v.status = 'dormant' THEN 'active'
+                ELSE v.status
+              END AS effective_status_id
+       FROM vendors v
+       LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
+       LEFT JOIN (
+         SELECT vendor_id, MAX(COALESCE(timestamp, date)) AS latest_payment_at
+         FROM visit_logs
+         WHERE COALESCE(is_reversed, 0) = 0 AND cash_collected > 0
+         GROUP BY vendor_id
+       ) latest_payment ON latest_payment.vendor_id = v.vendor_id
+       WHERE 1 = 1 ${where}
+       ORDER BY v.vendor_name ASC, v.vendor_id ASC`,
+      params,
+    );
+    const [statusRows] = await this.execute<any[]>('SELECT status_id, name FROM vendor_statuses WHERE is_active = 1 ORDER BY status_id ASC');
+    const names = new Map((statusRows ?? []).map((row) => [String(row.status_id), String(row.name)]));
+    const groups = new Map<string, AdminDashboardVendorStatus>();
+    for (const row of rows ?? []) {
+      const statusId = String(row.effective_status_id || row.stored_status_id || 'active');
+      const statusName = names.get(statusId) ?? (statusId === 'dormant' ? 'Dormant' : statusId === 'inactive' ? 'Inactive' : String(row.stored_status_name || statusId));
+      const group = groups.get(statusId) ?? { statusId, statusName, count: 0, vendors: [] };
+      group.count += 1;
+      group.vendors.push({ vendorId: String(row.vendor_id), vendorName: String(row.vendor_name), statusId, statusName });
+      groups.set(statusId, group);
+    }
+    for (const row of statusRows ?? []) {
+      const statusId = String(row.status_id);
+      if (!groups.has(statusId)) groups.set(statusId, { statusId, statusName: String(row.name), count: 0, vendors: [] });
+    }
+    return [...groups.values()].sort((a, b) => a.statusName.localeCompare(b.statusName));
   }
 
   private async getSnapshot(filters: AdminDashboardFilters): Promise<AdminDashboardSnapshot> {

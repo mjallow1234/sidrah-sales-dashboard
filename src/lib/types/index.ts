@@ -503,10 +503,10 @@ export interface ProductIntelligence {
   category?: string;
   unit?: string;
   currentStock: number;
-  unitsSold: number;
-  salesValue: number;
+  unitsPurchased: number;
+  purchaseValue: number;
   expectedValue: number;
-  salesShare?: number;
+  purchaseShare?: number;
   averageUnitPrice?: number;
   coverageDays?: number;
   movementClassification?: 'fast' | 'normal' | 'slow' | 'not_moving';
@@ -545,17 +545,17 @@ export interface ProductPerformance {
   productName?: string;
   category?: string;
   unit?: string;
-  unitsSold: number;
-  salesValue: number;
+  unitsPurchased: number;
+  purchaseValue: number;
   expectedValue: number;
-  salesShare?: number;
+  purchaseShare?: number;
   averageUnitPrice?: number;
   currentStock: number;
   stockRemainingDays?: number;
   movementClassification?: 'fast' | 'normal' | 'slow' | 'not_moving';
   visitCount: number;
-  firstSaleDate?: string;
-  lastSaleDate?: string;
+  firstPurchaseDate?: string;
+  lastPurchaseDate?: string;
 }
 
 export interface VendorIntelligence {
@@ -567,17 +567,17 @@ export interface VendorIntelligence {
   trendSignals: TrendSignal[];
   statusSummary: {
     currentStock: number;
-    recentSales: number;
+    recentPurchases: number;
     balanceOwed: number;
     collectionRate?: number;
     stockCoverageDays?: number;
   };
-  salesVolume: Signal<{
-    totalUnitsSold: number;
-    totalSalesValue: number;
+  purchaseVolume: Signal<{
+    totalUnitsPurchased: number;
+    totalPurchaseValue: number;
     totalCashCollected: number;
   }>;
-  salesVelocity: Signal<{
+  purchaseVelocity: Signal<{
     averageDailyUnits?: number;
     averageDailyValue?: number;
     visitCount: number;
@@ -589,7 +589,7 @@ export interface VendorIntelligence {
   }>;
   stockRemaining: Signal<{
     daysRemaining?: number;
-    method?: 'averageDailySales';
+    method?: 'averageDailyPurchases';
     coverageNote?: string;
   }>;
   lastVisit: Signal<{ lastVisitDate?: string }>;
@@ -704,8 +704,8 @@ export interface Transaction {
   sales_rep_name?: string;
   created_by?: string | null;
   opening_stock: number;
-  stock_sold: number;
   stock_added: number;
+  unit_price?: number;
   cash_collected: number;
   closing_stock: number;
   sales_rep: string;

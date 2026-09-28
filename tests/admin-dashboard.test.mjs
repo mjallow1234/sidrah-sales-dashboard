@@ -117,15 +117,19 @@ test('location aggregation is deterministic under only_full_group_by', () => {
   assert.doesNotMatch(repository, /= COALESCE\(NULLIF\(TRIM\(v\.location\), ''\), 'Unknown location'\)/);
 });
 
-test('dashboard has loading, empty, error, metric switching, and drill-down links', () => {
+test('dashboard has loading, empty, error, metric switching, and modal drill-downs', () => {
   const ui = read('src/components/dashboard/admin-control-center.tsx');
   assert.match(ui, /Loading Admin Control Center/);
   assert.match(ui, /Unable to load dashboard summary/);
   assert.match(ui, /No period activity found/);
   assert.match(ui, /MetricTabs/);
-  for (const href of ['/transactions', '/vendors', '/deliveries', '/factory', '/factory/production', '/factory/movements']) {
-    assert.match(ui, new RegExp(href.replace(/\//g, '\\/')));
-  }
+  assert.match(ui, /DetailModal/);
+  assert.match(ui, /openTransactions\('Cash Collected'/);
+  assert.match(ui, /title: 'Outstanding Deliveries'/);
+  assert.match(ui, /kind: 'movements'/);
+  assert.match(ui, /Vendor Status/);
+  assert.match(ui, /status\.vendors\.map/);
+  assert.match(ui, /sort\(\(a, b\) => b\.amount - a\.amount\)/);
 });
 
 test('react query hook uses a scoped dashboard query key', () => {

@@ -116,6 +116,20 @@ export interface AdminDashboardFilterOptions {
   locations: string[];
 }
 
+export interface AdminDashboardVendorStatusVendor {
+  vendorId: string;
+  vendorName: string;
+  statusId: string;
+  statusName: string;
+}
+
+export interface AdminDashboardVendorStatus {
+  statusId: string;
+  statusName: string;
+  count: number;
+  vendors: AdminDashboardVendorStatusVendor[];
+}
+
 export interface AdminDashboardSummary {
   filters: AdminDashboardFilters;
   snapshot: AdminDashboardSnapshot;
@@ -128,4 +142,5 @@ export interface AdminDashboardSummary {
   attention: AdminDashboardAttention;
   dataQuality: AdminDashboardDataQuality;
   filterOptions: AdminDashboardFilterOptions;
+  vendorStatuses: AdminDashboardVendorStatus[];
 }
