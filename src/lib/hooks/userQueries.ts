@@ -51,10 +51,11 @@ async function updateAppUser(userId: string, payload: Record<string, unknown>) {
   });
 }
 
-export function useAppUsersQuery() {
+export function useAppUsersQuery(enabled = true) {
   return useQuery<AppUser[]>({
     queryKey: ['appUsers'],
     queryFn: () => fetchAppUsers(),
+    enabled,
   });
 }
 
