@@ -38,7 +38,7 @@ function unwrapListResponse<T>(result: any): T[] {
   return [] as T[];
 }
 
-export async function getProducts(params?: { active?: boolean | string; category?: string }): Promise<Product[]> {
+export async function getProducts(params?: { active?: boolean | string; category?: string; productId?: string }): Promise<Product[]> {
   const path = `/api/products${buildQueryString(params ?? {})}`;
   const result = await fetchJson<any>(path);
   return unwrapListResponse<Product>(result);
