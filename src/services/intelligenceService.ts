@@ -86,19 +86,19 @@ function computeDaysRemaining(currentStock: number, avgDailyUnits: number): numb
   return undefined;
 }
 
-function computeAverageUnitPrice(salesValue: number, unitsSold: number): number | undefined {
-  return unitsSold > 0 ? salesValue / unitsSold : undefined;
+function computeAverageUnitPrice(purchaseValue: number, unitsPurchased: number): number | undefined {
+  return unitsPurchased > 0 ? purchaseValue / unitsPurchased : undefined;
 }
 
 function determineStockRemainingStatus(
   visitStatus: SignalStatus,
   currentStock: number,
-  totalUnitsSold: number,
+  totalUnitsPurchased: number,
 ): SignalStatus {
   if (visitStatus === 'no_history' || visitStatus === 'insufficient_data') {
     return visitStatus;
   }
-  if (currentStock > 0 && totalUnitsSold === 0) {
+  if (currentStock > 0 && totalUnitsPurchased === 0) {
     return 'insufficient_data';
   }
   return visitStatus;
@@ -241,7 +241,7 @@ function buildSignalLevel(score: number): IntelligenceSignalLevel {
 }
 
 function buildRiskSignals(
-  salesMomentumLabel: string,
+  purchaseMomentumLabel: string,
   balanceOwed: number,
   collectionRate: number | undefined,
   daysRemaining: number | undefined,
@@ -264,7 +264,7 @@ function buildRiskSignals(
     risks.push({
       title: 'Collection is lagging',
       level: 'high',
-      summary: `Collected cash is ${collectionRate.toFixed(0)}% of expected sales.`,
+      summary: `Collected cash is ${collectionRate.toFixed(0)}% of expected purchase value.`,
       detail: 'Partial collection creates receivable risk and may reduce working capital for the vendor. ',
       action: 'Review payment timing and follow up on outstanding receipts.',
       evidence: summaryEvidence,
@@ -276,18 +276,18 @@ function buildRiskSignals(
       title: 'Inventory coverage is low',
       level: daysRemaining < 3 ? 'critical' : 'high',
       summary: `Estimated coverage is about ${formatNumber(daysRemaining)} days.`,
-      detail: 'Current stock is only enough for a few days of recent observed sales, increasing the risk of stockouts.',
+      detail: 'Current stock is only enough for a few days of recent observed purchases, increasing the risk of stockouts.',
       action: 'Plan replenishment for the most active products immediately.',
       evidence: summaryEvidence,
     });
   }
 
-  if (salesMomentumLabel.includes('declining')) {
+  if (purchaseMomentumLabel.includes('slowing')) {
     risks.push({
-      title: 'Sales momentum is weakening',
+      title: 'Purchase momentum is weakening',
       level: 'high',
       summary: 'Recent activity is falling compared with the prior period.',
-      detail: 'A downward shift in demand can reduce turnover and increase inventory risk.',
+      detail: 'A downward shift in purchasing activity can reduce turnover and increase inventory risk.',
       action: 'Investigate whether product availability or market demand has changed.',
       evidence: summaryEvidence,
     });
@@ -301,7 +301,7 @@ function buildRiskSignals(
         title: 'Recent visit activity is low',
         level: 'watch',
         summary: `No visit recorded for ${daysSinceLastVisit} days.`,
-        detail: 'Less frequent visits can slow sales recovery and make collection follow-up harder.',
+        detail: 'Less frequent visits can slow reorder activity and make collection follow-up harder.',
         action: 'Schedule a follow-up visit and verify current stock on hand.',
         evidence: summaryEvidence,
       });
@@ -314,7 +314,7 @@ function buildRiskSignals(
       level: 'watch',
       summary: 'The vendor has sparse visit history over the chosen period.',
       detail: 'This reduces confidence in projections and suggests caution when making supply decisions.',
-      action: 'Collect more visit and sales data before relying on long-term forecasts.',
+      action: 'Collect more visit and purchase data before relying on long-term forecasts.',
       evidence: summaryEvidence,
     });
   }
@@ -323,7 +323,7 @@ function buildRiskSignals(
 }
 
 function buildOpportunitySignals(
-  salesMomentumLabel: string,
+  purchaseMomentumLabel: string,
   collectionRate: number | undefined,
   productPerformanceList: ProductPerformance[],
   daysRemaining: number | undefined,
@@ -332,7 +332,7 @@ function buildOpportunitySignals(
   const opportunities: IntelligenceSignal[] = [];
   const fastProduct = productPerformanceList.find((product) => product.movementClassification === 'fast');
   const slowProduct = productPerformanceList.find((product) => product.movementClassification === 'slow');
-  const highConcentrationProduct = productPerformanceList.find((product) => (product.salesShare ?? 0) >= 50);
+  const highConcentrationProduct = productPerformanceList.find((product) => (product.purchaseShare ?? 0) >= 50);
 
   if (fastProduct && fastProduct.currentStock <= 7) {
     opportunities.push({
@@ -345,22 +345,22 @@ function buildOpportunitySignals(
     });
   }
 
-  if (highConcentrationProduct && (highConcentrationProduct.salesShare ?? 0) >= 50) {
+  if (highConcentrationProduct && (highConcentrationProduct.purchaseShare ?? 0) >= 50) {
     opportunities.push({
       title: 'High product concentration',
       level: 'opportunity',
-      summary: `Sales are concentrated in ${highConcentrationProduct.productName ?? highConcentrationProduct.productId}.`,
+      summary: `Purchases are concentrated in ${highConcentrationProduct.productName ?? highConcentrationProduct.productId}.`,
       detail: 'This product drives a large share of vendor volume and should be kept available to support revenue.',
       action: `Keep ${highConcentrationProduct.productName ?? highConcentrationProduct.productId} well stocked.`,
       evidence,
     });
   }
 
-  if (salesMomentumLabel.includes('accelerating') && collectionRate !== undefined && collectionRate >= 80) {
+  if (purchaseMomentumLabel.includes('accelerating') && collectionRate !== undefined && collectionRate >= 80) {
     opportunities.push({
       title: 'Convert momentum into reliable cash',
       level: 'opportunity',
-      summary: 'Sales activity is strengthening while collection remains adequate.',
+      summary: 'Purchase activity is strengthening while collection remains adequate.',
       detail: 'The vendor is generating momentum and is in a position to convert it into cash if collections stay on track.',
       action: 'Maintain supply of active products and monitor payment follow-through.',
       evidence,
@@ -386,8 +386,8 @@ function buildOpportunitySignals(
 }
 
 function buildTrendSignals(
-  recentUnitsSold: number,
-  previousUnitsSold: number,
+  recentUnitsPurchased: number,
+  previousUnitsPurchased: number,
   recentCashCollected: number,
   previousCashCollected: number,
   recentExpectedCash: number,
@@ -401,19 +401,19 @@ function buildTrendSignals(
 ): TrendSignal[] {
   const collectionRateRecent = recentExpectedCash > 0 ? (recentCashCollected / recentExpectedCash) * 100 : undefined;
   const collectionRatePrevious = previousExpectedCash > 0 ? (previousCashCollected / previousExpectedCash) * 100 : undefined;
-  const salesTrend = describeTrendDirection('Sales', recentUnitsSold, previousUnitsSold, hasTrendEvidence, 'units');
+  const purchaseTrend = describeTrendDirection('Purchases', recentUnitsPurchased, previousUnitsPurchased, hasTrendEvidence, 'units');
   const collectionTrend = describeTrendDirection('Collections', collectionRateRecent, collectionRatePrevious, hasTrendEvidence, '%');
   const visitTrend = describeTrendDirection('Visits', currentVisitCount, previousVisitCount, hasTrendEvidence, ' visits');
   const coverageTrend = describeTrendDirection('Coverage', currentCoverage, previousCoverage, hasTrendEvidence, ' days');
 
   return [
     {
-      name: 'sales',
-      label: 'Sales trend',
-      currentValue: recentUnitsSold,
-      previousValue: previousUnitsSold,
-      direction: salesTrend.direction,
-      note: salesTrend.note,
+      name: 'purchases',
+      label: 'Purchase trend',
+      currentValue: recentUnitsPurchased,
+      previousValue: previousUnitsPurchased,
+      direction: purchaseTrend.direction,
+      note: purchaseTrend.note,
       evidence,
     },
     {
@@ -460,7 +460,7 @@ function buildDataQualitySignals(
       level: 'watch',
       summary: 'No confirmed visits are available for this vendor within the selected period.',
       detail: 'Without visit history, trend and coverage estimates are unreliable.',
-      action: 'Collect visit and sales data before making significant inventory or payment decisions.',
+      action: 'Collect visit and purchase data before making significant inventory or payment decisions.',
       evidence,
     });
     return signals;
@@ -500,10 +500,10 @@ function buildProductIntelligence(
   return products
     .map((product) => {
       const stock = currentStockMap.get(product.productId) ?? product.currentStock;
-      const coverageDays = product.unitsSold > 0 && stock > 0 && product.visitCount > 0
-        ? computeDaysRemaining(stock, product.unitsSold / Math.max(product.visitCount, 1))
+      const coverageDays = product.unitsPurchased > 0 && stock > 0 && product.visitCount > 0
+        ? computeDaysRemaining(stock, product.unitsPurchased / Math.max(product.visitCount, 1))
         : undefined;
-      const hasProductTrendEvidence = product.visitCount >= 3 && product.firstSaleDate && product.lastSaleDate && product.firstSaleDate !== product.lastSaleDate;
+      const hasProductTrendEvidence = product.visitCount >= 3 && product.firstPurchaseDate && product.lastPurchaseDate && product.firstPurchaseDate !== product.lastPurchaseDate;
       let trendDirection: TrendDirection = 'insufficient_data';
       let trendLabel = 'Not enough product-level history is available to determine a trend.';
       if (hasProductTrendEvidence) {
@@ -511,21 +511,21 @@ function buildProductIntelligence(
         trendLabel = product.movementClassification === 'fast'
           ? 'Product movement is fast relative to current stock coverage.'
           : product.movementClassification === 'slow'
-          ? 'Product movement is slow relative to recent sales.'
+          ? 'Product movement is slow relative to recent purchases.'
           : product.movementClassification === 'not_moving'
-          ? 'No sales movement has been recorded for this product.'
+          ? 'No purchase movement has been recorded for this product.'
           : 'Product movement is within a normal range.';
       }
 
       let recommendedAction: string | undefined;
       if (coverageDays !== undefined && coverageDays < 5 && product.currentStock > 0) {
         recommendedAction = `Replenish ${product.productName ?? product.productId} soon; coverage is ${formatNumber(coverageDays)} days.`;
-      } else if (product.unitsSold > 0 && product.currentStock === 0) {
+      } else if (product.unitsPurchased > 0 && product.currentStock === 0) {
         recommendedAction = `Replenish ${product.productName ?? product.productId} immediately; recent demand exists but no stock remains.`;
-      } else if (product.unitsSold === 0 && product.currentStock > 0 && product.visitCount >= 2) {
+      } else if (product.unitsPurchased === 0 && product.currentStock > 0 && product.visitCount >= 2) {
         recommendedAction = `Investigate ${product.productName ?? product.productId}; stock exists but recent movement is weak.`;
-      } else if (product.salesShare !== undefined && product.salesShare >= 25) {
-        recommendedAction = `Maintain supply of ${product.productName ?? product.productId}; it accounts for ${product.salesShare.toFixed(0)}% of sales.`;
+      } else if (product.purchaseShare !== undefined && product.purchaseShare >= 25) {
+        recommendedAction = `Maintain supply of ${product.productName ?? product.productId}; it accounts for ${product.purchaseShare.toFixed(0)}% of purchases.`;
       }
 
       return {
@@ -534,10 +534,10 @@ function buildProductIntelligence(
         category: product.category,
         unit: product.unit,
         currentStock: stock,
-        unitsSold: product.unitsSold,
-        salesValue: product.salesValue,
+        unitsPurchased: product.unitsPurchased,
+        purchaseValue: product.purchaseValue,
         expectedValue: product.expectedValue,
-        salesShare: product.salesShare,
+        purchaseShare: product.purchaseShare,
         averageUnitPrice: product.averageUnitPrice,
         coverageDays,
         movementClassification: product.movementClassification,
@@ -554,7 +554,7 @@ function buildProductIntelligence(
         if (item.recommendedAction?.includes('Investigate')) return 80;
         if (item.movementClassification === 'fast') return 70;
         if (item.movementClassification === 'slow') return 60;
-        if (item.salesShare !== undefined) return item.salesShare;
+        if (item.purchaseShare !== undefined) return item.purchaseShare;
         return 0;
       };
       return score(b) - score(a);
@@ -586,11 +586,11 @@ function formatCurrency(value: number): string {
   return `GMD ${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`;
 }
 
-function classifyProductMovement(currentStock: number, unitsSold: number, windowDays: number) {
-  if (unitsSold === 0) {
+function classifyProductMovement(currentStock: number, unitsPurchased: number, windowDays: number) {
+  if (unitsPurchased === 0) {
     return 'not_moving' as const;
   }
-  const averageDailyUnits = windowDays > 0 ? unitsSold / windowDays : 0;
+  const averageDailyUnits = windowDays > 0 ? unitsPurchased / windowDays : 0;
   if (averageDailyUnits <= 0) {
     return 'not_moving' as const;
   }
@@ -610,7 +610,7 @@ function classifyProductMovement(currentStock: number, unitsSold: number, window
 function buildSummary(
   vendorName: string | undefined,
   vendorLocation: string | undefined,
-  totalUnitsSold: number,
+  totalUnitsPurchased: number,
   totalExpectedCash: number,
   totalCashCollected: number,
   averageDailyUnits: number,
@@ -618,8 +618,8 @@ function buildSummary(
   totalStockUnits: number,
   outstandingBalance: number,
   collectionRate: number | undefined,
-  salesMomentumLabel: string,
-  salesMomentumChange: number | undefined,
+  purchaseMomentumLabel: string,
+  purchaseMomentumChange: number | undefined,
   daysRemaining: number | undefined,
   visitHistoryStatus: SignalStatus,
   distinctVisitDays: number,
@@ -652,37 +652,37 @@ function buildSummary(
     }
   }
 
-  if (salesMomentumLabel.includes('accelerating')) {
-    actions.push('Leverage recent sales momentum to keep the most active products in stock.');
+  if (purchaseMomentumLabel.includes('accelerating')) {
+    actions.push('Leverage recent purchase momentum to keep the most active products in stock.');
   }
 
-  if (totalStockUnits === 0 && totalUnitsSold > 0) {
-    keyIssues.push('No current stock is recorded despite recent sales activity.');
+  if (totalStockUnits === 0 && totalUnitsPurchased > 0) {
+    keyIssues.push('No current stock is recorded despite recent purchase activity.');
     actions.push('Verify inventory records and restock quickly.');
   }
 
   const headline = vendorName
-    ? `${vendorName} intelligence: ${keyIssues.length > 0 ? keyIssues[0] : salesMomentumLabel}`
-    : `Vendor intelligence: ${keyIssues.length > 0 ? keyIssues[0] : salesMomentumLabel}`;
+    ? `${vendorName} intelligence: ${keyIssues.length > 0 ? keyIssues[0] : purchaseMomentumLabel}`
+    : `Vendor intelligence: ${keyIssues.length > 0 ? keyIssues[0] : purchaseMomentumLabel}`;
 
   const whatIsHappening = keyIssues.length > 0
     ? keyIssues.join(' ')
-    : `Recent activity is steady with ${totalUnitsSold} units recorded and no critical issues flagged.`;
+    : `Recent activity is steady with ${totalUnitsPurchased} units recorded and no critical issues flagged.`;
 
   const whyItMatters = outstandingBalance > 0 && daysRemaining !== undefined
     ? `This matters because the vendor currently carries GMD ${formatNumber(outstandingBalance)} outstanding while estimated coverage is only ${formatNumber(daysRemaining)} days.`
     : outstandingBalance > 0
     ? `This matters because the vendor currently carries GMD ${formatNumber(outstandingBalance)} outstanding.`
     : daysRemaining !== undefined
-    ? `This matters because estimated coverage is ${formatNumber(daysRemaining)} days, which may leave little buffer if sales continue.`
+    ? `This matters because estimated coverage is ${formatNumber(daysRemaining)} days, which may leave little buffer if purchases continue.`
     : 'This matters because current data coverage is limited and the estimates are therefore less certain.';
 
   const whatToDo = actions.length > 0
     ? actions.filter((value, index, self) => self.indexOf(value) === index).join(' ')
-    : 'Monitor the vendor closely and keep stock levels aligned with recent sales activity.';
+    : 'Monitor the vendor closely and keep stock levels aligned with recent purchase activity.';
 
   const dataQualityScore = visitHistoryStatus === 'ok' && distinctVisitDays >= 8 && windowDays >= 21 ? 2 : 1;
-  const confidence = dataQualityScore >= 2 && collectionRate !== undefined && totalUnitsSold >= 10 ? 'strong' : dataQualityScore === 1 ? 'moderate' : 'limited';
+  const confidence = dataQualityScore >= 2 && collectionRate !== undefined && totalUnitsPurchased >= 10 ? 'strong' : dataQualityScore === 1 ? 'moderate' : 'limited';
 
   return {
     headline,
@@ -697,7 +697,7 @@ function buildSummary(
 
 
 function buildOpportunities(
-  salesMomentumLabel: string,
+  purchaseMomentumLabel: string,
   collectionRate: number | undefined,
   productPerformanceList: ProductPerformance[],
   daysRemaining: number | undefined,
@@ -709,7 +709,7 @@ function buildOpportunities(
   if (fastProduct) {
     actions.push({
       title: 'Prioritize fast-moving stock',
-      description: `Focus follow-up visits on ${fastProduct.productName ?? fastProduct.productId}, which is selling quickly and may need replenishment soon.`,
+      description: `Focus follow-up visits on ${fastProduct.productName ?? fastProduct.productId}, which is being purchased quickly and may need replenishment soon.`,
       evidence,
     });
   }
@@ -718,7 +718,7 @@ function buildOpportunities(
   if (slowProduct) {
     actions.push({
       title: 'Review slow-moving inventory',
-      description: `Investigate why ${slowProduct.productName ?? slowProduct.productId} is not converting through sales as expected.`,
+      description: `Investigate why ${slowProduct.productName ?? slowProduct.productId} is not converting through purchases as expected.`,
       evidence,
     });
   }
@@ -731,10 +731,10 @@ function buildOpportunities(
     });
   }
 
-  if (salesMomentumLabel.includes('accelerating')) {
+  if (purchaseMomentumLabel.includes('accelerating')) {
     actions.push({
       title: 'Leverage positive momentum',
-      description: 'Use recent sales strength to maintain coverage on the most active products.',
+      description: 'Use recent purchase strength to maintain coverage on the most active products.',
       evidence,
     });
   }
@@ -818,7 +818,7 @@ export async function getVendorIntelligence(
   type VisitSummaryRow = {
     visitCount: string;
     distinctVisitDays: string;
-    totalUnitsSold: string;
+    totalUnitsPurchased: string;
     totalExpectedCash: string;
     totalCashCollected: string;
     firstVisitDate: string | null;
@@ -831,7 +831,7 @@ export async function getVendorIntelligence(
     `SELECT
        COUNT(*) AS visitCount,
        COUNT(DISTINCT vl.date) AS distinctVisitDays,
-       COALESCE(SUM(vl.stock_sold), 0) AS totalUnitsSold,
+       COALESCE(SUM(vl.stock_added), 0) AS totalUnitsPurchased,
        COALESCE(SUM(vl.expected_cash), 0) AS totalExpectedCash,
        COALESCE(SUM(vl.cash_collected), 0) AS totalCashCollected,
        MIN(vl.date) AS firstVisitDate,
@@ -844,7 +844,7 @@ export async function getVendorIntelligence(
   const visitSummary = visitSummaryRows[0] ?? {
     visitCount: '0',
     distinctVisitDays: '0',
-    totalUnitsSold: '0',
+    totalUnitsPurchased: '0',
     totalExpectedCash: '0',
     totalCashCollected: '0',
     firstVisitDate: null,
@@ -853,7 +853,7 @@ export async function getVendorIntelligence(
 
   const visitCount = toNumber(visitSummary.visitCount);
   const distinctVisitDays = toNumber(visitSummary.distinctVisitDays);
-  const totalUnitsSold = toNumber(visitSummary.totalUnitsSold);
+  const totalUnitsPurchased = toNumber(visitSummary.totalUnitsPurchased);
   const totalExpectedCash = toNumber(visitSummary.totalExpectedCash);
   const totalCashCollected = toNumber(visitSummary.totalCashCollected);
   const firstVisitDate = normalizeDate(visitSummary.firstVisitDate);
@@ -863,27 +863,27 @@ export async function getVendorIntelligence(
 
   const visitEvidence = buildEvidence(
     'visit_logs',
-    ['vendor_id', 'product_id', 'date', 'stock_sold', 'expected_cash', 'cash_collected', 'is_reversed'],
+    ['vendor_id', 'product_id', 'date', 'stock_added', 'expected_cash', 'cash_collected', 'is_reversed'],
     createVisitEvidenceDescription(vendorId, options),
     visitCount,
     firstVisitDate && lastVisitDate ? { start: firstVisitDate, end: lastVisitDate } : undefined,
   );
 
-  const salesVolumeSignal: Signal<{ totalUnitsSold: number; totalSalesValue: number; totalCashCollected: number }> = {
-    name: 'salesVolume',
+  const purchaseVolumeSignal: Signal<{ totalUnitsPurchased: number; totalPurchaseValue: number; totalCashCollected: number }> = {
+    name: 'purchaseVolume',
     value: {
-      totalUnitsSold,
-      totalSalesValue: totalExpectedCash,
+      totalUnitsPurchased,
+      totalPurchaseValue: totalExpectedCash,
       totalCashCollected,
     },
     status: visitCount > 0 ? 'ok' : 'no_history',
     evidence: [visitEvidence],
   };
 
-  const averageDailyUnits = windowDays > 0 ? totalUnitsSold / windowDays : 0;
+  const averageDailyUnits = windowDays > 0 ? totalUnitsPurchased / windowDays : 0;
   const averageDailyValue = windowDays > 0 ? totalExpectedCash / windowDays : 0;
-  const salesVelocitySignal: Signal<{ averageDailyUnits?: number; averageDailyValue?: number; visitCount: number; windowDays: number }> = {
-    name: 'salesVelocity',
+  const purchaseVelocitySignal: Signal<{ averageDailyUnits?: number; averageDailyValue?: number; visitCount: number; windowDays: number }> = {
+    name: 'purchaseVelocity',
     value: {
       averageDailyUnits: visitHistoryStatus === 'ok' || visitHistoryStatus === 'sparse_data' ? averageDailyUnits : undefined,
       averageDailyValue: visitHistoryStatus === 'ok' || visitHistoryStatus === 'sparse_data' ? averageDailyValue : undefined,
@@ -894,15 +894,15 @@ export async function getVendorIntelligence(
     evidence: [visitEvidence],
   };
 
-  const stockRemainingStatus = determineStockRemainingStatus(visitHistoryStatus, totalStockUnits, totalUnitsSold);
+  const stockRemainingStatus = determineStockRemainingStatus(visitHistoryStatus, totalStockUnits, totalUnitsPurchased);
   const stockRemainingValue = visitHistoryStatus === 'ok'
     ? computeDaysRemaining(totalStockUnits, averageDailyUnits)
     : undefined;
-  const stockRemainingSignal: Signal<{ daysRemaining?: number; method?: 'averageDailySales'; coverageNote?: string }> = {
+  const stockRemainingSignal: Signal<{ daysRemaining?: number; method?: 'averageDailyPurchases'; coverageNote?: string }> = {
     name: 'stockRemaining',
     value: {
       daysRemaining: stockRemainingValue,
-      ...(stockRemainingValue !== undefined ? { method: 'averageDailySales', coverageNote: `Estimated coverage: ~${formatNumber(stockRemainingValue)} days based on recent observed sales.` } : { coverageNote: 'Insufficient history to estimate coverage.' }),
+      ...(stockRemainingValue !== undefined ? { method: 'averageDailyPurchases', coverageNote: `Estimated coverage: ~${formatNumber(stockRemainingValue)} days based on recent observed purchases.` } : { coverageNote: 'Insufficient history to estimate coverage.' }),
     },
     status: stockRemainingStatus,
     evidence: [visitEvidence, currentInventoryEvidence],
@@ -995,17 +995,17 @@ export async function getVendorIntelligence(
   if (recentStartDate && recentEndDate) {
     recentStartDate.setDate(recentEndDate.getDate() - (recentWindowDays - 1));
   }
-  let recentUnitsSold = 0;
+  let recentUnitsPurchased = 0;
   let recentExpectedCash = 0;
   let recentCashCollected = 0;
-  let previousUnitsSold = 0;
+  let previousUnitsPurchased = 0;
   let previousExpectedCash = 0;
   let previousCashCollected = 0;
-  let recentRows: Array<{ unitsSold: string; expectedCash: string; cashCollected: string; visitCount: string }> = [
-    { unitsSold: '0', expectedCash: '0', cashCollected: '0', visitCount: '0' },
+  let recentRows: Array<{ unitsPurchased: string; expectedCash: string; cashCollected: string; visitCount: string }> = [
+    { unitsPurchased: '0', expectedCash: '0', cashCollected: '0', visitCount: '0' },
   ];
-  let previousRows: Array<{ unitsSold: string; expectedCash: string; cashCollected: string; visitCount: string }> = [
-    { unitsSold: '0', expectedCash: '0', cashCollected: '0', visitCount: '0' },
+  let previousRows: Array<{ unitsPurchased: string; expectedCash: string; cashCollected: string; visitCount: string }> = [
+    { unitsPurchased: '0', expectedCash: '0', cashCollected: '0', visitCount: '0' },
   ];
   if (recentStartDate) {
     const recentStart = recentStartDate.toISOString().slice(0, 10);
@@ -1017,9 +1017,9 @@ export async function getVendorIntelligence(
     const previousStart = previousStartDate.toISOString().slice(0, 10);
     const previousEnd = previousEndDate.toISOString().slice(0, 10);
 
-    const [fetchedRecentRows] = await query<Array<{ unitsSold: string; expectedCash: string; cashCollected: string; visitCount: string }>>(
+    const [fetchedRecentRows] = await query<Array<{ unitsPurchased: string; expectedCash: string; cashCollected: string; visitCount: string }>>(
       `SELECT
-         COALESCE(SUM(vl.stock_sold), 0) AS unitsSold,
+         COALESCE(SUM(vl.stock_added), 0) AS unitsPurchased,
          COALESCE(SUM(vl.expected_cash), 0) AS expectedCash,
          COALESCE(SUM(vl.cash_collected), 0) AS cashCollected,
          COUNT(*) AS visitCount
@@ -1030,9 +1030,9 @@ export async function getVendorIntelligence(
       { ...params, recentStart, recentEnd },
     );
 
-    const [fetchedPreviousRows] = await query<Array<{ unitsSold: string; expectedCash: string; cashCollected: string; visitCount: string }>>(
+    const [fetchedPreviousRows] = await query<Array<{ unitsPurchased: string; expectedCash: string; cashCollected: string; visitCount: string }>>(
       `SELECT
-         COALESCE(SUM(vl.stock_sold), 0) AS unitsSold,
+         COALESCE(SUM(vl.stock_added), 0) AS unitsPurchased,
          COALESCE(SUM(vl.expected_cash), 0) AS expectedCash,
          COALESCE(SUM(vl.cash_collected), 0) AS cashCollected,
          COUNT(*) AS visitCount
@@ -1045,28 +1045,28 @@ export async function getVendorIntelligence(
 
     recentRows = fetchedRecentRows;
     previousRows = fetchedPreviousRows;
-    recentUnitsSold = toNumber(recentRows[0]?.unitsSold);
+    recentUnitsPurchased = toNumber(recentRows[0]?.unitsPurchased);
     recentExpectedCash = toNumber(recentRows[0]?.expectedCash);
     recentCashCollected = toNumber(recentRows[0]?.cashCollected);
-    previousUnitsSold = toNumber(previousRows[0]?.unitsSold);
+    previousUnitsPurchased = toNumber(previousRows[0]?.unitsPurchased);
     previousExpectedCash = toNumber(previousRows[0]?.expectedCash);
     previousCashCollected = toNumber(previousRows[0]?.cashCollected);
   }
 
-  const recentAverageDailyUnits = recentWindowDays > 0 ? recentUnitsSold / recentWindowDays : 0;
-  const previousAverageDailyUnits = recentWindowDays > 0 ? previousUnitsSold / recentWindowDays : 0;
+  const recentAverageDailyUnits = recentWindowDays > 0 ? recentUnitsPurchased / recentWindowDays : 0;
+  const previousAverageDailyUnits = recentWindowDays > 0 ? previousUnitsPurchased / recentWindowDays : 0;
   const recentVisitCount = recentRows[0] ? toNumber(recentRows[0].visitCount) : 0;
   const previousVisitCount = previousRows[0] ? toNumber(previousRows[0].visitCount) : 0;
-  const salesMomentumChange = previousAverageDailyUnits > 0 ? recentAverageDailyUnits - previousAverageDailyUnits : undefined;
-  let salesMomentumLabel = 'Sales activity is stable';
-  if (recentUnitsSold === 0 && previousUnitsSold === 0) {
-    salesMomentumLabel = 'No confirmed sales activity in the recent period';
-  } else if (previousUnitsSold === 0 && recentUnitsSold > 0) {
-    salesMomentumLabel = 'Sales momentum is building';
-  } else if (salesMomentumChange !== undefined && salesMomentumChange > previousAverageDailyUnits * 0.15) {
-    salesMomentumLabel = 'Sales momentum is accelerating';
-  } else if (salesMomentumChange !== undefined && salesMomentumChange < -previousAverageDailyUnits * 0.15) {
-    salesMomentumLabel = 'Sales momentum is declining';
+  const purchaseMomentumChange = previousAverageDailyUnits > 0 ? recentAverageDailyUnits - previousAverageDailyUnits : undefined;
+  let purchaseMomentumLabel = 'Purchase activity is stable';
+  if (recentUnitsPurchased === 0 && previousUnitsPurchased === 0) {
+    purchaseMomentumLabel = 'No confirmed purchase activity in the recent period';
+  } else if (previousUnitsPurchased === 0 && recentUnitsPurchased > 0) {
+    purchaseMomentumLabel = 'Purchase momentum is building';
+  } else if (purchaseMomentumChange !== undefined && purchaseMomentumChange > previousAverageDailyUnits * 0.15) {
+    purchaseMomentumLabel = 'Purchase momentum is accelerating';
+  } else if (purchaseMomentumChange !== undefined && purchaseMomentumChange < -previousAverageDailyUnits * 0.15) {
+    purchaseMomentumLabel = 'Purchase momentum is slowing';
   }
 
   const previousCoverage = previousAverageDailyUnits > 0 ? computeDaysRemaining(totalStockUnits, previousAverageDailyUnits) : undefined;
@@ -1075,7 +1075,7 @@ export async function getVendorIntelligence(
   const summary = buildSummary(
     vendorName,
     vendorLocation,
-    totalUnitsSold,
+    totalUnitsPurchased,
     totalExpectedCash,
     totalCashCollected,
     averageDailyUnits,
@@ -1083,8 +1083,8 @@ export async function getVendorIntelligence(
     totalStockUnits,
     outstandingBalance,
     paymentMetricsSignal.value.collectionRate,
-    salesMomentumLabel,
-    salesMomentumChange,
+    purchaseMomentumLabel,
+    purchaseMomentumChange,
     stockRemainingValue,
     visitHistoryStatus,
     distinctVisitDays,
@@ -1098,11 +1098,11 @@ export async function getVendorIntelligence(
     product_name: string;
     category: string;
     unit: string;
-    unitsSold: string;
+    unitsPurchased: string;
     expectedValue: string;
     cashCollected: string;
-    firstSaleDate: string | null;
-    lastSaleDate: string | null;
+    firstPurchaseDate: string | null;
+    lastPurchaseDate: string | null;
     windowDays: string;
     visitCount: string;
   };
@@ -1113,11 +1113,11 @@ export async function getVendorIntelligence(
        COALESCE(p.product_name, '') AS product_name,
        COALESCE(p.category, '') AS category,
        COALESCE(p.unit, '') AS unit,
-       COALESCE(SUM(vl.stock_sold), 0) AS unitsSold,
+       COALESCE(SUM(vl.stock_added), 0) AS unitsPurchased,
        COALESCE(SUM(vl.expected_cash), 0) AS expectedValue,
        COALESCE(SUM(vl.cash_collected), 0) AS cashCollected,
-       MIN(vl.date) AS firstSaleDate,
-       MAX(vl.date) AS lastSaleDate,
+       MIN(vl.date) AS firstPurchaseDate,
+       MAX(vl.date) AS lastPurchaseDate,
        COALESCE(DATEDIFF(MAX(vl.date), MIN(vl.date)) + 1, 0) AS windowDays,
        COUNT(*) AS visitCount
      FROM visit_logs vl
@@ -1137,38 +1137,38 @@ export async function getVendorIntelligence(
 
   const productPerformanceList: ProductPerformance[] = productRows.map((row) => {
     const productId = row.product_id;
-    const unitsSold = toNumber(row.unitsSold);
+    const unitsPurchased = toNumber(row.unitsPurchased);
     const expectedValue = toNumber(row.expectedValue);
     const cashCollected = toNumber(row.cashCollected);
-    const firstSaleDate = normalizeDate(row.firstSaleDate);
-    const lastSaleDate = normalizeDate(row.lastSaleDate);
+    const firstPurchaseDate = normalizeDate(row.firstPurchaseDate);
+    const lastPurchaseDate = normalizeDate(row.lastPurchaseDate);
     const windowDaysProduct = toNumber(row.windowDays);
-    const averageUnitPrice = computeAverageUnitPrice(expectedValue, unitsSold);
+    const averageUnitPrice = computeAverageUnitPrice(expectedValue, unitsPurchased);
     const currentStockByProduct = inventoryByProduct.get(productId) ?? 0;
-    const movementClassification = classifyProductMovement(currentStockByProduct, unitsSold, windowDaysProduct);
-    const stockRemainingDays = computeDaysRemaining(currentStockByProduct, unitsSold > 0 ? unitsSold / windowDaysProduct : 0);
+    const movementClassification = classifyProductMovement(currentStockByProduct, unitsPurchased, windowDaysProduct);
+    const stockRemainingDays = computeDaysRemaining(currentStockByProduct, unitsPurchased > 0 ? unitsPurchased / windowDaysProduct : 0);
     return {
       productId,
       productName: row.product_name,
       category: row.category,
       unit: row.unit,
-      unitsSold,
-      salesValue: expectedValue,
+      unitsPurchased,
+      purchaseValue: expectedValue,
       expectedValue,
       averageUnitPrice,
       currentStock: currentStockByProduct,
       stockRemainingDays,
       movementClassification,
       visitCount: toNumber(row.visitCount),
-      firstSaleDate,
-      lastSaleDate,
+      firstPurchaseDate,
+      lastPurchaseDate,
     };
   });
 
-  const totalSoldForShare = totalUnitsSold || 1;
+  const totalPurchasedForShare = totalUnitsPurchased || 1;
   productPerformanceList.forEach((item) => {
-    if (totalUnitsSold > 0) {
-      item.salesShare = Number(((item.unitsSold / totalSoldForShare) * 100).toFixed(1));
+    if (totalUnitsPurchased > 0) {
+      item.purchaseShare = Number(((item.unitsPurchased / totalPurchasedForShare) * 100).toFixed(1));
     }
   });
 
@@ -1179,7 +1179,7 @@ export async function getVendorIntelligence(
     evidence: [
       buildEvidence(
         'visit_logs',
-        ['vendor_id', 'product_id', 'stock_sold', 'expected_cash', 'cash_collected', 'date', 'is_reversed'],
+        ['vendor_id', 'product_id', 'stock_added', 'expected_cash', 'cash_collected', 'date', 'is_reversed'],
         createVisitEvidenceDescription(vendorId, options),
         productPerformanceList.length,
       ),
@@ -1193,7 +1193,7 @@ export async function getVendorIntelligence(
   };
 
   const vendorRisks = buildRiskSignals(
-    salesMomentumLabel,
+    purchaseMomentumLabel,
     outstandingBalance,
     paymentMetricsSignal.value.collectionRate,
     stockRemainingValue,
@@ -1203,7 +1203,7 @@ export async function getVendorIntelligence(
   );
 
   const vendorOpportunities = buildOpportunitySignals(
-    salesMomentumLabel,
+    purchaseMomentumLabel,
     paymentMetricsSignal.value.collectionRate,
     productPerformanceList,
     stockRemainingValue,
@@ -1234,8 +1234,8 @@ export async function getVendorIntelligence(
   );
 
   const trendSignals = buildTrendSignals(
-    recentUnitsSold,
-    previousUnitsSold,
+    recentUnitsPurchased,
+    previousUnitsPurchased,
     recentCashCollected,
     previousCashCollected,
     recentExpectedCash,
@@ -1260,13 +1260,13 @@ export async function getVendorIntelligence(
     trendSignals,
     statusSummary: {
       currentStock: totalStockUnits,
-      recentSales: totalUnitsSold,
+      recentPurchases: totalUnitsPurchased,
       balanceOwed: outstandingBalance,
       collectionRate: paymentMetricsSignal.value.collectionRate,
       stockCoverageDays: stockRemainingValue,
     },
-    salesVolume: salesVolumeSignal,
-    salesVelocity: salesVelocitySignal,
+    purchaseVolume: purchaseVolumeSignal,
+    purchaseVelocity: purchaseVelocitySignal,
     currentInventory: currentInventorySignal,
     stockRemaining: stockRemainingSignal,
     lastVisit: lastVisitSignal,

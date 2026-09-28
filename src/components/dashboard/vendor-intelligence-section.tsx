@@ -168,7 +168,7 @@ function renderProductPerformanceTable(performance: VendorIntelligence['productP
         <thead>
           <tr>
             <th className="whitespace-nowrap px-4 py-3 text-left font-semibold uppercase tracking-wide text-slate-500">Product</th>
-            <th className="whitespace-nowrap px-4 py-3 text-left font-semibold uppercase tracking-wide text-slate-500">Units sold</th>
+            <th className="whitespace-nowrap px-4 py-3 text-left font-semibold uppercase tracking-wide text-slate-500">Units purchased</th>
             <th className="whitespace-nowrap px-4 py-3 text-left font-semibold uppercase tracking-wide text-slate-500">Current stock</th>
             <th className="whitespace-nowrap px-4 py-3 text-left font-semibold uppercase tracking-wide text-slate-500">Expected value</th>
           </tr>
@@ -177,7 +177,7 @@ function renderProductPerformanceTable(performance: VendorIntelligence['productP
           {rows.map((item) => (
             <tr key={item.productId}>
               <td className="whitespace-nowrap px-4 py-3 text-slate-700">{item.productName ?? item.productId}</td>
-              <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatNumber(item.unitsSold)}</td>
+              <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatNumber(item.unitsPurchased)}</td>
               <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatNumber(item.currentStock)}</td>
               <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCurrency(item.expectedValue)}</td>
             </tr>
@@ -281,8 +281,8 @@ export function VendorIntelligenceSection() {
                 <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <DataChip label="Vendor" value={selectedVendor?.vendor_name ?? selectedVendorId} />
                   <DataChip label="Last visit" value={intelligence.lastVisit.value.lastVisitDate ?? 'Unknown'} />
-                  <DataChip label="Visit count" value={formatNumber(intelligence.salesVelocity.value.visitCount)} />
-                  <DataChip label="Coverage" value={`${formatNumber(intelligence.salesVelocity.value.windowDays)} days`} />
+                  <DataChip label="Visit count" value={formatNumber(intelligence.purchaseVelocity.value.visitCount)} />
+                  <DataChip label="Coverage" value={`${formatNumber(intelligence.purchaseVelocity.value.windowDays)} days`} />
                 </div>
               </div>
 
@@ -303,14 +303,14 @@ export function VendorIntelligenceSection() {
                 <p className="mt-2 text-sm text-slate-600">Across {formatNumber(intelligence.currentInventory.value.totalProducts)} products</p>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                <p className="text-sm uppercase tracking-[0.22em] text-slate-500">Recent sales</p>
-                <p className="mt-4 text-3xl font-semibold text-slate-900">{formatNumber(intelligence.salesVolume.value.totalUnitsSold)}</p>
-                <p className="mt-2 text-sm text-slate-600">Units sold in last {formatNumber(intelligence.salesVelocity.value.windowDays)} days</p>
+                <p className="text-sm uppercase tracking-[0.22em] text-slate-500">Recent purchases</p>
+                <p className="mt-4 text-3xl font-semibold text-slate-900">{formatNumber(intelligence.purchaseVolume.value.totalUnitsPurchased)}</p>
+                <p className="mt-2 text-sm text-slate-600">Units received in last {formatNumber(intelligence.purchaseVelocity.value.windowDays)} days</p>
               </div>
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
-                <p className="text-sm uppercase tracking-[0.22em] text-slate-500">Sales value</p>
-                <p className="mt-4 text-3xl font-semibold text-slate-900">{formatCurrency(intelligence.salesVolume.value.totalSalesValue)}</p>
-                <p className="mt-2 text-sm text-slate-600">Collected {formatCurrency(intelligence.salesVolume.value.totalCashCollected)}</p>
+                <p className="text-sm uppercase tracking-[0.22em] text-slate-500">Purchase value</p>
+                <p className="mt-4 text-3xl font-semibold text-slate-900">{formatCurrency(intelligence.purchaseVolume.value.totalPurchaseValue)}</p>
+                <p className="mt-2 text-sm text-slate-600">Collected {formatCurrency(intelligence.purchaseVolume.value.totalCashCollected)}</p>
               </div>
             </div>
 
@@ -333,7 +333,7 @@ export function VendorIntelligenceSection() {
               <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6">
                 <p className="text-sm uppercase tracking-[0.22em] text-slate-500">Stock coverage</p>
                 <p className="mt-4 text-3xl font-semibold text-slate-900">{intelligence.stockRemaining.value.daysRemaining !== undefined ? formatNumber(intelligence.stockRemaining.value.daysRemaining) : '-'}</p>
-                <p className="mt-2 text-sm text-slate-600">{intelligence.stockRemaining.value.method === 'averageDailySales' ? 'Days of coverage' : 'Insufficient history'}</p>
+                <p className="mt-2 text-sm text-slate-600">{intelligence.stockRemaining.value.method === 'averageDailyPurchases' ? 'Days of coverage' : 'Insufficient history'}</p>
               </div>
             </div>
 
@@ -420,8 +420,8 @@ export function VendorIntelligenceSection() {
                       </div>
                       <div className="mt-4 grid gap-3 sm:grid-cols-4 text-sm text-slate-700">
                         <div>
-                          <p className="font-semibold text-slate-900">Sold</p>
-                          <p className="mt-1">{formatNumber(product.unitsSold)}</p>
+                          <p className="font-semibold text-slate-900">Purchased</p>
+                          <p className="mt-1">{formatNumber(product.unitsPurchased)}</p>
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">Stock</p>
@@ -433,7 +433,7 @@ export function VendorIntelligenceSection() {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">Share</p>
-                          <p className="mt-1">{product.salesShare !== undefined ? `${product.salesShare.toFixed(1)}%` : '-'}</p>
+                          <p className="mt-1">{product.purchaseShare !== undefined ? `${product.purchaseShare.toFixed(1)}%` : '-'}</p>
                         </div>
                       </div>
                     </div>
