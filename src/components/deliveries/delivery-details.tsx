@@ -175,7 +175,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
             <div>Priority: <span className="font-semibold">{priorityLabels[delivery.priority] ?? 'Normal'}</span></div>
             <div>Created: {new Date(delivery.date_created).toLocaleString()}</div>
             <div>Delivery Date: {delivery.delivery_date ? new Date(`${delivery.delivery_date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Not specified'}</div>
-            {delivery.cooking_location ? <div>Cooking Location: {delivery.cooking_location}</div> : null}
+            {delivery.cooking_location ? <div>Cooking Location: <span className={`font-semibold ${delivery.cooking_location === 'Home' ? 'text-emerald-700' : 'text-blue-700'}`}>{delivery.cooking_location}</span></div> : null}
             <div>Created by: {delivery.created_by_name || 'Unknown user'}</div>
             <div>Assigned to: {assignedToLabel}</div>
             {delivery.claimed_at ? <div>Claimed at: {new Date(delivery.claimed_at).toLocaleString()}</div> : null}
