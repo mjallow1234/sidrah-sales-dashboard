@@ -14,6 +14,7 @@ export interface CreateDeliveryPayload {
   status: DeliveryStatus;
   priority: DeliveryPriority;
   delivery_date?: string | null;
+  cooking_location?: 'Home' | 'Workplace' | null;
   created_by: string;
   claimed_by?: string | null;
   claimed_at?: string | null;
@@ -98,6 +99,7 @@ export class DeliveryRepository extends BaseRepository {
       accountability_cash_collected: row.accountability_cash_collected === null || row.accountability_cash_collected === undefined ? undefined : Number(row.accountability_cash_collected),
       accountability_stock_returned: row.accountability_stock_returned === null || row.accountability_stock_returned === undefined ? undefined : Number(row.accountability_stock_returned),
       accountability_remaining_value: row.accountability_remaining_value === null || row.accountability_remaining_value === undefined ? undefined : Number(row.accountability_remaining_value),
+      cooking_location: row.cooking_location === 'Home' || row.cooking_location === 'Workplace' ? row.cooking_location : undefined,
     };
   }
 
@@ -249,6 +251,7 @@ export class DeliveryRepository extends BaseRepository {
         status,
         priority,
         delivery_date,
+        cooking_location,
         created_by,
         claimed_by,
         claimed_at,
@@ -267,6 +270,7 @@ export class DeliveryRepository extends BaseRepository {
         :status,
         :priority,
         :delivery_date,
+        :cooking_location,
         :created_by,
         :claimed_by,
         :claimed_at,
@@ -286,6 +290,7 @@ export class DeliveryRepository extends BaseRepository {
         status: payload.status,
         priority: payload.priority,
         delivery_date: payload.delivery_date ?? null,
+        cooking_location: payload.cooking_location ?? null,
         created_by: payload.created_by,
         claimed_by: payload.claimed_by ?? null,
         claimed_at: payload.claimed_at ?? null,
@@ -308,6 +313,19 @@ export class DeliveryRepository extends BaseRepository {
     );
     if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
       throw new Error('Delivery date can only be changed for pending or ongoing deliveries.');
+    }
+    return this.findById(deliveryId);
+  }
+
+  public async updateDeliveryDetails(deliveryId: string, deliveryDate: string, cookingLocation: 'Home' | 'Workplace' | null, updatedBy: string): Promise<DeliveryRecord> {
+    const [result] = await (this.db.execute as any)(
+      `UPDATE deliveries
+       SET delivery_date = :delivery_date, cooking_location = :cooking_location, updated_by = :updated_by, last_updated = NOW()
+       WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,
+      { delivery_date: deliveryDate, cooking_location: cookingLocation, updated_by: updatedBy, delivery_id: deliveryId },
+    );
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
+      throw new Error('Delivery details can only be changed for pending or ongoing deliveries.');
     }
     return this.findById(deliveryId);
   }

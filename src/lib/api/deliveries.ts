@@ -99,6 +99,7 @@ export async function createDelivery(payload: {
   notes?: string;
   priority?: DeliveryPriority;
   delivery_date: string;
+  cooking_location?: 'Home' | 'Workplace';
 }) {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>('/api/deliveries', {
     method: 'POST',
@@ -152,6 +153,13 @@ export async function updateDeliveryDate(deliveryId: string, deliveryDate: strin
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ delivery_date: deliveryDate }),
+  });
+  return result.data;
+}
+
+export async function updateDeliveryDetails(deliveryId: string, payload: { delivery_date: string; cooking_location?: 'Home' | 'Workplace' }): Promise<DeliveryRecord> {
+  const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   });
   return result.data;
 }

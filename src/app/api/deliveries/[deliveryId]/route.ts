@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
-import { getDeliveryById, updateDeliveryDate } from '@/services/deliveryService';
+import { getDeliveryById, updateDeliveryDetails } from '@/services/deliveryService';
 
 function getDeliveryId(request: NextRequest): string {
   const { pathname } = request.nextUrl;
@@ -31,7 +31,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const deliveryId = getDeliveryId(request);
     const payload = await request.json();
-    const delivery = await updateDeliveryDate(deliveryId, payload?.delivery_date, session.userId);
+    const delivery = await updateDeliveryDetails(deliveryId, payload?.delivery_date, payload?.cooking_location, session.userId);
     return Response.json({ status: 'success', data: delivery });
   } catch (error: unknown) {
     const status = error instanceof Error && 'status' in error ? Number((error as { status?: number }).status) || 500 : 500;

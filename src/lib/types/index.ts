@@ -212,6 +212,7 @@ export interface DeliveryRecord {
   status: DeliveryStatus;
   priority: DeliveryPriority;
   delivery_date?: string;
+  cooking_location?: 'Home' | 'Workplace';
   created_by: string;
   created_by_name?: string;
   date_created: string;

@@ -7,7 +7,7 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, decideAccountabilityTransfer, getAccountabilityAgents, getAccountabilityTransfers, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, initiateAccountabilityTransfer, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, updateDeliveryDate, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, decideAccountabilityTransfer, getAccountabilityAgents, getAccountabilityTransfers, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, initiateAccountabilityTransfer, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, updateDeliveryDate, updateDeliveryDetails, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
@@ -424,6 +424,17 @@ export function useUpdateDeliveryDateMutation() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['deliveries'] });
       queryClient.invalidateQueries({ queryKey: ['delivery', variables.deliveryId] });
+    },
+  });
+}
+
+export function useUpdateDeliveryDetailsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ deliveryId, deliveryDate, cookingLocation }: { deliveryId: string; deliveryDate: string; cookingLocation?: 'Home' | 'Workplace' }) => updateDeliveryDetails(deliveryId, { delivery_date: deliveryDate, ...(cookingLocation ? { cooking_location: cookingLocation } : {}) }),
+    onSuccess: (delivery) => {
+      queryClient.setQueryData(['delivery', delivery.delivery_id], delivery);
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
     },
   });
 }

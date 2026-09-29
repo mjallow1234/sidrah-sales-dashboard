@@ -86,6 +86,7 @@ export interface CreateDeliveryRequest {
   notes?: string;
   priority?: unknown;
   delivery_date?: unknown;
+  cooking_location?: unknown;
 }
 
 const deliveryPriorities: readonly DeliveryPriority[] = ['low', 'normal', 'high', 'urgent'];
@@ -109,6 +110,12 @@ function validateDeliveryDate(value: unknown): string {
   return value;
 }
 
+function validateCookingLocation(value: unknown): 'Home' | 'Workplace' | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  if (value !== 'Home' && value !== 'Workplace') throw new HttpError(400, 'Cooking location must be Home or Workplace.');
+  return value;
+}
+
 export async function createDelivery(payload: CreateDeliveryRequest, createdBy: string): Promise<DeliveryRecord> {
   const productRepository = new ProductRepository(getPool());
   const customerName = validateRequiredString(payload.customer_name, 'Customer name');
@@ -119,6 +126,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   const notes = typeof payload.notes === 'string' && payload.notes.trim() !== '' ? payload.notes.trim() : undefined;
   const priority = validatePriority(payload.priority);
   const deliveryDate = validateDeliveryDate(payload.delivery_date);
+  const cookingLocation = validateCookingLocation(payload.cooking_location);
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
@@ -138,6 +146,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
     status: 'pending',
     priority,
     delivery_date: deliveryDate,
+    cooking_location: cookingLocation,
     created_by: createdBy,
     claimed_by: null,
     claimed_at: null,
@@ -165,6 +174,13 @@ export async function updateDeliveryDate(deliveryId: string, value: unknown, act
   const deliveryDate = validateDeliveryDate(value);
   return transaction(async (connection) => new DeliveryRepository(connection).updateDeliveryDate(deliveryId, deliveryDate, actingUserId));
 }
+
+export async function updateDeliveryDetails(deliveryId: string, deliveryDateValue: unknown, cookingLocationValue: unknown, actingUserId: string): Promise<DeliveryRecord> {
+  const deliveryDate = validateDeliveryDate(deliveryDateValue);
+  const cookingLocation = validateCookingLocation(cookingLocationValue) ?? null;
+  return transaction(async (connection) => new DeliveryRepository(connection).updateDeliveryDetails(deliveryId, deliveryDate, cookingLocation, actingUserId));
+}
+
 export async function getDeliveries(status?: DeliveryStatus | DeliveryStatus[], deliveryUserId?: string): Promise<DeliveryRecord[]> {
   const repository = new DeliveryRepository(getPool());
   const filters: DeliverySearchFilters = {};

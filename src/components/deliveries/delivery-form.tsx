@@ -24,6 +24,7 @@ export function DeliveryForm() {
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
   const [deliveryDate, setDeliveryDate] = useState(today);
+  const [cookingLocation, setCookingLocation] = useState<'Home' | 'Workplace' | ''>('');
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
   const [items, setItems] = useState<DeliveryLineItem[]>([{ ...initialItem }]);
@@ -91,6 +92,7 @@ export function DeliveryForm() {
         customer_phone: customerPhone,
         delivery_address: deliveryAddress,
         delivery_date: deliveryDate,
+        cooking_location: cookingLocation || undefined,
         items: payloadItems,
         notes: notes || undefined,
         priority,
@@ -100,6 +102,7 @@ export function DeliveryForm() {
       setCustomerPhone('');
       setDeliveryAddress('');
       setDeliveryDate(today());
+      setCookingLocation('');
       setNotes('');
       setPriority('normal');
       setItems([{ ...initialItem }]);
@@ -153,6 +156,15 @@ export function DeliveryForm() {
           onChange={(event) => setDeliveryAddress(event.target.value)}
           className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
         />
+      </label>
+
+      <label className="block text-sm text-slate-700">
+        Cooking Location
+        <select value={cookingLocation} onChange={(event) => setCookingLocation(event.target.value as typeof cookingLocation)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
+          <option value="">Not specified</option>
+          <option value="Home">Home</option>
+          <option value="Workplace">Workplace</option>
+        </select>
       </label>
 
       <label className="block text-sm text-slate-700">
