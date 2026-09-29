@@ -7,9 +7,14 @@ export async function GET(request: NextRequest) {
   const session = await getVerifiedSession(request);
   if (!session) return unauthorizedResponse();
   if (!isFactoryRole(session.role)) return forbiddenResponse();
-  const limit = Number(request.nextUrl.searchParams.get('limit') ?? 100);
+  const params = request.nextUrl.searchParams;
+  const limit = Number(params.get('limit') ?? 100);
+  const movementTypeParam = params.get('movementType');
+  const movementType = movementTypeParam === 'production' || movementTypeParam === 'leaving_factory' || movementTypeParam === 'returned_factory'
+    ? movementTypeParam
+    : undefined;
   try {
-    return Response.json({ status: 'success', data: await listFactoryMovements(Number.isFinite(limit) ? limit : 100) });
+    return Response.json({ status: 'success', data: await listFactoryMovements(Number.isFinite(limit) ? limit : 100, { startDate: params.get('startDate') || undefined, endDate: params.get('endDate') || undefined, productId: params.get('productId') || undefined, movementType }) });
   } catch (error) {
     return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }

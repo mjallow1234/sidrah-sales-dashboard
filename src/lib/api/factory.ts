@@ -7,8 +7,8 @@ async function requestJson<T>(path: string, options?: RequestInit): Promise<T> {
   return json.data as T;
 }
 
-export function getFactoryInventory() { return requestJson<FactoryInventory[]>('/api/factory/inventory'); }
-export function getFactoryMovements() { return requestJson<FactoryStockMovement[]>('/api/factory/movements?limit=100'); }
+export function getFactoryInventory(filters?: { productId?: string }) { const query = filters?.productId ? `?productId=${encodeURIComponent(filters.productId)}` : ''; return requestJson<FactoryInventory[]>(`/api/factory/inventory${query}`); }
+export function getFactoryMovements(filters?: { startDate?: string; endDate?: string; productId?: string; movementType?: string }) { const query = new URLSearchParams({ limit: '100', ...(filters?.startDate ? { startDate: filters.startDate } : {}), ...(filters?.endDate ? { endDate: filters.endDate } : {}), ...(filters?.productId ? { productId: filters.productId } : {}), ...(filters?.movementType ? { movementType: filters.movementType } : {}) }); return requestJson<FactoryStockMovement[]>(`/api/factory/movements?${query.toString()}`); }
 export function createFactoryMovement(payload: {
   operation_id: string;
   movement_type: FactoryMovementType;

@@ -19,15 +19,17 @@ export class FactoryInventoryRepository extends BaseRepository {
     super(db);
   }
 
-  async findAll(): Promise<FactoryInventory[]> {
+  async findAll(productId?: string): Promise<FactoryInventory[]> {
+    const condition = productId ? ' AND p.product_id = ?' : '';
     const [rows] = await this.execute<any[]>(
       `SELECT fi.factory_inventory_id, p.product_id, p.product_name, p.unit,
               COALESCE(fi.current_quantity, 0) AS current_quantity,
               fi.created_at, fi.updated_at
        FROM products p
        LEFT JOIN factory_inventory fi ON fi.product_id = p.product_id
-       WHERE p.active = TRUE
+       WHERE p.active = TRUE${condition}
        ORDER BY p.product_name ASC`,
+      productId ? [productId] : [],
     );
     return rows.map(mapInventory);
   }

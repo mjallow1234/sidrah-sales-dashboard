@@ -69,9 +69,16 @@ export class FactoryStockMovementRepository extends BaseRepository {
     return rows.map(mapMovement);
   }
 
-  async findAll(limit = 100): Promise<FactoryStockMovement[]> {
+  async findAll(limit = 100, filters: { startDate?: string; endDate?: string; productId?: string; movementType?: FactoryMovementType } = {}): Promise<FactoryStockMovement[]> {
     const safeLimit = Math.max(1, Math.min(500, Math.trunc(limit)));
-    const [rows] = await this.execute<any[]>(`${movementSelect} ORDER BY e.recorded_at DESC, e.event_id DESC, m.movement_id DESC LIMIT ${safeLimit}`);
+    const conditions: string[] = [];
+    const params: Record<string, unknown> = {};
+    if (filters.startDate) { conditions.push('e.occurred_at >= :startDate'); params.startDate = `${filters.startDate} 00:00:00`; }
+    if (filters.endDate) { conditions.push('e.occurred_at <= :endDate'); params.endDate = `${filters.endDate} 23:59:59`; }
+    if (filters.productId) { conditions.push('m.product_id = :productId'); params.productId = filters.productId; }
+    if (filters.movementType) { conditions.push('e.movement_type = :movementType'); params.movementType = filters.movementType; }
+    const where = conditions.length ? ` WHERE ${conditions.join(' AND ')}` : '';
+    const [rows] = await this.execute<any[]>(`${movementSelect}${where} ORDER BY e.recorded_at DESC, e.event_id DESC, m.movement_id DESC LIMIT ${safeLimit}`, params);
     return rows.map(mapMovement);
   }
 

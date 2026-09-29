@@ -42,8 +42,8 @@ function normalizeItems(payload: CreateFactoryMovementPayload): FactoryMovementI
   const seen = new Set<string>();
   return source.map((item, index) => { const productId = requiredString(item?.product_id, `items[${index}].product_id`); if (seen.has(productId)) throw new ValidationError('The same product cannot be entered more than once.'); seen.add(productId); return { product_id: productId, quantity: positiveNumber(item?.quantity, `items[${index}].quantity`) }; });
 }
-export async function listFactoryInventory(): Promise<FactoryInventory[]> { return new FactoryInventoryRepository(getPool()).findAll(); }
-export async function listFactoryMovements(limit = 100): Promise<FactoryStockMovement[]> { return new FactoryStockMovementRepository(getPool()).findAll(limit); }
+export async function listFactoryInventory(productId?: string): Promise<FactoryInventory[]> { return new FactoryInventoryRepository(getPool()).findAll(productId); }
+export async function listFactoryMovements(limit = 100, filters?: { startDate?: string; endDate?: string; productId?: string; movementType?: FactoryMovementType }): Promise<FactoryStockMovement[]> { return new FactoryStockMovementRepository(getPool()).findAll(limit, filters); }
 export async function listFactoryEventRevisions(eventId: string) { return new FactoryRecordRevisionRepository(getPool()).findForRecord('movement_event', requiredString(eventId, 'event_id')); }
 function sameItems(a: FactoryStockMovement[], b: FactoryMovementItem[]): boolean { if (a.length !== b.length) return false; const expected = new Map(b.map((item) => [item.product_id, item.quantity])); return a.every((item) => expected.get(item.product_id) === Number(item.quantity)); }
 

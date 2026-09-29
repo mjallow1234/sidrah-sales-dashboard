@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   if (!session) return unauthorizedResponse();
   if (!isFactoryRole(session.role)) return forbiddenResponse();
   try {
-    return Response.json({ status: 'success', data: await listFactoryInventory() });
+    return Response.json({ status: 'success', data: await listFactoryInventory(request.nextUrl.searchParams.get('productId') || undefined) });
   } catch (error) {
     return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
   }
