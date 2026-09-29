@@ -17,6 +17,7 @@ test('delivery date flows through schema, API, repository, form, and card', () =
   assert.match(api, /updateDeliveryDate/);
   assert.match(service, /validateDeliveryDate/);
   assert.match(repository, /delivery_date/);
+  assert.match(repository, /delivery_date: row\.delivery_date/);
   assert.match(form, /Delivery Date/);
   assert.match(form, /delivery_date: deliveryDate/);
   assert.match(card, /delivery\.delivery_date/);

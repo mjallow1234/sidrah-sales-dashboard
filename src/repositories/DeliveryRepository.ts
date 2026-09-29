@@ -77,6 +77,7 @@ export class DeliveryRepository extends BaseRepository {
       notes: row.notes === null ? undefined : String(row.notes),
       status: String(row.status) as DeliveryRecord['status'],
       priority: String(row.priority || 'normal') as DeliveryPriority,
+      delivery_date: row.delivery_date === null || row.delivery_date === undefined ? undefined : String(row.delivery_date).slice(0, 10),
       created_by: String(row.created_by),
       created_by_name: this.resolveUserName(row.created_by, row.created_by_name),
       date_created: String(row.date_created),
