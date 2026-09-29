@@ -40,4 +40,19 @@ export class RecommendedDeliveryRepository extends BaseRepository {
       date_created: row.date_created instanceof Date ? row.date_created.toISOString() : String(row.date_created),
     }));
   }
+
+  public async findCurrentLocation(deliveryUserId: string): Promise<{ latitude: number; longitude: number; location_updated_at: string } | null> {
+    const [rows] = await this.execute<any[]>(
+      `SELECT latitude, longitude, location_updated_at
+       FROM delivery_user_locations WHERE delivery_user_id = ? LIMIT 1`,
+      [deliveryUserId],
+    );
+    if (!rows.length) return null;
+    const row = rows[0];
+    return {
+      latitude: Number(row.latitude),
+      longitude: Number(row.longitude),
+      location_updated_at: row.location_updated_at instanceof Date ? row.location_updated_at.toISOString() : String(row.location_updated_at),
+    };
+  }
 }

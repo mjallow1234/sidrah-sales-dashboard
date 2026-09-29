@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { formatDateOnly } from '@/lib/dateOnly';
 import { useRecommendedNextDeliveryQuery } from '@/lib/hooks/recommendedDeliveryQueries';
+import { useSaveCurrentDeliveryUserLocationMutation } from '@/lib/hooks/deliveryUserLocationQueries';
 
 const priorityLabels = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' } as const;
 
 export function RecommendedNextDelivery({ enabled }: { enabled: boolean }) {
   const [locationReady, setLocationReady] = useState(false);
   const [coordinates, setCoordinates] = useState<{ latitude?: number; longitude?: number }>({});
+  const saveLocation = useSaveCurrentDeliveryUserLocationMutation();
 
   useEffect(() => {
     if (!enabled) return;
@@ -20,6 +22,7 @@ export function RecommendedNextDelivery({ enabled }: { enabled: boolean }) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+        saveLocation.mutate({ latitude: position.coords.latitude, longitude: position.coords.longitude });
         setLocationReady(true);
       },
       () => setLocationReady(true),

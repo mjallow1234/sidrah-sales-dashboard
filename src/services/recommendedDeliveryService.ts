@@ -1,6 +1,7 @@
 import { getPool } from '@/lib/db';
 import type { RecommendedDelivery } from '@/lib/types/recommended-delivery';
 import { RecommendedDeliveryRepository, type RecommendedDeliveryCandidate } from '@/repositories/RecommendedDeliveryRepository';
+import { DELIVERY_LOCATION_STALE_MINUTES } from '@/services/deliveryUserLocationService';
 
 const priorityRank: Record<RecommendedDeliveryCandidate['priority'], number> = { urgent: 0, high: 1, normal: 2, low: 3 };
 
@@ -63,7 +64,15 @@ export function rankRecommendedDeliveries(candidates: RecommendedDeliveryCandida
     }));
 }
 
-export async function getRecommendedNextDelivery(latitude?: number, longitude?: number): Promise<RecommendedDelivery | null> {
-  const candidates = await new RecommendedDeliveryRepository(getPool()).findEligible();
+export async function getRecommendedNextDelivery(deliveryUserId: string, latitude?: number, longitude?: number): Promise<RecommendedDelivery | null> {
+  const repository = new RecommendedDeliveryRepository(getPool());
+  if (latitude === undefined || longitude === undefined) {
+    const stored = await repository.findCurrentLocation(deliveryUserId);
+    if (stored && Date.now() - new Date(stored.location_updated_at).getTime() <= DELIVERY_LOCATION_STALE_MINUTES * 60_000) {
+      latitude = stored.latitude;
+      longitude = stored.longitude;
+    }
+  }
+  const candidates = await repository.findEligible();
   return rankRecommendedDeliveries(candidates, latitude, longitude)[0] ?? null;
 }

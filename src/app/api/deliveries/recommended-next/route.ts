@@ -16,5 +16,5 @@ export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const latitude = coordinate(url.searchParams.get('latitude'), -90, 90);
   const longitude = coordinate(url.searchParams.get('longitude'), -180, 180);
-  return Response.json({ status: 'success', data: await getRecommendedNextDelivery(latitude, longitude) });
+  return Response.json({ status: 'success', data: await getRecommendedNextDelivery(session.userId ?? '', latitude, longitude) });
 }

@@ -39,3 +39,17 @@ test('recommendation falls back without inventing distance and does not claim de
   assert.match(component, /Open Delivery/);
   assert.doesNotMatch(service, /claimDelivery|update.*status|reassignDelivery/);
 });
+
+test('phase 2 persists only the authenticated delivery user location and enforces freshness', () => {
+  const migration = read('db/migrations/0035_add_delivery_user_locations.sql');
+  const repository = read('src/repositories/DeliveryUserLocationRepository.ts');
+  const service = read('src/services/deliveryUserLocationService.ts');
+  const route = read('src/app/api/deliveries/location/route.ts');
+  assert.match(migration, /CREATE TABLE IF NOT EXISTS delivery_user_locations/);
+  assert.match(migration, /PRIMARY KEY \(delivery_user_id\)/);
+  assert.match(repository, /ON DUPLICATE KEY UPDATE/);
+  assert.match(service, /DELIVERY_LOCATION_STALE_MINUTES = 15/);
+  assert.match(service, /delivery_user_id: userId/);
+  assert.match(route, /isDeliveryRole/);
+  assert.doesNotMatch(route, /payload\?\.delivery_user_id/);
+});
