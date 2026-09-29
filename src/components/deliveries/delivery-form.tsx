@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCreateDeliveryMutation, useProductsQuery, useVendorsQuery } from '@/lib/hooks/queries';
 import type { DeliveryItem } from '@/lib/types';
-import { formatLocalDateInput } from '@/lib/dateOnly';
+import { formatLocalDateInput, isValidDateOnly } from '@/lib/dateOnly';
 
 interface DeliveryLineItem {
   product_id: string;
@@ -73,6 +73,15 @@ export function DeliveryForm() {
 
     if (!canSubmit || !selectedVendor) {
       setErrorMessage('Please complete all required delivery details.');
+      return;
+    }
+    const todayDate = today();
+    if (!isValidDateOnly(deliveryDate)) {
+      setErrorMessage('Please enter a valid delivery date.');
+      return;
+    }
+    if (deliveryDate < todayDate) {
+      setErrorMessage('Delivery date cannot be in the past. Select today or a future date.');
       return;
     }
 

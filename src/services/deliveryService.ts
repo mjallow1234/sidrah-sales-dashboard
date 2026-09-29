@@ -8,6 +8,7 @@ import { AppUserRepository } from '@/repositories/AppUserRepository';
 import { NotFoundError } from '@/repositories/errors';
 import { AgentAccountabilityRepository, type AccountabilityLine } from '@/repositories/AgentAccountabilityRepository';
 import { VendorAccountabilityAssignmentRepository } from '@/repositories/VendorAccountabilityAssignmentRepository';
+import { formatLocalDateInput, isValidDateOnly } from '@/lib/dateOnly';
 
 class HttpError extends Error {
   public readonly status: number;
@@ -99,15 +100,12 @@ function validatePriority(value: unknown): DeliveryPriority {
   return value as DeliveryPriority;
 }
 
-function validateDeliveryDate(value: unknown): string {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+function validateDeliveryDate(value: unknown, rejectPast = false): string {
+  if (typeof value !== 'string' || !isValidDateOnly(value)) {
     throw new HttpError(400, 'Delivery date is required and must be a valid date.');
   }
-  const [year, month, day] = value.split('-').map(Number);
-  const leapYear = year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0);
-  const daysInMonth = [31, leapYear ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-  if (month < 1 || month > 12 || day < 1 || day > daysInMonth[month - 1]) {
-    throw new HttpError(400, 'Delivery date is invalid.');
+  if (rejectPast && value < formatLocalDateInput()) {
+    throw new HttpError(400, 'Delivery date cannot be in the past. Select today or a future date.');
   }
   return value;
 }
@@ -127,7 +125,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   const vendorId = validateRequiredString(payload.vendor_id, 'Vendor');
   const notes = typeof payload.notes === 'string' && payload.notes.trim() !== '' ? payload.notes.trim() : undefined;
   const priority = validatePriority(payload.priority);
-  const deliveryDate = validateDeliveryDate(payload.delivery_date);
+  const deliveryDate = validateDeliveryDate(payload.delivery_date, true);
   const cookingLocation = validateCookingLocation(payload.cooking_location);
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');

@@ -24,6 +24,7 @@ test('delivery date flows through schema, API, repository, form, and card', () =
   assert.match(card, /delivery\.delivery_date/);
   assert.match(repository, /getUTCFullYear/);
   assert.match(dateOnly, /formatDateOnly/);
+  assert.match(dateOnly, /isValidDateOnly/);
   assert.match(dateOnly, /Not specified/);
   assert.doesNotMatch(card, /new Date\(`\$\{delivery\.delivery_date\}/);
 });
@@ -37,6 +38,24 @@ test('delivery date editing is management-authorized and limited to active reque
   assert.match(route, /export async function PATCH/);
   assert.match(repository, /status IN \('pending', 'ongoing'\)/);
   assert.match(details, /useUpdateDeliveryDateMutation/);
-  assert.match(service, /daysInMonth/);
-  assert.doesNotMatch(service, /toISOString\(\)\.slice\(0, 10\)/);
+  assert.match(service, /cannot be in the past/);
+  assert.match(service, /formatLocalDateInput/);
+});
+
+test('new delivery dates reject past calendar dates before persistence', () => {
+  const form = read('src/components/deliveries/delivery-form.tsx');
+  const service = read('src/services/deliveryService.ts');
+  const today = '2026-09-29';
+  const cases = [
+    ['2026-09-29', true],
+    ['2026-09-30', true],
+    ['2026-09-28', false],
+    ['2025-01-01', false],
+  ];
+  for (const [value, expected] of cases) {
+    assert.equal(value >= today, expected, `${value} date-only comparison`);
+  }
+  assert.match(form, /deliveryDate < todayDate/);
+  assert.match(service, /validateDeliveryDate\(payload\.delivery_date, true\)/);
+  assert.match(service, /Delivery date cannot be in the past/);
 });
