@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   useAuthQuery,
@@ -14,6 +14,7 @@ import {
   useMarkDeliveryDeliveredMutation,
   useReassignDeliveryMutation,
   useProductsQuery,
+  useUpdateDeliveryDateMutation,
 } from '@/lib/hooks/queries';
 import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
 import { canRecordDeliveryPayment } from '@/lib/authorization';
@@ -55,6 +56,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const cancelMutation = useCancelDeliveryMutation();
   const addCommentMutation = useAddDeliveryCommentMutation();
   const addItemsMutation = useAddDeliveryItemsMutation();
+  const updateDeliveryDateMutation = useUpdateDeliveryDateMutation();
   const recordPaymentMutation = useRecordDeliveryPaymentMutation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProductsQuery();
 
@@ -85,6 +87,12 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [additionalItems, setAdditionalItems] = useState([{ product_id: '', quantity: 1 }]);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentOptionId, setPaymentOptionId] = useState('');
+  const [editingDeliveryDate, setEditingDeliveryDate] = useState(false);
+  const [deliveryDate, setDeliveryDate] = useState('');
+
+  useEffect(() => {
+    if (delivery) setDeliveryDate(delivery.delivery_date ?? '');
+  }, [delivery]);
 
   const assignedToLabel = useMemo(() => {
     if (!delivery?.claimed_by) {
@@ -160,6 +168,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
             </div>
             <div>Priority: <span className="font-semibold">{priorityLabels[delivery.priority] ?? 'Normal'}</span></div>
             <div>Created: {new Date(delivery.date_created).toLocaleString()}</div>
+            <div>Delivery Date: {delivery.delivery_date ? new Date(`${delivery.delivery_date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Not specified'}</div>
             <div>Created by: {delivery.created_by_name || 'Unknown user'}</div>
             <div>Assigned to: {assignedToLabel}</div>
             {delivery.claimed_at ? <div>Claimed at: {new Date(delivery.claimed_at).toLocaleString()}</div> : null}
@@ -177,6 +186,23 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
           {isDeliveryUser && delivery.claimed_by === currentUserId ? <DeliveryNavigationActions latitude={delivery.vendor_location_latitude} longitude={delivery.vendor_location_longitude} /> : <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm text-slate-600">Directions are available to the assigned delivery user.</p>}
         </div>
       </div>
+
+      {isAdminOrSupervisor && isActionable ? (
+        <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold text-slate-900">Delivery Date</h2>
+            {!editingDeliveryDate ? <Button type="button" variant="secondary" onClick={() => setEditingDeliveryDate(true)}>Edit date</Button> : null}
+          </div>
+          {editingDeliveryDate ? (
+            <div className="mt-4 flex flex-wrap items-end gap-3">
+              <label className="text-sm font-semibold text-slate-900">Delivery Date<input type="date" required value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="mt-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 font-normal" /></label>
+              <Button type="button" onClick={() => updateDeliveryDateMutation.mutate({ deliveryId: delivery.delivery_id, deliveryDate }, { onSuccess: () => setEditingDeliveryDate(false) })} disabled={!deliveryDate || updateDeliveryDateMutation.isPending}>{updateDeliveryDateMutation.isPending ? 'Saving…' : 'Save date'}</Button>
+              <Button type="button" variant="secondary" onClick={() => { setDeliveryDate(delivery.delivery_date ?? ''); setEditingDeliveryDate(false); }}>Cancel</Button>
+              {updateDeliveryDateMutation.error ? <p className="w-full text-sm text-rose-600">{updateDeliveryDateMutation.error.message}</p> : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <DeliveryLocationReporter
         deliveryId={delivery.delivery_id}

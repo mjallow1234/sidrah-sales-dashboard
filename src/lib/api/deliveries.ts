@@ -98,6 +98,7 @@ export async function createDelivery(payload: {
   items: DeliveryItem[];
   notes?: string;
   priority?: DeliveryPriority;
+  delivery_date: string;
 }) {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>('/api/deliveries', {
     method: 'POST',
@@ -143,6 +144,15 @@ export async function cancelDelivery(deliveryId: string, comment?: string): Prom
 
 export async function getDeliveryActivity(deliveryId: string): Promise<DeliveryActivity[]> {
   const result = await fetchJson<{ status: string; data: DeliveryActivity[] }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/activity`);
+  return result.data;
+}
+
+export async function updateDeliveryDate(deliveryId: string, deliveryDate: string): Promise<DeliveryRecord> {
+  const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ delivery_date: deliveryDate }),
+  });
   return result.data;
 }
 

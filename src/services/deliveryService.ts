@@ -85,6 +85,7 @@ export interface CreateDeliveryRequest {
   items: DeliveryItem[];
   notes?: string;
   priority?: unknown;
+  delivery_date?: unknown;
 }
 
 const deliveryPriorities: readonly DeliveryPriority[] = ['low', 'normal', 'high', 'urgent'];
@@ -97,6 +98,17 @@ function validatePriority(value: unknown): DeliveryPriority {
   return value as DeliveryPriority;
 }
 
+function validateDeliveryDate(value: unknown): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new HttpError(400, 'Delivery date is required and must be a valid date.');
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new HttpError(400, 'Delivery date is invalid.');
+  }
+  return value;
+}
+
 export async function createDelivery(payload: CreateDeliveryRequest, createdBy: string): Promise<DeliveryRecord> {
   const productRepository = new ProductRepository(getPool());
   const customerName = validateRequiredString(payload.customer_name, 'Customer name');
@@ -106,6 +118,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   const vendorId = validateRequiredString(payload.vendor_id, 'Vendor');
   const notes = typeof payload.notes === 'string' && payload.notes.trim() !== '' ? payload.notes.trim() : undefined;
   const priority = validatePriority(payload.priority);
+  const deliveryDate = validateDeliveryDate(payload.delivery_date);
 
   const now = new Date().toISOString().slice(0, 19).replace('T', ' ');
 
@@ -124,6 +137,7 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
     notes,
     status: 'pending',
     priority,
+    delivery_date: deliveryDate,
     created_by: createdBy,
     claimed_by: null,
     claimed_at: null,
@@ -146,6 +160,11 @@ export async function createDelivery(payload: CreateDeliveryRequest, createdBy: 
   });
 }
 
+
+export async function updateDeliveryDate(deliveryId: string, value: unknown, actingUserId: string): Promise<DeliveryRecord> {
+  const deliveryDate = validateDeliveryDate(value);
+  return transaction(async (connection) => new DeliveryRepository(connection).updateDeliveryDate(deliveryId, deliveryDate, actingUserId));
+}
 export async function getDeliveries(status?: DeliveryStatus | DeliveryStatus[], deliveryUserId?: string): Promise<DeliveryRecord[]> {
   const repository = new DeliveryRepository(getPool());
   const filters: DeliverySearchFilters = {};

@@ -12,6 +12,10 @@ interface DeliveryLineItem {
 
 const initialItem: DeliveryLineItem = { product_id: '', quantity: 1 };
 
+function today() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 export function DeliveryForm() {
   const { data: vendors = [], isLoading: vendorsLoading, isError: vendorsError } = useVendorsQuery();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProductsQuery();
@@ -19,6 +23,7 @@ export function DeliveryForm() {
   const [vendorId, setVendorId] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState(today);
   const [notes, setNotes] = useState('');
   const [priority, setPriority] = useState<'low' | 'normal' | 'high' | 'urgent'>('normal');
   const [items, setItems] = useState<DeliveryLineItem[]>([{ ...initialItem }]);
@@ -40,9 +45,10 @@ export function DeliveryForm() {
       vendorId.trim() !== '' &&
       customerPhone.trim() !== '' &&
       deliveryAddress.trim() !== '' &&
+      deliveryDate !== '' &&
       items.every((item) => item.product_id.trim() !== '' && item.quantity > 0)
     );
-  }, [vendorId, customerPhone, deliveryAddress, items]);
+  }, [vendorId, customerPhone, deliveryAddress, deliveryDate, items]);
 
   const handleAddItem = () => {
     setItems((current) => [...current, { ...initialItem }]);
@@ -84,6 +90,7 @@ export function DeliveryForm() {
         customer_name: selectedVendor.vendor_name,
         customer_phone: customerPhone,
         delivery_address: deliveryAddress,
+        delivery_date: deliveryDate,
         items: payloadItems,
         notes: notes || undefined,
         priority,
@@ -92,6 +99,7 @@ export function DeliveryForm() {
       setVendorId('');
       setCustomerPhone('');
       setDeliveryAddress('');
+      setDeliveryDate(today());
       setNotes('');
       setPriority('normal');
       setItems([{ ...initialItem }]);
@@ -143,6 +151,17 @@ export function DeliveryForm() {
           type="text"
           value={deliveryAddress}
           onChange={(event) => setDeliveryAddress(event.target.value)}
+          className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+        />
+      </label>
+
+      <label className="block text-sm text-slate-700">
+        Delivery Date
+        <input
+          type="date"
+          required
+          value={deliveryDate}
+          onChange={(event) => setDeliveryDate(event.target.value)}
           className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
         />
       </label>

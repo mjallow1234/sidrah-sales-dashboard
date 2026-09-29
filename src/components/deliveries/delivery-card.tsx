@@ -78,6 +78,10 @@ export function DeliveryCard({ delivery, showNavigation = false }: { delivery: D
               <p className="mt-1 break-words text-slate-800">{delivery.claimed_by ? delivery.claimed_by_name || 'Assigned user unavailable' : 'Unassigned'}</p>
             </div>
             <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Delivery Date</p>
+              <p className="mt-1 break-words text-slate-800">{delivery.delivery_date ? new Date(`${delivery.delivery_date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Not specified'}</p>
+            </div>
+            <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Requested</p>
               <p className="mt-1 break-words text-slate-800">{formatRequestedAt(delivery.date_created)}</p>
             </div>

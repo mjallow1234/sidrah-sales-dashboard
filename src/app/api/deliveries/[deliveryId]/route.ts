@@ -1,6 +1,7 @@
 import type { NextRequest } from 'next/server';
-import { getVerifiedSession, unauthorizedResponse } from '@/lib/session';
-import { getDeliveryById } from '@/services/deliveryService';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminOrSupervisorRole } from '@/lib/authorization';
+import { getDeliveryById, updateDeliveryDate } from '@/services/deliveryService';
 
 function getDeliveryId(request: NextRequest): string {
   const { pathname } = request.nextUrl;
@@ -20,5 +21,20 @@ export async function GET(request: NextRequest) {
     return Response.json({ status: 'success', data: delivery });
   } catch (error: unknown) {
     return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) return unauthorizedResponse();
+  if (!isAdminOrSupervisorRole(session.role) || !session.userId) return forbiddenResponse();
+  try {
+    const deliveryId = getDeliveryId(request);
+    const payload = await request.json();
+    const delivery = await updateDeliveryDate(deliveryId, payload?.delivery_date, session.userId);
+    return Response.json({ status: 'success', data: delivery });
+  } catch (error: unknown) {
+    const status = error instanceof Error && 'status' in error ? Number((error as { status?: number }).status) || 500 : 500;
+    return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status });
   }
 }

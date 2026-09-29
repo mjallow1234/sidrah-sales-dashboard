@@ -13,6 +13,7 @@ export interface CreateDeliveryPayload {
   notes?: string;
   status: DeliveryStatus;
   priority: DeliveryPriority;
+  delivery_date?: string | null;
   created_by: string;
   claimed_by?: string | null;
   claimed_at?: string | null;
@@ -247,6 +248,7 @@ export class DeliveryRepository extends BaseRepository {
         notes,
         status,
         priority,
+        delivery_date,
         created_by,
         claimed_by,
         claimed_at,
@@ -264,6 +266,7 @@ export class DeliveryRepository extends BaseRepository {
         :notes,
         :status,
         :priority,
+        :delivery_date,
         :created_by,
         :claimed_by,
         :claimed_at,
@@ -282,6 +285,7 @@ export class DeliveryRepository extends BaseRepository {
         notes: payload.notes ?? null,
         status: payload.status,
         priority: payload.priority,
+        delivery_date: payload.delivery_date ?? null,
         created_by: payload.created_by,
         claimed_by: payload.claimed_by ?? null,
         claimed_at: payload.claimed_at ?? null,
@@ -293,6 +297,19 @@ export class DeliveryRepository extends BaseRepository {
     );
 
     return this.findById(payload.delivery_id);
+  }
+
+  public async updateDeliveryDate(deliveryId: string, deliveryDate: string, updatedBy: string): Promise<DeliveryRecord> {
+    const [result] = await (this.db.execute as any)(
+      `UPDATE deliveries
+       SET delivery_date = :delivery_date, updated_by = :updated_by, last_updated = NOW()
+       WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,
+      { delivery_date: deliveryDate, updated_by: updatedBy, delivery_id: deliveryId },
+    );
+    if ((result as import('mysql2/promise').OkPacket).affectedRows === 0) {
+      throw new Error('Delivery date can only be changed for pending or ongoing deliveries.');
+    }
+    return this.findById(deliveryId);
   }
 
   private async lockDelivery(deliveryId: string): Promise<any> {

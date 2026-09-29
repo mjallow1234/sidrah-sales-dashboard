@@ -211,6 +211,7 @@ export interface DeliveryRecord {
   notes?: string;
   status: DeliveryStatus;
   priority: DeliveryPriority;
+  delivery_date?: string;
   created_by: string;
   created_by_name?: string;
   date_created: string;
