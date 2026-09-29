@@ -8,6 +8,7 @@ import { useDeliveryTrackingQuery } from '@/lib/hooks/deliveryTrackingQueries';
 import type { DeliveryRecord } from '@/lib/types';
 import { DeliveryCard } from './delivery-card';
 import { DeliveryTrackingMap } from './delivery-tracking-map';
+import { RecommendedNextDelivery } from './recommended-next-delivery';
 
 const statusOptions = [
   { value: '', label: 'All' },
@@ -76,6 +77,8 @@ export function DeliveryList() {
           )}
         </div>
       </div>
+
+      <RecommendedNextDelivery enabled={auth?.role === 'delivery'} />
 
       {canViewPreparationSummary ? (
         <DeliveryTrackingMap locations={trackingQuery.data ?? []} isLoading={trackingQuery.isLoading} isError={trackingQuery.isError} />
