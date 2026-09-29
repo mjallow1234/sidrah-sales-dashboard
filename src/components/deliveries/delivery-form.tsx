@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useCreateDeliveryMutation, useProductsQuery, useVendorsQuery } from '@/lib/hooks/queries';
 import type { DeliveryItem } from '@/lib/types';
+import { formatLocalDateInput } from '@/lib/dateOnly';
 
 interface DeliveryLineItem {
   product_id: string;
@@ -13,7 +14,7 @@ interface DeliveryLineItem {
 const initialItem: DeliveryLineItem = { product_id: '', quantity: 1 };
 
 function today() {
-  return new Date().toISOString().slice(0, 10);
+  return formatLocalDateInput();
 }
 
 export function DeliveryForm() {

@@ -67,6 +67,11 @@ export class DeliveryRepository extends BaseRepository {
   }
 
   private mapRow(row: any): DeliveryRecord {
+    const deliveryDate = row.delivery_date instanceof Date
+      ? `${row.delivery_date.getUTCFullYear()}-${String(row.delivery_date.getUTCMonth() + 1).padStart(2, '0')}-${String(row.delivery_date.getUTCDate()).padStart(2, '0')}`
+      : typeof row.delivery_date === 'string' && /^\d{4}-\d{2}-\d{2}/.test(row.delivery_date)
+        ? row.delivery_date.slice(0, 10)
+        : undefined;
     return {
       delivery_id: String(row.delivery_id),
       vendor_id: row.vendor_id === null || row.vendor_id === undefined ? undefined : String(row.vendor_id),
@@ -77,7 +82,7 @@ export class DeliveryRepository extends BaseRepository {
       notes: row.notes === null ? undefined : String(row.notes),
       status: String(row.status) as DeliveryRecord['status'],
       priority: String(row.priority || 'normal') as DeliveryPriority,
-      delivery_date: row.delivery_date === null || row.delivery_date === undefined ? undefined : String(row.delivery_date).slice(0, 10),
+      delivery_date: deliveryDate,
       created_by: String(row.created_by),
       created_by_name: this.resolveUserName(row.created_by, row.created_by_name),
       date_created: String(row.date_created),

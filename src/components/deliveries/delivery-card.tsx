@@ -5,6 +5,7 @@ import { useState } from 'react';
 import type { DeliveryRecord } from '@/lib/types';
 import { useDeliveryPaymentsQuery } from '@/lib/hooks/deliveryPaymentQueries';
 import { DeliveryNavigationActions } from './delivery-navigation-actions';
+import { formatDateOnly } from '@/lib/dateOnly';
 
 const statusLabels: Record<DeliveryRecord['status'], string> = {
   pending: 'Pending',
@@ -79,7 +80,7 @@ export function DeliveryCard({ delivery, showNavigation = false }: { delivery: D
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Delivery Date</p>
-              <p className="mt-1 break-words text-slate-800">{delivery.delivery_date ? new Date(`${delivery.delivery_date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Not specified'}</p>
+              <p className="mt-1 break-words text-slate-800">{formatDateOnly(delivery.delivery_date)}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Requested</p>

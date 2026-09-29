@@ -22,6 +22,7 @@ import { canRecordDeliveryPayment } from '@/lib/authorization';
 import type { DeliveryItem } from '@/lib/types';
 import { DeliveryLocationReporter } from './delivery-location-reporter';
 import { DeliveryNavigationActions } from './delivery-navigation-actions';
+import { formatDateOnly } from '@/lib/dateOnly';
 
 interface DeliveryDetailsProps {
   deliveryId: string;
@@ -174,7 +175,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
             </div>
             <div>Priority: <span className="font-semibold">{priorityLabels[delivery.priority] ?? 'Normal'}</span></div>
             <div>Created: {new Date(delivery.date_created).toLocaleString()}</div>
-            <div>Delivery Date: {delivery.delivery_date ? new Date(`${delivery.delivery_date}T00:00:00`).toLocaleDateString(undefined, { dateStyle: 'long' }) : 'Not specified'}</div>
+            <div>Delivery Date: {formatDateOnly(delivery.delivery_date)}</div>
             {delivery.cooking_location ? <div>Cooking Location: <span className={`font-semibold ${delivery.cooking_location === 'Home' ? 'text-emerald-700' : 'text-blue-700'}`}>{delivery.cooking_location}</span></div> : null}
             <div>Created by: {delivery.created_by_name || 'Unknown user'}</div>
             <div>Assigned to: {assignedToLabel}</div>
