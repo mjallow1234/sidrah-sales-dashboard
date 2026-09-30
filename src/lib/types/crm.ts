@@ -43,4 +43,14 @@ export interface CrmLeadFilters {
   capturedFrom?: string;
   capturedTo?: string;
   followUpDate?: string;
+  followUpBucket?: 'overdue' | 'today' | 'upcoming';
+}
+
+export interface CrmLeadSummary {
+  follow_up_today: number;
+  overdue_follow_ups: number;
+  upcoming_follow_ups: number;
+  new_leads: number;
+  converted_leads: number;
+  lost_leads: number;
 }

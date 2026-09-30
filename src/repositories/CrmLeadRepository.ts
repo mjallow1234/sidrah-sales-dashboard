@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus } from '@/lib/types/crm';
+import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary } from '@/lib/types/crm';
 import type { RepositoryDbClient } from './types';
 import { BaseRepository } from './BaseRepository';
 
@@ -35,7 +35,7 @@ export class CrmLeadRepository extends BaseRepository {
     return rows.length ? this.mapLead(rows[0]) : null;
   }
 
-  public async list(filters: CrmLeadFilters, ownAgentUserId?: string): Promise<CrmLead[]> {
+  public async list(filters: CrmLeadFilters, ownAgentUserId?: string, today = new Date().toISOString().slice(0, 10)): Promise<CrmLead[]> {
     const conditions: string[] = [];
     const params: Record<string, unknown> = {};
     if (ownAgentUserId) { conditions.push('l.assigned_agent_user_id = :own_agent'); params.own_agent = ownAgentUserId; }
@@ -45,8 +45,27 @@ export class CrmLeadRepository extends BaseRepository {
     if (filters.capturedFrom) { conditions.push('l.captured_at >= :captured_from'); params.captured_from = filters.capturedFrom; }
     if (filters.capturedTo) { conditions.push('l.captured_at <= :captured_to'); params.captured_to = filters.capturedTo; }
     if (filters.followUpDate) { conditions.push('l.next_follow_up_date = :follow_up_date'); params.follow_up_date = filters.followUpDate; }
+    if (filters.followUpBucket === 'overdue') { conditions.push("l.next_follow_up_date < :follow_up_today AND l.status IN ('new', 'follow_up_required')"); params.follow_up_today = today; }
+    if (filters.followUpBucket === 'today') { conditions.push("l.next_follow_up_date = :follow_up_today AND l.status IN ('new', 'follow_up_required')"); params.follow_up_today = today; }
+    if (filters.followUpBucket === 'upcoming') { conditions.push("l.next_follow_up_date > :follow_up_today AND l.status IN ('new', 'follow_up_required')"); params.follow_up_today = today; }
     const [rows] = await this.execute<any[]>(this.selectSql(conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''), params);
     return rows.map((row) => this.mapLead(row));
+  }
+
+  public async summary(ownAgentUserId: string | undefined, today: string): Promise<CrmLeadSummary> {
+    const params: Record<string, unknown> = { today };
+    const scope = ownAgentUserId ? ' AND assigned_agent_user_id = :own_agent' : '';
+    if (ownAgentUserId) params.own_agent = ownAgentUserId;
+    const [rows] = await this.execute<any[]>(`SELECT
+      SUM(next_follow_up_date = :today AND status IN ('new', 'follow_up_required')) AS follow_up_today,
+      SUM(next_follow_up_date < :today AND status IN ('new', 'follow_up_required')) AS overdue_follow_ups,
+      SUM(next_follow_up_date > :today AND status IN ('new', 'follow_up_required')) AS upcoming_follow_ups,
+      SUM(status = 'new') AS new_leads,
+      SUM(status = 'converted') AS converted_leads,
+      SUM(status = 'lost') AS lost_leads
+      FROM crm_leads WHERE 1=1${scope}`, params);
+    const row = rows[0] ?? {};
+    return { follow_up_today: Number(row.follow_up_today ?? 0), overdue_follow_ups: Number(row.overdue_follow_ups ?? 0), upcoming_follow_ups: Number(row.upcoming_follow_ups ?? 0), new_leads: Number(row.new_leads ?? 0), converted_leads: Number(row.converted_leads ?? 0), lost_leads: Number(row.lost_leads ?? 0) };
   }
 
   public async updateLead(leadId: string, updates: Record<string, unknown>): Promise<CrmLead | null> {

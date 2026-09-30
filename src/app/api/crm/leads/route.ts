@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   if (!session) return unauthorizedResponse();
   if (!allowed(session.role) || !session.userId) return forbiddenResponse();
   const q = request.nextUrl.searchParams;
-  try { return Response.json({ status: 'success', data: await listLeads({ status: (q.get('status') as any) || undefined, assignedAgentUserId: q.get('assignedAgentUserId') || undefined, search: q.get('search') || undefined, capturedFrom: q.get('capturedFrom') || undefined, capturedTo: q.get('capturedTo') || undefined, followUpDate: q.get('followUpDate') || undefined }, { userId: session.userId, role: session.role }) }); } catch (error) { return errorResponse(error); }
+  try { return Response.json({ status: 'success', data: await listLeads({ status: (q.get('status') as any) || undefined, assignedAgentUserId: q.get('assignedAgentUserId') || undefined, search: q.get('search') || undefined, capturedFrom: q.get('capturedFrom') || undefined, capturedTo: q.get('capturedTo') || undefined, followUpDate: q.get('followUpDate') || undefined, followUpBucket: (q.get('followUpBucket') as any) || undefined }, { userId: session.userId, role: session.role }) }); } catch (error) { return errorResponse(error); }
 }
 
 export async function POST(request: NextRequest) {

@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getPool, transaction } from '@/lib/db';
-import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus } from '@/lib/types/crm';
+import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary } from '@/lib/types/crm';
 import { CrmLeadRepository } from '@/repositories/CrmLeadRepository';
 import { ValidationError, NotFoundError } from './errors';
 
@@ -22,6 +22,7 @@ function date(value: unknown, field: string, required = false): string | null {
 }
 function status(value: unknown): CrmLeadStatus { const result = text(value, 'status', true) as string; if (!statuses.has(result)) throw new ValidationError('Invalid lead status.'); return result as CrmLeadStatus; }
 function now() { return new Date().toISOString().slice(0, 19).replace('T', ' '); }
+function todayDateOnly() { const current = new Date(); return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`; }
 
 async function validateAgent(connection: any, userId: string): Promise<void> {
   const [rows] = await connection.execute('SELECT user_id FROM app_users WHERE user_id = ? AND role = \'agent\' AND status = \'active\' LIMIT 1', [userId]);
@@ -33,7 +34,13 @@ function canManage(role?: string) { return role === 'supervisor' || role === 'ad
 export async function listLeads(filters: CrmLeadFilters, session: { userId: string; role?: string }) {
   const own = session.role === 'agent' ? session.userId : undefined;
   if (!own && !canManage(session.role)) throw new Error('Insufficient permissions.');
-  return new CrmLeadRepository(getPool()).list(filters, own);
+  return new CrmLeadRepository(getPool()).list(filters, own, todayDateOnly());
+}
+
+export async function getSummary(session: { userId: string; role?: string }): Promise<CrmLeadSummary> {
+  const own = session.role === 'agent' ? session.userId : undefined;
+  if (!own && !canManage(session.role)) throw new Error('Insufficient permissions.');
+  return new CrmLeadRepository(getPool()).summary(own, todayDateOnly());
 }
 
 export async function getLead(leadId: string, session: { userId: string; role?: string }): Promise<CrmLead> {
@@ -99,7 +106,7 @@ export async function addActivity(leadId: string, input: Record<string, unknown>
   if (!['note', 'follow_up'].includes(activityType)) throw new ValidationError('Invalid activity type.');
   return transaction(async (connection) => {
     const repository = new CrmLeadRepository(connection);
-    if (followUpDate) await repository.updateLead(leadId, { next_follow_up_date: followUpDate, updated_at: now(), updated_by_user_id: session.userId });
+    if (Object.prototype.hasOwnProperty.call(input, 'follow_up_date')) await repository.updateLead(leadId, { next_follow_up_date: followUpDate, updated_at: now(), updated_by_user_id: session.userId });
     return repository.createActivity({ lead_id: leadId, activity_type: activityType, activity_at: now(), actor_user_id: session.userId, note, follow_up_date: followUpDate });
   });
 }
