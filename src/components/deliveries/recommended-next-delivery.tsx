@@ -1,34 +1,52 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { formatDateOnly } from '@/lib/dateOnly';
 import { useRecommendedNextDeliveryQuery } from '@/lib/hooks/recommendedDeliveryQueries';
-import { useSaveCurrentDeliveryUserLocationMutation } from '@/lib/hooks/deliveryUserLocationQueries';
+import { useCurrentDeliveryUserLocationQuery, useSaveCurrentDeliveryUserLocationMutation } from '@/lib/hooks/deliveryUserLocationQueries';
 
 const priorityLabels = { urgent: 'Urgent', high: 'High', normal: 'Normal', low: 'Low' } as const;
 
 export function RecommendedNextDelivery({ enabled }: { enabled: boolean }) {
   const [locationReady, setLocationReady] = useState(false);
   const [coordinates, setCoordinates] = useState<{ latitude?: number; longitude?: number }>({});
+  const [locationState, setLocationState] = useState<'fresh' | 'stale' | 'unavailable'>('unavailable');
+  const locationRequestStarted = useRef(false);
+  const storedLocation = useCurrentDeliveryUserLocationQuery(enabled);
   const saveLocation = useSaveCurrentDeliveryUserLocationMutation();
 
   useEffect(() => {
     if (!enabled) return;
+    if (storedLocation.isLoading || locationRequestStarted.current) return;
+    locationRequestStarted.current = true;
+    if (storedLocation.data?.state === 'fresh' && storedLocation.data.location) {
+      setCoordinates({ latitude: storedLocation.data.location.latitude, longitude: storedLocation.data.location.longitude });
+      setLocationState('fresh');
+      setLocationReady(true);
+      return;
+    }
+    setLocationState(storedLocation.data?.state === 'stale' ? 'stale' : 'unavailable');
     if (!navigator.geolocation) {
       setLocationReady(true);
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setCoordinates({ latitude: position.coords.latitude, longitude: position.coords.longitude });
-        saveLocation.mutate({ latitude: position.coords.latitude, longitude: position.coords.longitude });
+      async (position) => {
+        const nextCoordinates = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+        setCoordinates(nextCoordinates);
+        setLocationState('fresh');
+        try {
+          await saveLocation.mutateAsync(nextCoordinates);
+        } catch {
+          // The recommendation can still use this fresh browser location for this request.
+        }
         setLocationReady(true);
       },
       () => setLocationReady(true),
       { enableHighAccuracy: true, maximumAge: 30_000, timeout: 10_000 },
     );
-  }, [enabled]);
+  }, [enabled, storedLocation.data, storedLocation.isLoading]);
 
   const recommendation = useRecommendedNextDeliveryQuery(coordinates.latitude, coordinates.longitude, enabled && locationReady);
   if (!enabled) return null;
@@ -53,5 +71,6 @@ export function RecommendedNextDelivery({ enabled }: { enabled: boolean }) {
       <p><span className="text-slate-500">Distance:</span> <span className="font-semibold text-slate-900">{delivery.distance_available ? `${delivery.distance_km} km` : 'Distance unavailable'}</span></p>
     </div>
     <p className="mt-4 text-xs text-slate-600">{delivery.recommendation_reason}</p>
+    <p className="mt-2 text-xs text-slate-500">{delivery.location_state === 'fresh' ? 'Using current location' : delivery.location_state === 'stale' || locationState === 'stale' ? 'Location stale — using priority fallback' : 'Location unavailable — using priority fallback'}</p>
   </section>;
 }

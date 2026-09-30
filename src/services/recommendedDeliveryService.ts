@@ -1,5 +1,5 @@
 import { getPool } from '@/lib/db';
-import type { RecommendedDelivery } from '@/lib/types/recommended-delivery';
+import type { RecommendationDistanceUnavailableReason, RecommendationLocationState, RecommendedDelivery } from '@/lib/types/recommended-delivery';
 import { RecommendedDeliveryRepository, type RecommendedDeliveryCandidate } from '@/repositories/RecommendedDeliveryRepository';
 import { DELIVERY_LOCATION_STALE_MINUTES } from '@/services/deliveryUserLocationService';
 
@@ -26,8 +26,9 @@ function compareDate(left?: string, right?: string): number {
   return 0;
 }
 
-export function rankRecommendedDeliveries(candidates: RecommendedDeliveryCandidate[], latitude?: number, longitude?: number): RecommendedDelivery[] {
+export function rankRecommendedDeliveries(candidates: RecommendedDeliveryCandidate[], latitude?: number, longitude?: number, locationState?: RecommendationLocationState): RecommendedDelivery[] {
   const hasDriverLocation = validCoordinate(latitude, -90, 90) && validCoordinate(longitude, -180, 180);
+  const effectiveLocationState = locationState ?? (hasDriverLocation ? 'fresh' : 'unavailable');
   return candidates
     .map((candidate) => {
       const hasVendorLocation = validCoordinate(candidate.vendor_latitude, -90, 90) && validCoordinate(candidate.vendor_longitude, -180, 180);
@@ -48,7 +49,22 @@ export function rankRecommendedDeliveries(candidates: RecommendedDeliveryCandida
       if (createdDifference !== 0) return createdDifference;
       return left.candidate.delivery_id.localeCompare(right.candidate.delivery_id);
     })
-    .map(({ candidate, distance }) => ({
+    .map(({ candidate, distance }) => {
+      const distanceUnavailableReason: RecommendationDistanceUnavailableReason | undefined = distance !== null
+        ? undefined
+        : effectiveLocationState === 'stale'
+          ? 'location_stale'
+          : effectiveLocationState === 'unavailable'
+            ? 'location_unavailable'
+            : 'vendor_coordinates_unavailable';
+      const recommendationReason = distance === null
+        ? effectiveLocationState === 'stale'
+          ? 'Highest priority available; location is stale, so priority/date/request-time fallback was used.'
+          : effectiveLocationState === 'unavailable'
+            ? 'Highest priority available; location unavailable, so priority/date/request-time fallback was used.'
+            : 'Highest priority available; vendor coordinates unavailable, so priority/date/request-time fallback was used.'
+        : `Highest priority available; nearest vendor within priority at ${distance.toFixed(2)} km.`;
+      return ({
       delivery_id: candidate.delivery_id,
       vendor_id: candidate.vendor_id,
       vendor_name: candidate.vendor_name,
@@ -58,21 +74,27 @@ export function rankRecommendedDeliveries(candidates: RecommendedDeliveryCandida
       delivery_address: candidate.delivery_address,
       distance_km: distance === null ? null : Number(distance.toFixed(2)),
       distance_available: distance !== null,
-      recommendation_reason: distance === null
-        ? `Highest priority available; proximity unavailable, then delivery date and request time.`
-        : `Highest priority available; nearest vendor within priority at ${distance.toFixed(2)} km.`,
-    }));
+      location_state: effectiveLocationState,
+      distance_unavailable_reason: distanceUnavailableReason,
+      recommendation_reason: recommendationReason,
+    });
+    });
 }
 
 export async function getRecommendedNextDelivery(deliveryUserId: string, latitude?: number, longitude?: number): Promise<RecommendedDelivery | null> {
   const repository = new RecommendedDeliveryRepository(getPool());
+  let locationState: RecommendationLocationState = latitude === undefined || longitude === undefined ? 'unavailable' : 'fresh';
   if (latitude === undefined || longitude === undefined) {
     const stored = await repository.findCurrentLocation(deliveryUserId);
-    if (stored && Date.now() - new Date(stored.location_updated_at).getTime() <= DELIVERY_LOCATION_STALE_MINUTES * 60_000) {
+    const storedTimestamp = stored ? new Date(stored.location_updated_at).getTime() : Number.NaN;
+    if (stored && Number.isFinite(storedTimestamp) && Date.now() - storedTimestamp <= DELIVERY_LOCATION_STALE_MINUTES * 60_000) {
       latitude = stored.latitude;
       longitude = stored.longitude;
+      locationState = 'fresh';
+    } else if (stored) {
+      locationState = 'stale';
     }
   }
   const candidates = await repository.findEligible();
-  return rankRecommendedDeliveries(candidates, latitude, longitude)[0] ?? null;
+  return rankRecommendedDeliveries(candidates, latitude, longitude, locationState)[0] ?? null;
 }

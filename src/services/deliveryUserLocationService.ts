@@ -2,6 +2,7 @@ import { getPool, transaction } from '@/lib/db';
 import { DeliveryUserLocationRepository, type DeliveryUserLocation } from '@/repositories/DeliveryUserLocationRepository';
 
 export const DELIVERY_LOCATION_STALE_MINUTES = 15;
+export type DeliveryUserLocationState = 'fresh' | 'stale' | 'unavailable';
 
 export class DeliveryUserLocationError extends Error {
   public readonly status: number;
@@ -19,6 +20,12 @@ function coordinate(value: unknown, label: string, minimum: number, maximum: num
 function isFresh(location: DeliveryUserLocation, now = Date.now()): boolean {
   const timestamp = new Date(location.location_updated_at).getTime();
   return Number.isFinite(timestamp) && now - timestamp <= DELIVERY_LOCATION_STALE_MINUTES * 60_000;
+}
+
+export async function getDeliveryUserLocationState(userId: string): Promise<{ location: DeliveryUserLocation | null; state: DeliveryUserLocationState }> {
+  const location = await new DeliveryUserLocationRepository(getPool()).findByUserId(userId);
+  if (!location) return { location: null, state: 'unavailable' };
+  return { location, state: isFresh(location) ? 'fresh' : 'stale' };
 }
 
 export async function getCurrentDeliveryUserLocation(userId: string): Promise<DeliveryUserLocation | null> {

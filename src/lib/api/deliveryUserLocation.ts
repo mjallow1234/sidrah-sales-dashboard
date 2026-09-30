@@ -6,14 +6,20 @@ export interface CurrentDeliveryUserLocation {
   source: string;
 }
 
+export type DeliveryUserLocationState = 'fresh' | 'stale' | 'unavailable';
+export interface CurrentDeliveryUserLocationResponse {
+  location: CurrentDeliveryUserLocation | null;
+  state: DeliveryUserLocationState;
+}
+
 async function parse<T>(response: Response): Promise<T> {
   const body = await response.json();
   if (!response.ok) throw new Error(body?.message || `Request failed: ${response.status}`);
   return body.data as T;
 }
 
-export async function getCurrentDeliveryUserLocation(): Promise<CurrentDeliveryUserLocation | null> {
-  return parse<CurrentDeliveryUserLocation | null>(await fetch('/api/deliveries/location'));
+export async function getCurrentDeliveryUserLocation(): Promise<CurrentDeliveryUserLocationResponse> {
+  return parse<CurrentDeliveryUserLocationResponse>(await fetch('/api/deliveries/location'));
 }
 
 export async function saveCurrentDeliveryUserLocation(latitude: number, longitude: number): Promise<CurrentDeliveryUserLocation> {

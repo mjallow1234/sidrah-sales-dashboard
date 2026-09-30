@@ -1,7 +1,7 @@
 import type { NextRequest } from 'next/server';
 import { isDeliveryRole } from '@/lib/authorization';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
-import { DeliveryUserLocationError, getCurrentDeliveryUserLocation, saveCurrentDeliveryUserLocation } from '@/services/deliveryUserLocationService';
+import { DeliveryUserLocationError, getDeliveryUserLocationState, saveCurrentDeliveryUserLocation } from '@/services/deliveryUserLocationService';
 
 function errorResponse(error: unknown) {
   const status = error instanceof DeliveryUserLocationError ? error.status : 500;
@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (!session) return unauthorizedResponse();
   if (!isDeliveryRole(session.role)) return forbiddenResponse();
   try {
-    return Response.json({ status: 'success', data: await getCurrentDeliveryUserLocation(session.userId ?? '') });
+    return Response.json({ status: 'success', data: await getDeliveryUserLocationState(session.userId ?? '') });
   } catch (error: unknown) {
     return errorResponse(error);
   }

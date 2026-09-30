@@ -34,10 +34,24 @@ test('recommendation falls back without inventing distance and does not claim de
   const service = read('src/services/recommendedDeliveryService.ts');
   const component = read('src/components/deliveries/recommended-next-delivery.tsx');
   assert.match(service, /distance_km: distance === null \? null/);
-  assert.match(service, /proximity unavailable/);
+  assert.match(service, /location_stale/);
+  assert.match(service, /location_unavailable/);
   assert.match(component, /navigator\.geolocation\.getCurrentPosition/);
   assert.match(component, /Open Delivery/);
   assert.doesNotMatch(service, /claimDelivery|update.*status|reassignDelivery/);
+});
+
+test('recommendation exposes transparent location state and only refreshes stale or unavailable stored locations', () => {
+  const service = read('src/services/recommendedDeliveryService.ts');
+  const locationService = read('src/services/deliveryUserLocationService.ts');
+  const component = read('src/components/deliveries/recommended-next-delivery.tsx');
+  assert.match(service, /location_state: effectiveLocationState/);
+  assert.match(service, /vendor_coordinates_unavailable/);
+  assert.match(locationService, /getDeliveryUserLocationState/);
+  assert.match(component, /storedLocation\.data\?\.state === 'fresh'/);
+  assert.match(component, /saveLocation\.mutateAsync/);
+  assert.match(component, /Location stale/);
+  assert.match(component, /Location unavailable/);
 });
 
 test('phase 2 persists only the authenticated delivery user location and enforces freshness', () => {
