@@ -1,0 +1,40 @@
+CREATE TABLE IF NOT EXISTS crm_leads (
+  lead_id VARCHAR(32) NOT NULL,
+  lead_name VARCHAR(255) NOT NULL,
+  phone VARCHAR(64) NULL,
+  location VARCHAR(255) NULL,
+  business_type VARCHAR(128) NULL,
+  lead_source VARCHAR(128) NULL,
+  assigned_agent_user_id VARCHAR(32) NULL,
+  captured_by_user_id VARCHAR(32) NOT NULL,
+  captured_at DATE NOT NULL,
+  status VARCHAR(32) NOT NULL,
+  notes TEXT NULL,
+  next_follow_up_date DATE NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  updated_by_user_id VARCHAR(32) NOT NULL,
+  PRIMARY KEY (lead_id),
+  KEY idx_crm_leads_agent_status (assigned_agent_user_id, status),
+  KEY idx_crm_leads_status_captured (status, captured_at),
+  KEY idx_crm_leads_follow_up (next_follow_up_date),
+  CONSTRAINT fk_crm_leads_assigned_agent FOREIGN KEY (assigned_agent_user_id) REFERENCES app_users (user_id) ON UPDATE CASCADE ON DELETE SET NULL,
+  CONSTRAINT fk_crm_leads_captured_by FOREIGN KEY (captured_by_user_id) REFERENCES app_users (user_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT fk_crm_leads_updated_by FOREIGN KEY (updated_by_user_id) REFERENCES app_users (user_id) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS crm_lead_activities (
+  activity_id VARCHAR(32) NOT NULL,
+  lead_id VARCHAR(32) NOT NULL,
+  activity_type VARCHAR(32) NOT NULL,
+  activity_at DATETIME NOT NULL,
+  actor_user_id VARCHAR(32) NOT NULL,
+  note TEXT NULL,
+  previous_status VARCHAR(32) NULL,
+  new_status VARCHAR(32) NULL,
+  follow_up_date DATE NULL,
+  PRIMARY KEY (activity_id),
+  KEY idx_crm_activities_lead_date (lead_id, activity_at),
+  CONSTRAINT fk_crm_activities_lead FOREIGN KEY (lead_id) REFERENCES crm_leads (lead_id) ON UPDATE CASCADE ON DELETE RESTRICT,
+  CONSTRAINT fk_crm_activities_actor FOREIGN KEY (actor_user_id) REFERENCES app_users (user_id) ON UPDATE CASCADE ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

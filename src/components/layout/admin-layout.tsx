@@ -31,6 +31,12 @@ const navSections = [
     ],
   },
   {
+    title: 'CRM',
+    links: [
+      { label: 'Leads', href: '/crm/leads', icon: Users },
+    ],
+  },
+  {
     title: 'Factory',
       links: [
        { label: 'Overview', href: '/factory', icon: Box },

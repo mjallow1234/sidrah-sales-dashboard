@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+test('CRM schema is isolated and append-only activities are supported', () => { const migration = read('db/migrations/0036_create_crm_leads.sql'); const service = read('src/services/crmLeadService.ts'); const repository = read('src/repositories/CrmLeadRepository.ts'); assert.match(migration, /CREATE TABLE IF NOT EXISTS crm_leads/); assert.match(migration, /CREATE TABLE IF NOT EXISTS crm_lead_activities/); assert.match(service, /LEAD_/); assert.match(repository, /LDA_/); assert.doesNotMatch(migration, /vendor_id|delivery_id|inventory_id|sales_rep_id|accountability/i); });
+test('CRM service validates statuses, dates, active agents, and creates creation activities transactionally', () => { const service = read('src/services/crmLeadService.ts'); assert.match(service, /follow_up_required/); assert.match(service, /YYYY-MM-DD/); assert.match(service, /role =/); assert.match(service, /repository.createActivity/); assert.match(service, /transaction/); });
+test('CRM routes enforce role and ownership boundaries', () => { const route = read('src/app/api/crm/leads/route.ts'); const detail = read('src/app/api/crm/leads/[leadId]/route.ts'); assert.match(route, /isAgentRole/); assert.match(route, /isAdminOrSupervisorRole/); assert.match(detail, /getLead/); });

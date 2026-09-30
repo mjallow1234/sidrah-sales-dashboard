@@ -100,6 +100,7 @@ export const config = {
     '/deliveries/:path*',
     '/factory',
     '/factory/:path*',
+    '/crm/:path*',
     '/api/:path*',
   ],
 };

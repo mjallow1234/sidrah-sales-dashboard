@@ -51,6 +51,10 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     return false;
   }
 
+  if (pathname === '/crm' || pathname.startsWith('/crm/')) {
+    return isAgentRole(role) || isAdminOrSupervisorRole(role);
+  }
+
   if (pathname === '/factory/expenses' || pathname.startsWith('/factory/expenses/')) {
     return isAdminRole(role);
   }
@@ -125,6 +129,10 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
 export function canViewLink(role: string | undefined, href: string): boolean {
   if (!role) {
     return false;
+  }
+
+  if (href === '/crm' || href.startsWith('/crm/')) {
+    return isAgentRole(role) || isAdminOrSupervisorRole(role);
   }
 
   if (href === '/factory/expenses' || href.startsWith('/factory/expenses/')) {
