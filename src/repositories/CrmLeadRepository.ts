@@ -5,10 +5,11 @@ import { BaseRepository } from './BaseRepository';
 
 const mapDate = (value: unknown) => value instanceof Date ? value.toISOString().slice(0, 10) : value == null ? null : String(value).slice(0, 10);
 const mapDateTime = (value: unknown) => value instanceof Date ? value.toISOString() : value == null ? '' : String(value);
+const normalizeCrmParams = (params: Record<string, unknown>): Record<string, unknown> => Object.fromEntries(Object.entries(params).map(([key, value]) => [key, value === undefined ? null : value]));
 
 export class CrmLeadRepository extends BaseRepository {
   public async createLead(input: Omit<CrmLead, 'assigned_agent_name' | 'captured_by_name' | 'updated_by_name' | 'created_at' | 'updated_at'> & { created_at: string; updated_at: string }): Promise<CrmLead> {
-    await this.execute(`INSERT INTO crm_leads (lead_id, lead_name, phone, location, business_type, lead_source, assigned_agent_user_id, captured_by_user_id, captured_at, status, notes, next_follow_up_date, created_at, updated_at, updated_by_user_id) VALUES (:lead_id, :lead_name, :phone, :location, :business_type, :lead_source, :assigned_agent_user_id, :captured_by_user_id, :captured_at, :status, :notes, :next_follow_up_date, :created_at, :updated_at, :updated_by_user_id)`, input as any);
+    await this.execute(`INSERT INTO crm_leads (lead_id, lead_name, phone, location, business_type, lead_source, assigned_agent_user_id, captured_by_user_id, captured_at, status, notes, next_follow_up_date, created_at, updated_at, updated_by_user_id) VALUES (:lead_id, :lead_name, :phone, :location, :business_type, :lead_source, :assigned_agent_user_id, :captured_by_user_id, :captured_at, :status, :notes, :next_follow_up_date, :created_at, :updated_at, :updated_by_user_id)`, normalizeCrmParams(input as Record<string, unknown>));
     return this.findById(input.lead_id) as Promise<CrmLead>;
   }
 
@@ -35,14 +36,14 @@ export class CrmLeadRepository extends BaseRepository {
     const fields = Object.keys(updates).filter((key) => ['lead_name', 'phone', 'location', 'business_type', 'lead_source', 'assigned_agent_user_id', 'captured_at', 'status', 'notes', 'next_follow_up_date', 'updated_at', 'updated_by_user_id'].includes(key));
     if (fields.length) {
       const params: Record<string, unknown> = { lead_id: leadId, ...updates };
-      await this.execute(`UPDATE crm_leads SET ${fields.map((field) => `${field} = :${field}`).join(', ')} WHERE lead_id = :lead_id`, params);
+      await this.execute(`UPDATE crm_leads SET ${fields.map((field) => `${field} = :${field}`).join(', ')} WHERE lead_id = :lead_id`, normalizeCrmParams(params));
     }
     return this.findById(leadId);
   }
 
   public async createActivity(input: { lead_id: string; activity_type: string; activity_at: string; actor_user_id: string; note?: string | null; previous_status?: string | null; new_status?: string | null; follow_up_date?: string | null }): Promise<CrmLeadActivity> {
     const activityId = `LDA_${randomUUID().replace(/-/g, '').slice(0, 20)}`;
-    await this.execute(`INSERT INTO crm_lead_activities (activity_id, lead_id, activity_type, activity_at, actor_user_id, note, previous_status, new_status, follow_up_date) VALUES (:activity_id, :lead_id, :activity_type, :activity_at, :actor_user_id, :note, :previous_status, :new_status, :follow_up_date)`, { activity_id: activityId, ...input });
+    await this.execute(`INSERT INTO crm_lead_activities (activity_id, lead_id, activity_type, activity_at, actor_user_id, note, previous_status, new_status, follow_up_date) VALUES (:activity_id, :lead_id, :activity_type, :activity_at, :actor_user_id, :note, :previous_status, :new_status, :follow_up_date)`, normalizeCrmParams({ activity_id: activityId, ...input }));
     const [rows] = await this.execute<any[]>(`SELECT a.*, u.name AS actor_name FROM crm_lead_activities a JOIN app_users u ON u.user_id = a.actor_user_id WHERE a.activity_id = :activity_id`, { activity_id: activityId });
     return this.mapActivity(rows[0]);
   }
