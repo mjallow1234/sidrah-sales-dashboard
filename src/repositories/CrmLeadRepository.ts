@@ -42,6 +42,8 @@ export class CrmLeadRepository extends BaseRepository {
     if (filters.status) { conditions.push('l.status = :status'); params.status = filters.status; }
     if (filters.assignedAgentUserId) { conditions.push('l.assigned_agent_user_id = :assigned_agent'); params.assigned_agent = filters.assignedAgentUserId; }
     if (filters.search) { conditions.push('(l.lead_name LIKE :search OR l.phone LIKE :search OR l.location LIKE :search)'); params.search = `%${filters.search}%`; }
+    if (filters.businessType) { conditions.push('l.business_type LIKE :business_type'); params.business_type = `%${filters.businessType}%`; }
+    if (filters.location) { conditions.push('l.location LIKE :location'); params.location = `%${filters.location}%`; }
     if (filters.capturedFrom) { conditions.push('l.captured_at >= :captured_from'); params.captured_from = filters.capturedFrom; }
     if (filters.capturedTo) { conditions.push('l.captured_at <= :captured_to'); params.captured_to = filters.capturedTo; }
     if (filters.followUpDate) { conditions.push('l.next_follow_up_date = :follow_up_date'); params.follow_up_date = filters.followUpDate; }

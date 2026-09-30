@@ -40,6 +40,8 @@ export interface CrmLeadFilters {
   status?: CrmLeadStatus;
   assignedAgentUserId?: string;
   search?: string;
+  businessType?: string;
+  location?: string;
   capturedFrom?: string;
   capturedTo?: string;
   followUpDate?: string;
