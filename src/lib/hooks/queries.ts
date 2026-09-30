@@ -7,7 +7,7 @@ import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib
 import { getStats } from '@/lib/api/stats';
 import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
-import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, decideAccountabilityTransfer, getAccountabilityAgents, getAccountabilityTransfers, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getDeliveryUsers, initiateAccountabilityTransfer, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, updateDeliveryDate, updateDeliveryDetails, type DeliveryUserOption } from '@/lib/api/deliveries';
+import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, decideAccountabilityTransfer, getAccountabilityAgents, getAccountabilityTransfers, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getForemanDeliveryPreparationSummary, getDeliveryUsers, initiateAccountabilityTransfer, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, updateDeliveryDate, updateDeliveryDetails, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
 import { getAdminActivity } from '@/lib/api/adminActivity';
 import { getInventoryRecords, getInventoryByVendor, getVendorInventory, getVendorInventoryByVendorAndProduct, getVendorBalances, getVendorsOwing } from '@/lib/api/inventory';
@@ -596,6 +596,16 @@ export function useDeliveryPreparationSummaryQuery(enabled = true) {
   return useQuery<DeliveryPreparationSummary>({
     queryKey: ['deliveryPreparationSummary'],
     queryFn: getDeliveryPreparationSummary,
+    enabled,
+    staleTime: 60 * 1000,
+    refetchOnWindowFocus: false,
+  });
+}
+
+export function useForemanDeliveryPreparationSummaryQuery(enabled = true) {
+  return useQuery<DeliveryPreparationSummary>({
+    queryKey: ['foremanDeliveryPreparationSummary'],
+    queryFn: getForemanDeliveryPreparationSummary,
     enabled,
     staleTime: 60 * 1000,
     refetchOnWindowFocus: false,

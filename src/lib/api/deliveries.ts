@@ -41,6 +41,11 @@ export async function getDeliveryPreparationSummary(): Promise<DeliveryPreparati
   return result.data;
 }
 
+export async function getForemanDeliveryPreparationSummary(): Promise<DeliveryPreparationSummary> {
+  const result = await fetchJson<{ status: string; data: DeliveryPreparationSummary }>('/api/factory/delivery-preparations');
+  return result.data;
+}
+
 export async function getDelivery(deliveryId: string): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}`);
   return result.data;

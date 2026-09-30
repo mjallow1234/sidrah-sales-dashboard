@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useFactoryContainerInventoryQuery } from '@/lib/hooks/queries';
 import { FactoryInventorySummary } from './factory-inventory-summary';
+import { DeliveryPreparations } from './delivery-preparations';
 
 const labels: Record<string, string> = { gallon: 'Gallons', bucket_5l: '5L Buckets', bucket_1kg: '1kg Buckets' };
 
 export function FactoryOverview() {
   const containers = useFactoryContainerInventoryQuery();
   return <div className="space-y-6">
+    <DeliveryPreparations />
     <FactoryInventorySummary />
     <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft sm:p-6">
       <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Empty containers</p>
