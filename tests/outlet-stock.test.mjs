@@ -1,0 +1,9 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const read = (file) => fs.readFileSync(file, 'utf8');
+test('outlet stock migration is isolated and append-only', () => { const sql = read('db/migrations/0039_create_outlet_stock_receipts.sql'); assert.match(sql, /CREATE TABLE IF NOT EXISTS outlet_stock_receipts/); assert.match(sql, /REFERENCES outlets/); assert.match(sql, /REFERENCES products/); assert.doesNotMatch(sql, /vendor_balances|deliveries|inventory|accountability/i); });
+test('stock balance is sourced from receipts minus outlet sales', () => { const repo = read('src/repositories/OutletStockRepository.ts'); assert.match(repo, /SUM\(quantity_received\)/); assert.match(repo, /SUM\(i\.quantity\)/); assert.match(repo, /current_stock/); assert.match(repo, /outlet_sales/); });
+test('stock receipt API is admin-only and validates positive quantity', () => { const service = read('src/services/outletStockService.ts'); const route = read('src/app/api/outlets/[outletId]/stock/route.ts'); assert.match(route, /isAdminRole/); assert.match(service, /quantity_received must be greater than zero/); assert.match(service, /Product does not exist/); assert.match(service, /outlet\.active/); });
+test('outlet detail exposes stock, receipt history and negative discrepancy state', () => { const ui = read('src/components/outlets/outlet-detail.tsx'); assert.match(ui, /Current Stock/); assert.match(ui, /Stock Received History/); assert.match(ui, /discrepancy/); });
+test('outlet stock is rendered as read-only responsive product cards', () => { const ui = read('src/components/outlets/outlet-detail.tsx'); assert.match(ui, /<article key=\{row\.product_id\}/); assert.match(ui, /text-4xl font-bold/); assert.match(ui, /Received/); assert.match(ui, /Sold/); });

@@ -18,6 +18,8 @@ import {
   UserPlus,
   Users,
   X,
+  FilePlus2,
+  Store,
 } from 'lucide-react';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { canViewLink } from '@/lib/authorization';
@@ -34,6 +36,18 @@ const navSections = [
     title: 'CRM',
     links: [
       { label: 'Leads', href: '/crm/leads', icon: Users },
+    ],
+  },
+  {
+    title: 'Forms',
+    links: [
+      { label: 'Form Builder', href: '/forms', icon: FilePlus2 },
+    ],
+  },
+  {
+    title: 'Outlets',
+    links: [
+      { label: 'Outlet sales', href: '/outlets', icon: Store },
     ],
   },
   {

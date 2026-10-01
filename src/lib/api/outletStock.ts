@@ -1,0 +1,4 @@
+import type { OutletStockBalance, OutletStockReceipt } from '@/lib/types/outlet-stock';
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> { const response = await fetch(path, options); const json = await response.json(); if (!response.ok || json.status === 'error') throw new Error(json.message || `Request failed: ${response.status}`); return json.data as T; }
+export const getOutletStock = (outletId: string) => request<{ balances: OutletStockBalance[]; receipts: OutletStockReceipt[] }>(`/api/outlets/${encodeURIComponent(outletId)}/stock`);
+export const createOutletStockReceipt = (outletId: string, payload: Record<string, unknown>) => request<OutletStockReceipt>(`/api/outlets/${encodeURIComponent(outletId)}/stock`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });

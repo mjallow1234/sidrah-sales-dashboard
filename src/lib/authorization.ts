@@ -54,6 +54,12 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
   if (pathname === '/crm' || pathname.startsWith('/crm/')) {
     return isAgentRole(role) || isAdminOrSupervisorRole(role);
   }
+  if (pathname === '/forms' || pathname.startsWith('/forms/')) {
+    return isAdminRole(role);
+  }
+  if (pathname === '/outlets' || pathname.startsWith('/outlets/')) {
+    return isAdminRole(role);
+  }
 
   if (pathname === '/factory/expenses' || pathname.startsWith('/factory/expenses/')) {
     return isAdminRole(role);
@@ -133,6 +139,12 @@ export function canViewLink(role: string | undefined, href: string): boolean {
 
   if (href === '/crm' || href.startsWith('/crm/')) {
     return isAgentRole(role) || isAdminOrSupervisorRole(role);
+  }
+  if (href === '/forms' || href.startsWith('/forms/')) {
+    return isAdminRole(role);
+  }
+  if (href === '/outlets' || href.startsWith('/outlets/')) {
+    return isAdminRole(role);
   }
 
   if (href === '/factory/expenses' || href.startsWith('/factory/expenses/')) {
