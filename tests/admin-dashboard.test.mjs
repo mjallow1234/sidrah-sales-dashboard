@@ -87,6 +87,8 @@ test('dashboard filters are explicit and preserve current-state versus period se
   assert.match(ui, /Current-state cards stay current/);
   assert.match(repository, /vendorConditions/);
   assert.match(repository, /visitConditions/);
+  assert.match(ui, /Reset Filters/);
+  assert.match(ui, /startDate: '', endDate: '', productId: '', location: '', salesRepId: ''/);
 });
 
 test('management UI avoids completed-sales and revenue terminology for supply metrics', () => {

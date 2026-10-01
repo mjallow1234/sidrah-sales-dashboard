@@ -24,6 +24,12 @@ test('destination pages consume dashboard filters', () => {
   assert.match(read('src/lib/hooks/queries.ts'), /effectiveFilters = filters/);
 });
 
+test('sales activity vendor names link by vendor id', () => {
+  const ui = read('src/components/dashboard/admin-control-center.tsx');
+  assert.match(ui, /vendors\/\$\{row\.vendor_id\}/);
+  assert.match(ui, /row\.vendor_name \|\| row\.vendor_id/);
+});
+
 test('destination APIs apply the missing scopes', () => {
   assert.match(read('src/app/api/vendors/route.ts'), /COALESCE\(NULLIF\(TRIM\(v\.location\)/);
   assert.match(read('src/app/api/products/route.ts'), /product_id = :product_id/);

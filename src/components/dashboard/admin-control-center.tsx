@@ -94,7 +94,7 @@ function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void 
     body = spec.rows?.length ? <div className="space-y-2">{spec.rows.map((row) => { const content = <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-sidrah-300"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{row.label}</p><p className="font-semibold text-slate-800">{row.value}</p></div>{row.detail ? <p className="mt-1 text-sm text-slate-600">{row.detail}</p> : null}</div>; return row.href ? <Link key={`${row.label}-${row.detail}`} href={row.href} className="block">{content}</Link> : <div key={`${row.label}-${row.detail}`}>{content}</div>; })}</div> : <EmptyState text="No records contribute to this dashboard value." />;
   } else if (spec.kind === 'transactions') {
     const rows = (transactions.data ?? []).filter((row) => spec.transactionMetric === 'cash' ? row.cash_collected > 0 : row.stock_added > 0);
-    body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{row.vendor_name || row.vendor_id}</p><p className="font-semibold text-slate-800">{spec.transactionMetric === 'cash' ? formatCurrency(row.cash_collected) : spec.transactionMetric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p></div><p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No matching visit records." />;
+    body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p><p className="font-semibold text-slate-800">{spec.transactionMetric === 'cash' ? formatCurrency(row.cash_collected) : spec.transactionMetric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p></div><p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No matching visit records." />;
   } else if (spec.kind === 'vendors') {
     const balanceMap = new Map((balances.data ?? []).map((row: VendorBalance) => [row.vendor_id, Number(row.balance_owed) || 0]));
     const rows = (vendors.data?.data.items ?? []).filter((row: Vendor) => spec.vendorBalanceFilter === 'owing' ? (balanceMap.get(row.vendor_id) ?? 0) > 0 : true);
@@ -308,6 +308,12 @@ export function AdminControlCenter() {
     setFilters((current) => ({ ...current, [key]: value || undefined }));
   }
 
+  const hasAppliedFilters = Boolean(filters.startDate)
+    || Boolean(filters.endDate)
+    || Boolean(filters.productId)
+    || Boolean(filters.location)
+    || Boolean(filters.salesRepId);
+
   const periodFilters = { startDate: filters.startDate, endDate: filters.endDate, productId: filters.productId, location: filters.location, salesRepId: filters.salesRepId };
   const openTransactions = (title: string, value: string, transactionMetric: 'cash' | 'quantity' | 'value', extra?: Partial<AdminDashboardFilters>) => setDetail({ title, value, kind: 'transactions', filters: { ...periodFilters, ...extra }, transactionMetric });
   const openSummary = (title: string, value: string, rows: DetailRow[]) => setDetail({ title, value, kind: 'summary', rows });
@@ -351,6 +357,7 @@ export function AdminControlCenter() {
             <label className="block text-sm text-slate-700">Location<select value={filters.location ?? ''} onChange={(event) => updateFilter('location', event.target.value)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"><option value="">All locations</option>{summary?.filterOptions.locations.map((location) => <option key={location} value={location}>{location}</option>)}</select></label>
             <label className="block text-sm text-slate-700">Sales Representative<select value={filters.salesRepId ?? ''} onChange={(event) => updateFilter('salesRepId', event.target.value)} className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"><option value="">All sales reps</option>{salesReps.map((rep) => <option key={rep.sales_rep_id} value={rep.sales_rep_id}>{rep.name}</option>)}</select></label>
           </div>
+          <button type="button" onClick={() => setFilters({ startDate: '', endDate: '', productId: '', location: '', salesRepId: '' })} disabled={!hasAppliedFilters} className="mt-4 rounded-3xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-50">Reset Filters</button>
           <p className="mt-4 text-xs leading-5 text-slate-500">Current-state cards stay current; date range controls selected-period activity and trends.</p>
         </Panel>
 
