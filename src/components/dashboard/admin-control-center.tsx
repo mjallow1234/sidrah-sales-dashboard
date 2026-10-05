@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Boxes, Factory, Package, Users } from 'lucide-react';
 import { useDeliveriesQuery, useFactoryInventoryQuery, useFactoryMovementsQuery, usePaginatedVendorsQuery, useProductsQuery, useSalesRepsQuery, useTransactionsQuery } from '@/lib/hooks/queries';
@@ -46,6 +47,33 @@ function defaultFilters(): AdminDashboardFilters {
     startDate: formatDate(start),
     endDate: formatDate(end),
   };
+}
+
+const dashboardFilterKeys = ['startDate', 'endDate', 'productId', 'location', 'salesRepId'] as const;
+
+function validDateParam(value: string | null) {
+  return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : undefined;
+}
+
+function filtersFromSearchParams(searchParams: { get(name: string): string | null }): AdminDashboardFilters {
+  const defaults = defaultFilters();
+  return {
+    startDate: validDateParam(searchParams.get('startDate')) ?? defaults.startDate,
+    endDate: validDateParam(searchParams.get('endDate')) ?? defaults.endDate,
+    productId: searchParams.get('productId') || undefined,
+    location: searchParams.get('location') || undefined,
+    salesRepId: searchParams.get('salesRepId') || undefined,
+  };
+}
+
+function dashboardSearchParams(filters: AdminDashboardFilters, current: string) {
+  const params = new URLSearchParams(current);
+  dashboardFilterKeys.forEach((key) => params.delete(key));
+  dashboardFilterKeys.forEach((key) => {
+    const value = filters[key];
+    if (value) params.set(key, value);
+  });
+  return params;
 }
 
 function formatNumber(value: number) {
@@ -275,7 +303,9 @@ function SalesRepActivity({ rows, onSelect }: { rows: AdminDashboardSalesRepRow[
 }
 
 export function AdminControlCenter() {
-  const [filters, setFilters] = useState<AdminDashboardFilters>(() => defaultFilters());
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [filters, setFilters] = useState<AdminDashboardFilters>(() => filtersFromSearchParams(searchParams));
   const [detail, setDetail] = useState<DetailSpec | null>(null);
   const [trendMetric, setTrendMetric] = useState<AdminDashboardTrendMetric>('cash_collected');
   const [locationMetric, setLocationMetric] = useState<LocationMetric>('suppliedQuantity');
@@ -284,6 +314,14 @@ export function AdminControlCenter() {
   const { data: salesReps = [] } = useSalesRepsQuery();
   const summaryQuery = useAdminDashboardSummaryQuery(filters);
   const summary = summaryQuery.data;
+
+  useEffect(() => {
+    const next = dashboardSearchParams(filters, searchParams.toString());
+    if (next.toString() !== searchParams.toString()) {
+      const query = next.toString();
+      router.replace(query ? `/dashboard?${query}` : '/dashboard', { scroll: false });
+    }
+  }, [filters, router, searchParams]);
 
   const locationMetricOptions = useMemo(() => [
     { id: 'suppliedQuantity' as const, label: 'Supplied Quantity' },
