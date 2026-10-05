@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { useAuthQuery, useDeliveriesQuery, useDeliveryPreparationSummaryQuery } from '@/lib/hooks/queries';
 import { useDeliveryPaymentSummaryQuery } from '@/lib/hooks/deliveryPaymentQueries';
@@ -24,21 +25,42 @@ function businessToday() {
 }
 
 export function DeliveryList() {
-  const [status, setStatus] = useState('pending,ongoing');
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const [defaultStatus] = useState('pending,ongoing');
+  const hasStatusParam = searchParams.has('status');
+  const status = hasStatusParam ? searchParams.get('status') ?? '' : defaultStatus;
+  const productId = searchParams.get('productId') || undefined;
+  const unassigned = searchParams.get('unassigned') === 'true';
+  const vendor = searchParams.get('vendor') || '';
+  const location = searchParams.get('location') || '';
+  const dateDelivered = searchParams.get('dateDelivered') || '';
   const [showPaymentBreakdown, setShowPaymentBreakdown] = useState(false);
   const [selectedPaymentDate, setSelectedPaymentDate] = useState(businessToday);
   const [paymentLocation, setPaymentLocation] = useState('');
   const [paymentVendorSearch, setPaymentVendorSearch] = useState('');
-  const { data: deliveries = [], isLoading, isError } = useDeliveriesQuery(status ? { status } : undefined);
+  const { data: deliveries = [], isLoading, isError } = useDeliveriesQuery({ status, productId, unassigned, vendor: vendor || undefined, location: location || undefined, dateDelivered: dateDelivered || undefined });
   const { data: auth, isLoading: authLoading } = useAuthQuery();
 
   const rows = useMemo(() => deliveries, [deliveries]);
+  const vendorOptions = useMemo(() => Array.from(new Set(rows.map((delivery) => delivery.customer_name).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [rows]);
+  const locationOptions = useMemo(() => Array.from(new Set(rows.map((delivery) => delivery.delivery_address).filter(Boolean))).sort((a, b) => a.localeCompare(b)), [rows]);
+  const visibleVendorOptions = vendor && !vendorOptions.includes(vendor) ? [vendor, ...vendorOptions] : vendorOptions;
+  const visibleLocationOptions = location && !locationOptions.includes(location) ? [location, ...locationOptions] : locationOptions;
   const canCreateDelivery = !authLoading && auth?.role !== 'delivery';
   const canViewPreparationSummary = auth?.role === 'admin' || auth?.role === 'super_admin' || auth?.role === 'supervisor';
   const trackingQuery = useDeliveryTrackingQuery(canViewPreparationSummary);
   const preparationSummary = useDeliveryPreparationSummaryQuery(canViewPreparationSummary);
   const paymentSummary = useDeliveryPaymentSummaryQuery({ date: selectedPaymentDate, location: paymentLocation || undefined, vendor: paymentVendorSearch || undefined }, canViewPreparationSummary);
   const emptyStateTitle = auth?.role === 'delivery' ? 'Currently no delivery requests available.' : 'No deliveries yet.';
+
+  function replaceFilter(key: string, value: string, preserveEmpty = false) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (value || preserveEmpty) params.set(key, value);
+    else params.delete(key);
+    const query = params.toString();
+    router.replace(query ? `/deliveries?${query}` : '/deliveries', { scroll: false });
+  }
 
   if (isLoading) {
     return <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-600">Loading deliveries…</div>;
@@ -60,7 +82,7 @@ export function DeliveryList() {
             Status
             <select
               value={status}
-              onChange={(event) => setStatus(event.target.value)}
+              onChange={(event) => replaceFilter('status', event.target.value, true)}
               className="mt-2 block rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
             >
               {statusOptions.map((option) => (
@@ -69,7 +91,25 @@ export function DeliveryList() {
                 </option>
               ))}
             </select>
-          </label>
+            </label>
+            <label className="text-sm text-slate-700">
+              Vendor
+              <select value={vendor} onChange={(event) => replaceFilter('vendor', event.target.value)} className="mt-2 block max-w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
+                <option value="">All vendors</option>
+                {visibleVendorOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="text-sm text-slate-700">
+              Location
+              <select value={location} onChange={(event) => replaceFilter('location', event.target.value)} className="mt-2 block max-w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none">
+                <option value="">All locations</option>
+                {visibleLocationOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+              </select>
+            </label>
+            <label className="text-sm text-slate-700">
+              Date Delivered
+              <input type="date" value={dateDelivered} onChange={(event) => replaceFilter('dateDelivered', event.target.value)} className="mt-2 block rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none" />
+            </label>
           {canCreateDelivery && (
             <Link href="/deliveries/new" className="inline-flex items-center justify-center rounded-3xl bg-sidrah-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-sidrah-600">
               New delivery request

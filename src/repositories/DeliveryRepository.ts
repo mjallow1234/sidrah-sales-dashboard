@@ -27,6 +27,11 @@ export interface CreateDeliveryPayload {
 export interface DeliverySearchFilters {
   status?: DeliveryStatus | DeliveryStatus[];
   deliveryUserId?: string;
+  productId?: string;
+  unassigned?: boolean;
+  vendor?: string;
+  location?: string;
+  deliveredDate?: string;
 }
 
 export interface DeliveryActivityPayload {
@@ -180,6 +185,25 @@ export class DeliveryRepository extends BaseRepository {
       params.deliveryUserId = filters.deliveryUserId;
     } else if (statuses.length > 0) {
       conditions.push(statusCondition);
+    }
+    if (filters.productId) {
+      conditions.push(`JSON_CONTAINS(d.items, JSON_OBJECT('product_id', :productId), '$')`);
+      params.productId = filters.productId;
+    }
+    if (filters.unassigned) {
+      conditions.push("d.status = 'pending' AND d.claimed_by IS NULL");
+    }
+    if (filters.vendor) {
+      conditions.push('(d.vendor_id = :vendor OR d.customer_name = :vendor)');
+      params.vendor = filters.vendor;
+    }
+    if (filters.location) {
+      conditions.push('d.delivery_address = :deliveryLocation');
+      params.deliveryLocation = filters.location;
+    }
+    if (filters.deliveredDate) {
+      conditions.push('DATE(d.delivered_at) = :deliveredDate');
+      params.deliveredDate = filters.deliveredDate;
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';

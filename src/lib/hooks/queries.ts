@@ -245,7 +245,7 @@ export function useSalesRepsQuery(enabled = true) {
   });
 }
 
-export function useDeliveriesQuery(filters?: { status?: string; productId?: string; unassigned?: boolean }, enabled = true) {
+export function useDeliveriesQuery(filters?: { status?: string; productId?: string; unassigned?: boolean; vendor?: string; location?: string; dateDelivered?: string }, enabled = true) {
   return useQuery<DeliveryRecord[]>({
     queryKey: ['deliveries', filters],
     queryFn: () => getDeliveries(filters),

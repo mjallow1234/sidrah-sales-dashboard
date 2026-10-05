@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { DeliveryRecord } from '@/lib/types';
 import { useDeliveryPaymentsQuery } from '@/lib/hooks/deliveryPaymentQueries';
 import { DeliveryNavigationActions } from './delivery-navigation-actions';
@@ -33,15 +34,23 @@ function formatRequestedAt(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
+function formatDeliveredAt(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { dateStyle: 'medium' });
+}
+
 export function DeliveryCard({ delivery, showNavigation = false }: { delivery: DeliveryRecord; showNavigation?: boolean }) {
   const [showAllProducts, setShowAllProducts] = useState(false);
+  const searchParams = useSearchParams();
   const paymentsQuery = useDeliveryPaymentsQuery(delivery.delivery_id);
   const visibleItems = showAllProducts ? delivery.items : delivery.items.slice(0, 3);
   const hasMoreItems = delivery.items.length > visibleItems.length;
+  const detailPath = `/deliveries/${delivery.delivery_id}`;
+  const detailHref = searchParams.toString() ? `${detailPath}?${searchParams.toString()}` : detailPath;
 
   return (
     <article className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-soft transition hover:border-sidrah-200 hover:shadow-md">
-      <Link href={`/deliveries/${delivery.delivery_id}`} className="block flex-1 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500 focus-visible:ring-offset-2">
+      <Link href={detailHref} className="block flex-1 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500 focus-visible:ring-offset-2">
         <div className="flex items-start justify-between gap-3">
           <h2 className="min-w-0 break-words text-lg font-semibold text-slate-900">{delivery.customer_name}</h2>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${statusClassNames[delivery.status]}`}>
@@ -81,6 +90,10 @@ export function DeliveryCard({ delivery, showNavigation = false }: { delivery: D
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Delivery Date</p>
               <p className="mt-1 break-words text-slate-800">{formatDateOnly(delivery.delivery_date)}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Date Delivered</p>
+              <p className="mt-1 break-words text-slate-800">{delivery.delivered_at ? formatDeliveredAt(delivery.delivered_at) : '—'}</p>
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Requested</p>

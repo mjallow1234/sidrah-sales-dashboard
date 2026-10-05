@@ -181,7 +181,7 @@ export async function updateDeliveryDetails(deliveryId: string, deliveryDateValu
   return transaction(async (connection) => new DeliveryRepository(connection).updateDeliveryDetails(deliveryId, deliveryDate, cookingLocation, actingUserId));
 }
 
-export async function getDeliveries(status?: DeliveryStatus | DeliveryStatus[], deliveryUserId?: string): Promise<DeliveryRecord[]> {
+export async function getDeliveries(status?: DeliveryStatus | DeliveryStatus[], deliveryUserId?: string, productId?: string, unassigned = false, vendor?: string, location?: string, deliveredDate?: string): Promise<DeliveryRecord[]> {
   const repository = new DeliveryRepository(getPool());
   const filters: DeliverySearchFilters = {};
   if (status) {
@@ -190,6 +190,11 @@ export async function getDeliveries(status?: DeliveryStatus | DeliveryStatus[], 
   if (deliveryUserId) {
     filters.deliveryUserId = deliveryUserId;
   }
+  if (productId) filters.productId = productId;
+  if (unassigned) filters.unassigned = true;
+  if (vendor) filters.vendor = vendor;
+  if (location) filters.location = location;
+  if (deliveredDate) filters.deliveredDate = deliveredDate;
   return repository.findAll(filters);
 }
 

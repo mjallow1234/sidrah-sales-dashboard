@@ -24,7 +24,7 @@ export interface DeliveryUserOption {
   username: string;
 }
 
-export async function getDeliveries(params?: { status?: string }): Promise<DeliveryRecord[]> {
+export async function getDeliveries(params?: { status?: string; productId?: string; unassigned?: boolean; vendor?: string; location?: string; dateDelivered?: string }): Promise<DeliveryRecord[]> {
   const query = params
     ? Object.entries(params)
         .filter(([, value]) => value !== undefined && value !== null && value !== '')
