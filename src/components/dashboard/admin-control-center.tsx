@@ -15,7 +15,7 @@ import type {
   AdminDashboardTrendMetric,
   AdminDashboardTrendPoint,
 } from '@/lib/types/admin-dashboard';
-import type { DeliveryRecord, FactoryInventory, FactoryStockMovement, Vendor, VendorBalance } from '@/lib/types';
+import type { DeliveryRecord, FactoryInventory, FactoryStockMovement, Transaction, Vendor, VendorBalance } from '@/lib/types';
 
 type LocationMetric = 'suppliedQuantity' | 'cashCollected' | 'activeVendors';
 type ProductMetric = 'suppliedQuantity' | 'cashCollected' | 'suppliedValue';
@@ -108,6 +108,27 @@ function ModalShell({ title, value, onClose, children }: { title: string; value:
   );
 }
 
+function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?: 'cash' | 'quantity' | 'value' }) {
+  const filteredRows = rows.filter((row) => metric === 'cash' ? row.cash_collected > 0 : row.stock_added > 0);
+  if (filteredRows.length === 0) return <EmptyState text="No matching visit records." />;
+  return <div className="space-y-2">{filteredRows.map((row) => {
+    const reversed = Boolean(row.is_reversed);
+    return <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p>
+        <p className="font-semibold text-slate-800">{metric === 'cash' ? formatCurrency(row.cash_collected) : metric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p>
+      </div>
+      <p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p>
+      <div className="mt-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
+      {reversed ? <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
+        <p><span className="font-semibold text-slate-700">Reversed by:</span> {row.reversed_by_name || 'Reversing user unavailable'}</p>
+        <p><span className="font-semibold text-slate-700">Reversal timestamp:</span> {row.reversed_at || 'Not available'}</p>
+        <p><span className="font-semibold text-slate-700">Reversal reason:</span> {row.reversal_reason || 'No reason recorded.'}</p>
+      </div> : null}
+    </div>;
+  })}</div>;
+}
+
 function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void }) {
   const transactionFilters = spec.filters ? { startDate: spec.filters.startDate, endDate: spec.filters.endDate, productId: spec.filters.productId, market: spec.filters.location, salesRepId: spec.filters.salesRepId } : undefined;
   const transactions = useTransactionsQuery(transactionFilters, spec.kind === 'transactions');
@@ -118,9 +139,11 @@ function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void 
   const movements = useFactoryMovementsQuery({ startDate: spec.filters?.startDate, endDate: spec.filters?.endDate, productId: spec.productId, movementType: spec.movementType }, spec.kind === 'movements');
 
   let body: React.ReactNode;
-  if (spec.kind === 'summary') {
+  if (spec.kind === 'transactions') {
+    body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : <TransactionDetailRows rows={transactions.data ?? []} metric={spec.transactionMetric} />;
+  } else if (spec.kind === 'summary') {
     body = spec.rows?.length ? <div className="space-y-2">{spec.rows.map((row) => { const content = <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-sidrah-300"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{row.label}</p><p className="font-semibold text-slate-800">{row.value}</p></div>{row.detail ? <p className="mt-1 text-sm text-slate-600">{row.detail}</p> : null}</div>; return row.href ? <Link key={`${row.label}-${row.detail}`} href={row.href} className="block">{content}</Link> : <div key={`${row.label}-${row.detail}`}>{content}</div>; })}</div> : <EmptyState text="No records contribute to this dashboard value." />;
-  } else if (spec.kind === 'transactions') {
+  } else if (false) {
     const rows = (transactions.data ?? []).filter((row) => spec.transactionMetric === 'cash' ? row.cash_collected > 0 : row.stock_added > 0);
     body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p><p className="font-semibold text-slate-800">{spec.transactionMetric === 'cash' ? formatCurrency(row.cash_collected) : spec.transactionMetric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p></div><p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No matching visit records." />;
   } else if (spec.kind === 'vendors') {
