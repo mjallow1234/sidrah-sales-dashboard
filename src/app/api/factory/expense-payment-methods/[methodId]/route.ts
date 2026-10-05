@@ -2,10 +2,11 @@ import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminRole } from '@/lib/authorization';
 import { editPaymentMethod, FactoryExpenseError } from '@/services/factoryExpenseService';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 
 export async function PATCH(request: NextRequest, context: { params: Promise<{ methodId: string }> }) {
-  const session = await getVerifiedSession(request);
-  if (!session) return unauthorizedResponse();
+  const session = await requirePermission(request, 'factory.expenses.manage');
+  if (session instanceof Response) return session;
   if (!isAdminRole(session.role)) return forbiddenResponse();
   try {
     const { methodId } = await context.params;

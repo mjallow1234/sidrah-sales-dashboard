@@ -2,12 +2,11 @@ import type { NextRequest } from 'next/server';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { getDeliveryPreparationSummary } from '@/services/deliveryService';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'deliveries.view');
+  if (session instanceof Response) return session;
   if (!isAdminOrSupervisorRole(session.role)) {
     return forbiddenResponse();
   }

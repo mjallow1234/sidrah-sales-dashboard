@@ -3,6 +3,7 @@ import { getPool } from '@/lib/db';
 import { updateVendor } from '@/services/vendorService';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAgentRole, isAdminOrSupervisorRole } from '@/lib/authorization';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 import type { Vendor } from '@/lib/types';
 
 function getIdFromUrl(request: NextRequest) {
@@ -54,10 +55,8 @@ function mapVendorRow(row: any): Vendor {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'vendors.view');
+  if (session instanceof Response) return session;
 
   try {
     const id = getIdFromUrl(request);
@@ -89,10 +88,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function PUT(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'vendors.edit');
+  if (session instanceof Response) return session;
   if (!isAdminOrSupervisorRole(session.role)) {
     return forbiddenResponse();
   }

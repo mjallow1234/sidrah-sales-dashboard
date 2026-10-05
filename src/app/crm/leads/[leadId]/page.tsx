@@ -1,4 +1,4 @@
-'use client';
-import { useParams } from 'next/navigation';
-import { LeadDetail } from '@/components/crm/lead-detail';
-export default function CrmLeadDetailPage() { const params = useParams<{ leadId: string }>(); return <main className="mx-auto max-w-3xl"><LeadDetail leadId={params.leadId} /></main>; }
+import { notFound } from 'next/navigation';
+import { getPagePermission } from '@/lib/server/pagePermissionEvaluator';
+import { CrmLeadDetailClient } from '@/components/crm/lead-detail-client';
+export default async function CrmLeadDetailPage() { if (!(await getPagePermission('crm.view'))) notFound(); return <CrmLeadDetailClient />; }

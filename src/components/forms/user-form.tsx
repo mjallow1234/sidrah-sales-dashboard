@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { NotificationBanner } from '@/components/ui/notification';
-import { useCreateAppUserMutation, useUpdateAppUserMutation } from '@/lib/hooks/userQueries';
+import { useCreateAppUserMutation, useSaveUserPermissionsMutation, useUpdateAppUserMutation } from '@/lib/hooks/userQueries';
+import { UserPermissionsPanel } from '@/components/forms/user-permissions-panel';
 import type { AppUser } from '@/lib/types';
+import { useAuthQuery } from '@/lib/hooks/queries';
 
 const userSchema = z.object({
   email: z.string().email('Email is required'),
@@ -34,6 +36,13 @@ export function UserForm({ initialValues, userId, onSuccess }: UserFormProps) {
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const createMutation = useCreateAppUserMutation();
   const updateMutation = useUpdateAppUserMutation();
+  const savePermissionsMutation = useSaveUserPermissionsMutation();
+  const auth = useAuthQuery();
+  const canSavePermissions = (!userId || auth.data?.userId !== userId) && (auth.data?.role === 'super_admin' || formState.role !== 'super_admin');
+  const [permissionOverrides, setPermissionOverrides] = useState<Array<{ permission_key: string; effect: 'deny' }>>([]);
+  const handlePermissionOverrides = useCallback((overrides: Array<{ permission_key: string; effect: 'deny' }>) => {
+    setPermissionOverrides(overrides);
+  }, []);
 
   const validate = () => {
     const validation = userSchema.safeParse(formState);
@@ -77,9 +86,12 @@ export function UserForm({ initialValues, userId, onSuccess }: UserFormProps) {
 
       if (userId) {
         await updateMutation.mutateAsync({ id: userId, payload });
+        if (canSavePermissions) await savePermissionsMutation.mutateAsync({ userId, overrides: permissionOverrides });
         setNotification({ type: 'success', message: 'User updated successfully' });
       } else {
-        await createMutation.mutateAsync(payload);
+        const result = await createMutation.mutateAsync(payload) as unknown as { data?: { user_id?: string } };
+        const createdUserId = result?.data?.user_id;
+        if (createdUserId && canSavePermissions) await savePermissionsMutation.mutateAsync({ userId: createdUserId, overrides: permissionOverrides });
         setNotification({ type: 'success', message: 'User created successfully' });
         setFormState({ email: '', phone: '', name: '', role: 'agent', status: 'active', password: '' });
       }
@@ -176,7 +188,9 @@ export function UserForm({ initialValues, userId, onSuccess }: UserFormProps) {
         </label>
       </div>
 
-      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending}>
+      <UserPermissionsPanel role={formState.role} userId={userId} onOverridesChange={handlePermissionOverrides} />
+
+      <Button type="submit" className="w-full" disabled={createMutation.isPending || updateMutation.isPending || savePermissionsMutation.isPending}>
         {userId ? (updateMutation.isPending ? 'Updating…' : 'Update User') : (createMutation.isPending ? 'Creating…' : 'Create User')}
       </Button>
     </form>

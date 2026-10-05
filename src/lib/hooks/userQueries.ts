@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AppUser } from '@/lib/types';
+import type { PermissionCatalogEntry, UserPermissionView } from '@/lib/types/permissions';
 
 async function fetchAppUsers() {
   return fetch('/api/appusers').then(async (res) => {
@@ -59,6 +60,39 @@ export function useAppUsersQuery(enabled = true) {
   });
 }
 
+async function fetchPermissionCatalog(role: string) {
+  return fetch(`/api/permissions/catalog?role=${encodeURIComponent(role)}`).then(async (res) => {
+    if (!res.ok) throw new Error('Unable to load permission catalog');
+    const json = await res.json();
+    return json.data?.permissions as PermissionCatalogEntry[];
+  });
+}
+
+async function fetchUserPermissions(userId: string) {
+  return fetch(`/api/users/${encodeURIComponent(userId)}/permissions`).then(async (res) => {
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new Error(json?.message || 'Unable to load user permissions');
+    }
+    const json = await res.json();
+    return json.data as UserPermissionView;
+  });
+}
+
+async function saveUserPermissions(userId: string, overrides: Array<{ permission_key: string; effect: 'allow' | 'deny'; reason?: string | null }>) {
+  return fetch(`/api/users/${encodeURIComponent(userId)}/permissions`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ overrides }),
+  }).then(async (res) => {
+    if (!res.ok) {
+      const json = await res.json().catch(() => null);
+      throw new Error(json?.message || 'Unable to save user permissions');
+    }
+    return res.json();
+  });
+}
+
 export function useAppUserQuery(userId: string) {
   return useQuery<AppUser>({
     queryKey: ['appUser', userId],
@@ -85,5 +119,45 @@ export function useUpdateAppUserMutation() {
       queryClient.invalidateQueries({ queryKey: ['appUsers'] });
       queryClient.invalidateQueries({ queryKey: ['appUser', variables.id] });
     },
+  });
+}
+
+export function usePermissionCatalogQuery(role: string, enabled = true) {
+  return useQuery<PermissionCatalogEntry[]>({
+    queryKey: ['permissionCatalog', role],
+    queryFn: () => fetchPermissionCatalog(role),
+    enabled: enabled && !!role,
+  });
+}
+
+export function useUserPermissionsQuery(userId: string, enabled = true) {
+  return useQuery<UserPermissionView>({
+    queryKey: ['userPermissions', userId],
+    queryFn: () => fetchUserPermissions(userId),
+    enabled: enabled && !!userId,
+  });
+}
+
+export function useSaveUserPermissionsMutation() {
+  const queryClient = useQueryClient();
+  return useMutation<unknown, Error, { userId: string; overrides: Array<{ permission_key: string; effect: 'allow' | 'deny'; reason?: string | null }> }>({
+    mutationFn: ({ userId, overrides }) => saveUserPermissions(userId, overrides),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['userPermissions', variables.userId] });
+    },
+  });
+}
+
+export function useEffectivePermissionQuery(permissionKey: string, enabled = true) {
+  return useQuery<boolean>({
+    queryKey: ['effectivePermission', permissionKey],
+    queryFn: async () => {
+      const response = await fetch(`/api/permissions/me?permissionKey=${encodeURIComponent(permissionKey)}`);
+      if (!response.ok) return false;
+      const json = await response.json();
+      return Boolean(json.data?.allowed);
+    },
+    enabled,
+    staleTime: 60 * 1000,
   });
 }

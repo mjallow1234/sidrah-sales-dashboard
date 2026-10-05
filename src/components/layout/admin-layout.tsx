@@ -24,6 +24,7 @@ import {
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { canViewLink } from '@/lib/authorization';
 import { useAuthQuery } from '@/lib/hooks/queries';
+import { useEffectivePermissionQuery } from '@/lib/hooks/userQueries';
 
 const navSections = [
   {
@@ -144,6 +145,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const [userName, setUserName] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<string | null>(null);
   const authQuery = useAuthQuery();
+  const vendorsPermission = useEffectivePermissionQuery('vendors.view', !!authQuery.data?.userId);
+  const deliveriesPermission = useEffectivePermissionQuery('deliveries.view', !!authQuery.data?.userId);
+  const factoryPermission = useEffectivePermissionQuery('factory.view', !!authQuery.data?.userId);
+  const crmPermission = useEffectivePermissionQuery('crm.view', !!authQuery.data?.userId);
+  const outletsPermission = useEffectivePermissionQuery('outlets.view', !!authQuery.data?.userId);
+  const accountabilityPermission = useEffectivePermissionQuery('accountability.view', !!authQuery.data?.userId);
 
   const showAdminShell = pathname !== '/' && pathname !== '/login';
 
@@ -184,10 +191,16 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       navSections
         .map((section) => ({
           ...section,
-          links: section.links.filter((item) => canViewLink(userRole ?? undefined, item.href)),
+          links: section.links.filter((item) => canViewLink(userRole ?? undefined, item.href) &&
+            (item.href.startsWith('/vendors') ? vendorsPermission.data !== false : true) &&
+            (item.href.startsWith('/deliveries') ? deliveriesPermission.data !== false : true) &&
+              (item.href.startsWith('/factory') ? factoryPermission.data !== false : true) &&
+              (item.href.startsWith('/crm') ? crmPermission.data !== false : true) &&
+              (item.href.startsWith('/outlets') ? outletsPermission.data !== false : true) &&
+              (item.href.startsWith('/accountability') ? accountabilityPermission.data !== false : true)),
         }))
         .filter((section) => section.links.length > 0),
-    [userRole],
+    [userRole, vendorsPermission.data, deliveriesPermission.data, factoryPermission.data, crmPermission.data, outletsPermission.data, accountabilityPermission.data],
   );
 
   const handleLogout = async () => {

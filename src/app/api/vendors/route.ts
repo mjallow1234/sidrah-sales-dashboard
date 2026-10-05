@@ -3,6 +3,7 @@ import { query as dbQuery } from '@/lib/db';
 import { createVendor } from '@/services/vendorService';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAgentRole, isAdminOrSupervisorRole } from '@/lib/authorization';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 import type { Vendor } from '@/lib/types';
 
 function parsePositiveInt(value: string | null, fallback?: number): number | undefined {
@@ -65,10 +66,8 @@ function getIdFromUrl(request: Request) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'vendors.view');
+  if (session instanceof Response) return session;
 
   try {
     const query = request.nextUrl.searchParams;
@@ -134,13 +133,9 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
-  if (!isAgentRole(session.role) && !isAdminOrSupervisorRole(session.role) && !isAdminOrSupervisorRole(session.role)) {
-    return forbiddenResponse();
-  }
+  const session = await requirePermission(request, 'vendors.create');
+  if (session instanceof Response) return session;
+  if (!isAgentRole(session.role) && !isAdminOrSupervisorRole(session.role)) return forbiddenResponse();
 
   try {
     const payload = await request.json();

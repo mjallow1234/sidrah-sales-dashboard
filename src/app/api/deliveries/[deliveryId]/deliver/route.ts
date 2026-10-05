@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { isAdminOrSupervisorRole, isDeliveryRole } from '@/lib/authorization';
 import { completeDeliveryAsAdmin, markDeliveryDelivered } from '@/services/deliveryService';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 
 function getDeliveryId(request: NextRequest): string {
   const { pathname } = request.nextUrl;
@@ -10,10 +11,8 @@ function getDeliveryId(request: NextRequest): string {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'deliveries.deliver');
+  if (session instanceof Response) return session;
   if (!isDeliveryRole(session.role) && !isAdminOrSupervisorRole(session.role)) {
     return forbiddenResponse();
   }

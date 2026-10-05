@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server';
 import { getVerifiedSession, unauthorizedResponse, forbiddenResponse } from '@/lib/session';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 import { getVendorLocation, submitVendorLocation } from '@/services/vendorLocationService';
 
 function getVendorId(request: NextRequest): string {
@@ -13,8 +14,8 @@ function responseError(error: unknown) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) return unauthorizedResponse();
+  const session = await requirePermission(request, 'vendors.view');
+  if (session instanceof Response) return session;
   try {
     return Response.json({ status: 'success', data: await getVendorLocation(getVendorId(request), { userId: session.userId ?? '', role: session.role, salesRepId: session.sales_rep_id }) });
   } catch (error) {
@@ -23,8 +24,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) return unauthorizedResponse();
+  const session = await requirePermission(request, 'vendors.edit');
+  if (session instanceof Response) return session;
   if (!session.userId) return forbiddenResponse();
   try {
     const payload = await request.json().catch(() => ({}));

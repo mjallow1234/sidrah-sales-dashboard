@@ -1,6 +1,9 @@
 import { FactoryContainerSection } from '@/components/factory/factory-container-section';
+import { notFound } from 'next/navigation';
+import { getPagePermission } from '@/lib/server/pagePermissionEvaluator';
 
-export default function FactoryContainersPage() {
+export default async function FactoryContainersPage() {
+  if (!(await getPagePermission('factory.view'))) notFound();
   return (
     <div className="space-y-6">
       <div>

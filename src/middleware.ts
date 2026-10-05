@@ -101,6 +101,8 @@ export const config = {
     '/factory',
     '/factory/:path*',
     '/crm/:path*',
+    '/outlets/:path*',
+    '/accountability/:path*',
     '/api/:path*',
   ],
 };

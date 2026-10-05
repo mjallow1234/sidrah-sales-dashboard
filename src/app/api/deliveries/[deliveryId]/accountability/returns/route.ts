@@ -2,12 +2,15 @@ import type { NextRequest } from 'next/server';
 import { isAdminOrSupervisorRole, type AppUserRole } from '@/lib/authorization';
 import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
 import { recordAccountabilityReturn, AccountabilityHttpError } from '@/services/agentAccountabilityService';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 
 function getDeliveryId(request: NextRequest): string { const parts = request.nextUrl.pathname.split('/').filter(Boolean); return parts[parts.length - 3] || ''; }
 
 export async function POST(request: NextRequest) {
   const session = await getVerifiedSession(request);
   if (!session) return unauthorizedResponse();
+  const permission = await requirePermission(request, 'accountability.collections.manage');
+  if (permission instanceof Response) return permission;
   if (!isAdminOrSupervisorRole(session.role)) return forbiddenResponse();
   try {
     const payload = await request.json().catch(() => ({}));

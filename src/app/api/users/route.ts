@@ -1,19 +1,15 @@
 import { randomUUID } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { hashPassword } from '@/lib/password';
-import { verifySession } from '@/lib/session';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminRole } from '@/lib/authorization';
 import { createAppUser } from '@/services/appUserService';
 
-async function getSessionUserId(request: NextRequest) {
-  const token = request.cookies.get('sidrah_session')?.value;
-  if (!token) {
-    return 'system';
-  }
-  const verification = await verifySession(token);
-  return verification.userId ?? 'system';
-}
-
 export async function POST(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) return unauthorizedResponse();
+  if (!isAdminRole(session.role)) return forbiddenResponse();
+
   const payload = await request.json();
   const { role, password } = payload as {
     role?: string;
@@ -24,7 +20,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'email, phone, name, and role are required.' }, { status: 400 });
   }
 
-  const actorId = await getSessionUserId(request);
+  const actorId = session.userId;
   const body: Record<string, unknown> = {
     ...payload,
     created_by: actorId,

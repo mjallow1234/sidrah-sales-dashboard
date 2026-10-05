@@ -1,6 +1,9 @@
 import { VendorSearch } from '@/components/vendors/vendor-search';
+import { notFound } from 'next/navigation';
+import { getPagePermission } from '@/lib/server/pagePermissionEvaluator';
 
-export default function VendorsPage() {
+export default async function VendorsPage() {
+  if (!(await getPagePermission('vendors.view'))) notFound();
   return (
     <main className="px-4 py-8 pb-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">

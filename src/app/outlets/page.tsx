@@ -1,2 +1,4 @@
 import { OutletList } from '@/components/outlets/outlet-list';
-export default function OutletsPage() { return <main className="px-4 py-8 pb-24 sm:px-6 lg:px-8"><div className="mx-auto max-w-6xl space-y-6"><section><p className="text-sm uppercase tracking-[0.24em] text-sidrah-500">Outlet Management</p><h1 className="mt-2 text-3xl font-semibold">Outlets</h1><p className="mt-2 text-slate-600">Manage physical sales locations and record their sales independently.</p></section><OutletList /></div></main>; }
+import { notFound } from 'next/navigation';
+import { getPagePermission } from '@/lib/server/pagePermissionEvaluator';
+export default async function OutletsPage() { if (!(await getPagePermission('outlets.view'))) notFound(); return <main className="px-4 py-8 pb-24 sm:px-6 lg:px-8"><div className="mx-auto max-w-6xl space-y-6"><section><p className="text-sm uppercase tracking-[0.24em] text-sidrah-500">Outlet Management</p><h1 className="mt-2 text-3xl font-semibold">Outlets</h1><p className="mt-2 text-slate-600">Manage physical sales locations and record their sales independently.</p></section><OutletList /></div></main>; }

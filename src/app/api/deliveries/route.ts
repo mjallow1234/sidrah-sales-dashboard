@@ -3,14 +3,13 @@ import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/l
 import { isAdminOrSupervisorRole, isAgentRole } from '@/lib/authorization';
 import type { DeliveryStatus } from '@/lib/types';
 import { createDelivery, getDeliveries } from '@/services/deliveryService';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 
 const validStatuses = ['pending', 'ongoing', 'delivered', 'cancelled'] as const;
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'deliveries.view');
+  if (session instanceof Response) return session;
 
   try {
     const statusParam = request.nextUrl.searchParams.get('status') ?? '';
@@ -26,10 +25,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) {
-    return unauthorizedResponse();
-  }
+  const session = await requirePermission(request, 'deliveries.create');
+  if (session instanceof Response) return session;
   if (!isAgentRole(session.role) && !isAdminOrSupervisorRole(session.role)) {
     return forbiddenResponse();
   }

@@ -1,25 +1,25 @@
 import { randomUUID } from 'crypto';
 import { NextRequest } from 'next/server';
 import { hashPassword } from '@/lib/password';
-import { verifySession } from '@/lib/session';
+import { forbiddenResponse, getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { isAdminRole } from '@/lib/authorization';
 import { fetchAppUserById, updateAppUser } from '@/services/appUserService';
 
-async function getSessionUserId(request: NextRequest) {
-  const token = request.cookies.get('sidrah_session')?.value;
-  if (!token) {
-    return 'system';
-  }
-  const verification = await verifySession(token);
-  return verification.userId ?? 'system';
-}
-
 export async function GET(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) return unauthorizedResponse();
+  if (!isAdminRole(session.role)) return forbiddenResponse();
+
   const id = request.nextUrl.pathname.split('/').filter(Boolean).pop();
   const result = await fetchAppUserById(id ?? '');
   return new Response(result.text, { status: result.status, headers: { 'Content-Type': 'application/json' } });
 }
 
 export async function PUT(request: NextRequest) {
+  const session = await getVerifiedSession(request);
+  if (!session) return unauthorizedResponse();
+  if (!isAdminRole(session.role)) return forbiddenResponse();
+
   const id = request.nextUrl.pathname.split('/').filter(Boolean).pop();
   const payload = await request.json();
   const body = { ...payload };
@@ -32,7 +32,7 @@ export async function PUT(request: NextRequest) {
   delete (body as any).user_id;
   delete (body as any).sales_rep_id;
 
-  body.updated_by = await getSessionUserId(request);
+  body.updated_by = session.userId;
 
   const updatePayload = {
     _method: 'PUT',

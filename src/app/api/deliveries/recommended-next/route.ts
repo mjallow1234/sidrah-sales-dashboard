@@ -2,6 +2,7 @@ import type { NextRequest } from 'next/server';
 import { getVerifiedSession, forbiddenResponse, unauthorizedResponse } from '@/lib/session';
 import { isDeliveryRole } from '@/lib/authorization';
 import { getRecommendedNextDelivery } from '@/services/recommendedDeliveryService';
+import { requirePermission } from '@/lib/server/permissionEvaluator';
 
 function coordinate(value: string | null, minimum: number, maximum: number): number | undefined {
   if (value === null || value === '') return undefined;
@@ -10,8 +11,8 @@ function coordinate(value: string | null, minimum: number, maximum: number): num
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getVerifiedSession(request);
-  if (!session) return unauthorizedResponse();
+  const session = await requirePermission(request, 'deliveries.view');
+  if (session instanceof Response) return session;
   if (!isDeliveryRole(session.role)) return forbiddenResponse();
   const url = new URL(request.url);
   const latitude = coordinate(url.searchParams.get('latitude'), -90, 90);
