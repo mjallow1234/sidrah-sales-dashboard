@@ -1,4 +1,4 @@
-import { VendorForm } from '@/components/forms/vendor-form';
+import { NewVendorClient } from '@/components/vendors/new-vendor-client';
 import { Fab } from '@/components/ui/fab';
 import { notFound } from 'next/navigation';
 import { getPagePermission } from '@/lib/server/pagePermissionEvaluator';
@@ -12,7 +12,7 @@ export default async function NewVendorPage() {
           <p className="text-sm uppercase tracking-[0.24em] text-sidrah-500">Add Vendor</p>
           <h1 className="mt-3 text-2xl font-semibold text-slate-900">Create a new vendor</h1>
         </section>
-        <VendorForm onSuccess={() => window.history.back()} />
+        <NewVendorClient />
       </div>
       <Fab href="/vendors" label="Back to vendors" />
     </main>
