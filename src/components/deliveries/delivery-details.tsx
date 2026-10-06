@@ -19,6 +19,7 @@ import {
 } from '@/lib/hooks/queries';
 import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
 import { canRecordDeliveryPayment } from '@/lib/authorization';
+import { useEffectivePermissionQuery } from '@/lib/hooks/userQueries';
 import type { DeliveryItem } from '@/lib/types';
 import { DeliveryLocationReporter } from './delivery-location-reporter';
 import { DeliveryNavigationActions } from './delivery-navigation-actions';
@@ -67,6 +68,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const currentRole = authQuery.data?.role;
   const isDeliveryUser = currentRole === 'delivery';
   const isAdminOrSupervisor = currentRole === 'admin' || currentRole === 'super_admin' || currentRole === 'supervisor';
+  const deliverPermission = useEffectivePermissionQuery('deliveries.deliver', Boolean(currentRole));
   const paymentOptionsQuery = useDeliveryPaymentOptionsQuery(false, Boolean(currentRole));
   const paymentsQuery = useDeliveryPaymentsQuery(deliveryId, Boolean(currentRole));
 
@@ -74,7 +76,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const canClaim = isDeliveryUser && delivery?.status === 'pending';
   const canDeliverSelf = isDeliveryUser && delivery?.status === 'ongoing' && delivery?.claimed_by === currentUserId;
   const canCompleteAsAdmin = isAdminOrSupervisor && isActionable;
-  const canMarkDelivered = canDeliverSelf || canCompleteAsAdmin;
+  const canMarkDelivered = deliverPermission.data === true && (canDeliverSelf || canCompleteAsAdmin);
   const canReassign = isAdminOrSupervisor && isActionable;
   const canCancel = isAdminOrSupervisor && isActionable;
   const canAddItems = (currentRole === 'agent' || isAdminOrSupervisor) && isActionable;

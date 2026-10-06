@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { AppUser } from '@/lib/types';
 import type { PermissionCatalogEntry, UserPermissionView } from '@/lib/types/permissions';
+import { useAuthQuery } from './queries';
 
 async function fetchAppUsers() {
   return fetch('/api/appusers').then(async (res) => {
@@ -149,15 +150,20 @@ export function useSaveUserPermissionsMutation() {
 }
 
 export function useEffectivePermissionQuery(permissionKey: string, enabled = true) {
+  const authQuery = useAuthQuery();
+  const userId = authQuery.data?.userId;
+  const role = authQuery.data?.role;
+  const queryEnabled = enabled && !!userId && !!role;
+
   return useQuery<boolean>({
-    queryKey: ['effectivePermission', permissionKey],
+    queryKey: ['effectivePermission', userId, role, permissionKey],
     queryFn: async () => {
       const response = await fetch(`/api/permissions/me?permissionKey=${encodeURIComponent(permissionKey)}`);
       if (!response.ok) return false;
       const json = await response.json();
       return Boolean(json.data?.allowed);
     },
-    enabled,
+    enabled: queryEnabled,
     staleTime: 60 * 1000,
   });
 }

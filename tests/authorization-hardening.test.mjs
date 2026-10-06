@@ -55,3 +55,10 @@ test('middleware matches outlets and accountability page families', () => {
   assert.match(middleware, /'\/outlets\/:path\*'/);
   assert.match(middleware, /'\/accountability\/:path\*'/);
 });
+
+test('delivery middleware allows only the current-user permission check outside delivery APIs', () => {
+  const middleware = read('src/middleware.ts');
+  assert.match(middleware, /const isOwnPermissionApi = pathname === '\/api\/permissions\/me'/);
+  assert.match(middleware, /!isDeliveryPaymentOptionsApi && !isOwnPermissionApi/);
+  assert.match(middleware, /session\.role === 'delivery'/);
+});

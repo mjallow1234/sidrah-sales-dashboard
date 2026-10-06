@@ -110,7 +110,7 @@ export const ROLE_CEILING: Readonly<Record<AppUserRole, readonly AccessKey[]>> =
     ACCESS_CATALOG.visitsView,
     ACCESS_CATALOG.visitsCreate,
   ],
-  delivery: [ACCESS_CATALOG.deliveriesView, ACCESS_CATALOG.deliveriesClaim],
+  delivery: [ACCESS_CATALOG.deliveriesView, ACCESS_CATALOG.deliveriesClaim, ACCESS_CATALOG.deliveriesDeliver],
   foreman: [ACCESS_CATALOG.factoryView, ACCESS_CATALOG.factoryProductionCreate, ACCESS_CATALOG.productsView],
 };
 

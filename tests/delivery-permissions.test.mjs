@@ -31,12 +31,49 @@ test('delivery operation APIs use the canonical action permissions', () => {
   }
 });
 
-test('delivery role ceiling remains unchanged and prevents escalation', () => {
+test('delivery role ceiling allows completion without broadening other actions', () => {
   assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesView), true);
   assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesClaim), true);
+  assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesDeliver), true);
+  assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesCreate), false);
   assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesAssign), false);
+  assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesReassign), false);
+  assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.deliveriesCancel), false);
   assert.equal(roleAllowsAccess('agent', ACCESS_CATALOG.deliveriesClaim), true);
   assert.equal(roleAllowsAccess('foreman', ACCESS_CATALOG.deliveriesView), false);
+});
+
+test('delivery completion UI follows the effective permission while retaining ownership checks', () => {
+  const details = read('src/components/deliveries/delivery-details.tsx');
+  assert.match(details, /useEffectivePermissionQuery\('deliveries\.deliver'/);
+  assert.match(details, /deliverPermission\.data === true/);
+  assert.match(details, /delivery\?\.claimed_by === currentUserId/);
+});
+
+test('delivery completion keeps override denial and service ownership safeguards', () => {
+  const evaluator = read('src/lib/server/permissionEvaluator.ts');
+  const service = read('src/repositories/DeliveryRepository.ts');
+  assert.match(evaluator, /if \(effect === 'deny'\) return \{ allowed: false/);
+  assert.match(service, /current\.status.*ongoing.*current\.claimed_by.*claimedBy/);
+});
+
+test('effective permission cache identity includes authenticated user and role', () => {
+  const hooks = read('src/lib/hooks/userQueries.ts');
+  assert.match(hooks, /const userId = authQuery\.data\?\.userId/);
+  assert.match(hooks, /const role = authQuery\.data\?\.role/);
+  assert.match(hooks, /queryKey: \['effectivePermission', userId, role, permissionKey\]/);
+  assert.match(hooks, /enabled: queryEnabled/);
+});
+
+test('delivery users can query only their own effective permission result', () => {
+  const route = read('src/app/api/permissions/me/route.ts');
+  const middleware = read('src/middleware.ts');
+  assert.match(route, /getVerifiedSession/);
+  assert.match(route, /session\.userId/);
+  assert.match(route, /isAccessKey\(permissionKey\)/);
+  assert.doesNotMatch(route, /userId.*searchParams/);
+  assert.match(middleware, /pathname === '\/api\/permissions\/me'/);
+  assert.match(middleware, /!isOwnPermissionApi/);
 });
 
 test('delivery APIs retain the existing role and ownership guards', () => {
