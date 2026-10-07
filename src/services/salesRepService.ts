@@ -1,7 +1,7 @@
-import { randomUUID } from 'crypto';
-import { getPool } from '@/lib/db';
+import { getPool, transaction } from '@/lib/db';
 import type { SalesRep } from '@/lib/types';
 import { SalesRepRepository } from '@/repositories/SalesRepRepository';
+import type { RepositoryDbClient } from '@/repositories/types';
 import { ValidationError } from './errors';
 
 function normalizeBoolean(value: unknown): boolean {
@@ -38,16 +38,36 @@ function validateSalesRepPayload(payload: Record<string, unknown>, isUpdate = fa
   }
 }
 
-export async function createSalesRep(payload: Record<string, unknown>): Promise<SalesRep> {
+export async function getNextSequentialSalesRepId(db: RepositoryDbClient): Promise<string> {
+  const [rows] = await db.execute<any[]>(
+    `SELECT sales_rep_id
+     FROM sales_reps
+     WHERE sales_rep_id REGEXP '^SR[0-9]+$'
+     FOR UPDATE`,
+  );
+
+  let nextNumber = rows.reduce((highest: number, row: any) => {
+    const match = /^SR(\d+)$/.exec(String(row.sales_rep_id ?? ''));
+    return match ? Math.max(highest, Number(match[1])) : highest;
+  }, 0) + 1;
+
+  while (true) {
+    const candidate = `SR${String(nextNumber).padStart(3, '0')}`;
+    const [existing] = await db.execute<any[]>('SELECT sales_rep_id FROM sales_reps WHERE sales_rep_id = ? LIMIT 1', [candidate]);
+    if (existing.length === 0) return candidate;
+    nextNumber += 1;
+  }
+}
+
+export async function createSalesRepInTransaction(db: RepositoryDbClient, payload: Record<string, unknown>): Promise<SalesRep> {
   validateSalesRepPayload(payload);
 
-  const repository = new SalesRepRepository(getPool());
-  const salesRepId = `SR_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
+  const salesRepId = await getNextSequentialSalesRepId(db);
   const now = new Date();
   const nowDate = now.toISOString().slice(0, 10);
   const nowDateTime = now.toISOString();
 
-  return repository.create({
+  return new SalesRepRepository(db).create({
     sales_rep_id: salesRepId,
     name: String(payload.full_name),
     phone: String(payload.phone),
@@ -60,6 +80,10 @@ export async function createSalesRep(payload: Record<string, unknown>): Promise<
     created_by: typeof payload.created_by === 'string' ? payload.created_by : undefined,
     updated_by: typeof payload.updated_by === 'string' ? payload.updated_by : undefined,
   });
+}
+
+export async function createSalesRep(payload: Record<string, unknown>): Promise<SalesRep> {
+  return transaction((connection) => createSalesRepInTransaction(connection, payload));
 }
 
 export async function updateSalesRep(salesRepId: string, payload: Record<string, unknown>): Promise<SalesRep> {

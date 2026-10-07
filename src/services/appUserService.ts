@@ -1,6 +1,7 @@
 import type { AppUser } from '@/lib/types';
-import { getPool } from '@/lib/db';
+import { getPool, transaction } from '@/lib/db';
 import { AppUserRepository } from '@/repositories/AppUserRepository';
+import { createSalesRepInTransaction } from '@/services/salesRepService';
 import { ValidationError, NotFoundError } from './errors';
 
 type AppUserServiceResult = {
@@ -83,6 +84,59 @@ function formatResult(status: number, payload: unknown): AppUserServiceResult {
   };
 }
 
+function buildAppUserPayload(payload: Record<string, unknown>, now: Date, userId: string) {
+  return {
+    user_id: userId,
+    username: String(payload.username ?? payload.email ?? payload.phone ?? `U_${now.getTime()}`),
+    email: String(payload.email ?? ''),
+    phone: String(payload.phone ?? ''),
+    name: String(payload.name ?? ''),
+    role: normalizeRole(payload.role) ?? 'agent',
+    status: normalizeStatus(payload.status) ?? 'active',
+    sales_rep_id: payload.sales_rep_id === undefined ? undefined : payload.sales_rep_id === null ? null : String(payload.sales_rep_id),
+    password_hash: String(payload.password_hash ?? ''),
+    password_reset_required: payload.password_reset_required === 'true' || payload.password_reset_required === '1' || payload.password_reset_required === true,
+    is_system_user: payload.is_system_user === 'true' || payload.is_system_user === '1' || payload.is_system_user === true,
+    failed_login_count: Number(payload.failed_login_count ?? 0),
+    last_login: formatSqlDateTime(payload.last_login),
+    last_failed_login: formatSqlDateTime(payload.last_failed_login),
+    lockout_until: formatSqlDateTime(payload.lockout_until),
+    version: Number(payload.version ?? 1),
+    created_by: payload.created_by === undefined ? undefined : String(payload.created_by),
+    updated_by: payload.updated_by === undefined ? undefined : String(payload.updated_by),
+    date_created: formatSqlDate(payload.date_created ?? now) ?? now.toISOString().slice(0, 10),
+    last_updated: formatSqlDateTime(payload.last_updated ?? now) ?? now.toISOString().slice(0, 19).replace('T', ' '),
+  };
+}
+
+function buildAppUserUpdates(payload: Record<string, unknown>) {
+  const updates: Record<string, unknown> = {};
+
+  if (payload.username !== undefined) updates.username = String(payload.username);
+  if (payload.email !== undefined) updates.email = String(payload.email);
+  if (payload.phone !== undefined) updates.phone = String(payload.phone);
+  if (payload.name !== undefined) updates.name = String(payload.name);
+  if (payload.role !== undefined) updates.role = String(payload.role);
+  if (payload.status !== undefined) updates.status = String(payload.status);
+  if (payload.sales_rep_id !== undefined) updates.sales_rep_id = payload.sales_rep_id === null ? null : String(payload.sales_rep_id);
+  if (payload.password_hash !== undefined) updates.password_hash = String(payload.password_hash);
+  if (payload.password_reset_required !== undefined) {
+    updates.password_reset_required = payload.password_reset_required === 'true' || payload.password_reset_required === '1' || payload.password_reset_required === true;
+  }
+  if (payload.is_system_user !== undefined) {
+    updates.is_system_user = payload.is_system_user === 'true' || payload.is_system_user === '1' || payload.is_system_user === true;
+  }
+  if (payload.failed_login_count !== undefined) updates.failed_login_count = Number(payload.failed_login_count);
+  if (payload.last_login !== undefined) updates.last_login = payload.last_login === null ? null : formatSqlDateTime(payload.last_login);
+  if (payload.last_failed_login !== undefined) updates.last_failed_login = payload.last_failed_login === null ? null : formatSqlDateTime(payload.last_failed_login);
+  if (payload.lockout_until !== undefined) updates.lockout_until = payload.lockout_until === null ? null : formatSqlDateTime(payload.lockout_until);
+  if (payload.version !== undefined) updates.version = Number(payload.version);
+  if (payload.updated_by !== undefined) updates.updated_by = payload.updated_by === null ? null : String(payload.updated_by);
+  updates.last_updated = formatSqlDateTime(new Date());
+
+  return updates;
+}
+
 function validateAppUserPayload(payload: Record<string, unknown>, isUpdate = false) {
   const requiredFields = ['email', 'phone', 'name', 'role', 'status'];
   if (!isUpdate) {
@@ -144,32 +198,23 @@ export async function createAppUser(payload: Record<string, unknown>): Promise<A
   try {
     validateAppUserPayload(payload);
     const now = new Date();
-    const repository = new AppUserRepository(getPool());
     const userId = String(payload.user_id ?? `U_${now.getTime()}`);
-
-    const defaultUsername = String(payload.username ?? payload.email ?? payload.phone ?? `U_${now.getTime()}`);
-    const user = await repository.create({
-      user_id: userId,
-      username: defaultUsername,
-      email: String(payload.email ?? ''),
-      phone: String(payload.phone ?? ''),
-      name: String(payload.name ?? ''),
-      role: normalizeRole(payload.role) ?? 'agent',
-      status: normalizeStatus(payload.status) ?? 'active',
-      sales_rep_id: payload.sales_rep_id === undefined ? undefined : payload.sales_rep_id === null ? null : String(payload.sales_rep_id),
-      password_hash: String(payload.password_hash ?? ''),
-      password_reset_required: payload.password_reset_required === 'true' || payload.password_reset_required === '1' || payload.password_reset_required === true,
-      is_system_user: payload.is_system_user === 'true' || payload.is_system_user === '1' || payload.is_system_user === true,
-      failed_login_count: Number(payload.failed_login_count ?? 0),
-      last_login: formatSqlDateTime(payload.last_login),
-      last_failed_login: formatSqlDateTime(payload.last_failed_login),
-      lockout_until: formatSqlDateTime(payload.lockout_until),
-      version: Number(payload.version ?? 1),
-      created_by: payload.created_by === undefined ? undefined : String(payload.created_by),
-      updated_by: payload.updated_by === undefined ? undefined : String(payload.updated_by),
-      date_created: formatSqlDate(payload.date_created ?? now) ?? now.toISOString().slice(0, 10),
-      last_updated: formatSqlDateTime(payload.last_updated ?? now) ?? now.toISOString().slice(0, 19).replace('T', ' '),
-    });
+    const appUserPayload = buildAppUserPayload(payload, now, userId);
+    const repository = new AppUserRepository(getPool());
+    const user = appUserPayload.role === 'agent'
+      ? await transaction(async (connection) => {
+        const transactionalRepository = new AppUserRepository(connection);
+        const createdUser = await transactionalRepository.create({ ...appUserPayload, sales_rep_id: null });
+        const salesRep = await createSalesRepInTransaction(connection, {
+          full_name: appUserPayload.name,
+          phone: appUserPayload.phone,
+          status: 'active',
+          created_by: appUserPayload.created_by,
+          updated_by: appUserPayload.updated_by,
+        });
+        return transactionalRepository.update(createdUser.user_id, { sales_rep_id: salesRep.sales_rep_id });
+      })
+      : await repository.create(appUserPayload);
 
     return formatResult(201, { status: 'success', data: user });
   } catch (error: unknown) {
@@ -183,32 +228,38 @@ export async function createAppUser(payload: Record<string, unknown>): Promise<A
 export async function updateAppUser(id: string, payload: Record<string, unknown>): Promise<AppUserServiceResult> {
   try {
     validateAppUserPayload(payload, true);
-    const repository = new AppUserRepository(getPool());
-    const updates: Record<string, unknown> = {};
+    const currentUser = await new AppUserRepository(getPool()).findById(id);
+    const requestedRole = payload.role === undefined ? undefined : normalizeRole(payload.role);
+    const shouldProvisionSalesRep = !currentUser.sales_rep_id && (
+      requestedRole === 'agent' ||
+      (requestedRole === undefined && currentUser.role === 'agent')
+    );
 
-    if (payload.username !== undefined) updates.username = String(payload.username);
-    if (payload.email !== undefined) updates.email = String(payload.email);
-    if (payload.phone !== undefined) updates.phone = String(payload.phone);
-    if (payload.name !== undefined) updates.name = String(payload.name);
-    if (payload.role !== undefined) updates.role = String(payload.role);
-    if (payload.status !== undefined) updates.status = String(payload.status);
-    if (payload.sales_rep_id !== undefined) {
-      updates.sales_rep_id = payload.sales_rep_id === null ? null : String(payload.sales_rep_id);
+    if (shouldProvisionSalesRep) {
+      const user = await transaction(async (connection) => {
+        const repository = new AppUserRepository(connection);
+        const lockedUser = await repository.findById(id);
+        const updates = buildAppUserUpdates(payload);
+
+        if (!lockedUser.sales_rep_id) {
+          const salesRep = await createSalesRepInTransaction(connection, {
+            full_name: updates.name ?? lockedUser.name,
+            phone: updates.phone ?? lockedUser.phone,
+            status: 'active',
+            created_by: updates.updated_by,
+            updated_by: updates.updated_by,
+          });
+          updates.sales_rep_id = salesRep.sales_rep_id;
+        }
+
+        return repository.update(id, updates as any);
+      });
+
+      return formatResult(200, { status: 'success', data: user });
     }
-    if (payload.password_hash !== undefined) updates.password_hash = String(payload.password_hash);
-    if (payload.password_reset_required !== undefined) {
-      updates.password_reset_required = payload.password_reset_required === 'true' || payload.password_reset_required === '1' || payload.password_reset_required === true;
-    }
-    if (payload.is_system_user !== undefined) {
-      updates.is_system_user = payload.is_system_user === 'true' || payload.is_system_user === '1' || payload.is_system_user === true;
-    }
-    if (payload.failed_login_count !== undefined) updates.failed_login_count = Number(payload.failed_login_count);
-    if (payload.last_login !== undefined) updates.last_login = payload.last_login === null ? null : formatSqlDateTime(payload.last_login);
-    if (payload.last_failed_login !== undefined) updates.last_failed_login = payload.last_failed_login === null ? null : formatSqlDateTime(payload.last_failed_login);
-    if (payload.lockout_until !== undefined) updates.lockout_until = payload.lockout_until === null ? null : formatSqlDateTime(payload.lockout_until);
-    if (payload.version !== undefined) updates.version = Number(payload.version);
-    if (payload.updated_by !== undefined) updates.updated_by = payload.updated_by === null ? null : String(payload.updated_by);
-    updates.last_updated = formatSqlDateTime(new Date());
+
+    const repository = new AppUserRepository(getPool());
+    const updates = buildAppUserUpdates(payload);
 
     const user = await repository.update(id, updates as any);
     return formatResult(200, { status: 'success', data: user });
