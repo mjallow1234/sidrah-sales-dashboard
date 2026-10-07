@@ -44,12 +44,12 @@ export async function middleware(request: NextRequest) {
     return NextResponse.json({ status: 'error', message: 'Not authenticated.' }, { status: 401 });
   }
 
-  if (isApiRequest && session.role === 'foreman' && !pathname.startsWith('/api/factory') && !pathname.startsWith('/api/products')) {
+  const isOwnPermissionApi = pathname === '/api/permissions/me';
+  if (isApiRequest && session.role === 'foreman' && !pathname.startsWith('/api/factory') && !pathname.startsWith('/api/products') && !isOwnPermissionApi) {
     return NextResponse.json({ status: 'error', message: 'Forbidden.' }, { status: 403 });
   }
 
   const isDeliveryPaymentOptionsApi = pathname === '/api/delivery-payment-options' || pathname.startsWith('/api/delivery-payment-options/');
-  const isOwnPermissionApi = pathname === '/api/permissions/me';
   if (isApiRequest && session.role === 'delivery' && !pathname.startsWith('/api/deliveries') && !isDeliveryPaymentOptionsApi && !isOwnPermissionApi) {
     return NextResponse.json({ status: 'error', message: 'Forbidden.' }, { status: 403 });
   }

@@ -62,3 +62,10 @@ test('delivery middleware allows only the current-user permission check outside 
   assert.match(middleware, /!isDeliveryPaymentOptionsApi && !isOwnPermissionApi/);
   assert.match(middleware, /session\.role === 'delivery'/);
 });
+
+test('foreman middleware allows only the current-user permission check outside factory/products APIs', () => {
+  const middleware = read('src/middleware.ts');
+  assert.match(middleware, /session\.role === 'foreman'/);
+  assert.match(middleware, /!pathname\.startsWith\('\/api\/factory'\) && !pathname\.startsWith\('\/api\/products'\) && !isOwnPermissionApi/);
+  assert.match(middleware, /const isOwnPermissionApi = pathname === '\/api\/permissions\/me'/);
+});
