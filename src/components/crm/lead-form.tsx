@@ -1,14 +1,81 @@
 'use client';
-import { useEffect, useState } from 'react';
+
+import { useEffect, useMemo, useState } from 'react';
+import type { FormFieldDefinition } from '@/lib/types/forms';
+import type { CrmLead } from '@/lib/types/crm';
+import { usePublishedLeadFormQuery } from '@/lib/hooks/formDefinitionQueries';
 import { useCreateCrmLeadMutation, useUpdateCrmLeadMutation } from '@/lib/hooks/crmLeadQueries';
-import type { CrmLead, CrmLeadStatus } from '@/lib/types/crm';
-const statuses: Array<[CrmLeadStatus, string]> = [['new', 'New'], ['follow_up_required', 'Follow-up Required'], ['converted', 'Converted'], ['not_interested', 'Not Interested'], ['lost', 'Lost']];
+
+const today = () => new Date().toISOString().slice(0, 10);
+const knownLeadKeys = new Set(['lead_name', 'phone', 'location', 'business_type', 'lead_source', 'captured_at', 'status', 'next_follow_up_date', 'notes']);
+
+function fieldValue(lead: CrmLead | undefined, key: string): unknown {
+  if (!lead) return key === 'captured_at' ? today() : key === 'status' ? 'new' : '';
+  return (lead as unknown as Record<string, unknown>)[key] ?? '';
+}
+
+function labelForKey(key: string): string {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase());
+}
+
+function LeadField({ field, value, onChange }: { field: FormFieldDefinition; value: unknown; onChange: (value: unknown) => void }) {
+  const current = String(value ?? '');
+  const options = field.options ?? [];
+  if (field.field_type === 'long_text') return <label className="block text-sm">{field.label}{field.is_required ? ' *' : ''}<textarea required={field.is_required} rows={4} value={current} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label>;
+  if (field.field_type === 'dropdown') return <label className="block text-sm">{field.label}{field.is_required ? ' *' : ''}<select required={field.is_required} value={current} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border p-3"><option value="">Select</option>{current && !options.includes(current) ? <option value={current}>{current} (existing value)</option> : null}{options.map(option => <option key={option} value={option}>{option}</option>)}</select></label>;
+  const inputType = field.field_type === 'date' ? 'date' : field.field_type === 'phone' ? 'tel' : field.field_type === 'number' ? 'number' : 'text';
+  return <label className="block text-sm">{field.label}{field.is_required ? ' *' : ''}<input required={field.is_required} type={inputType} value={current} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label>;
+}
+
+function DisabledLeadField({ lead, fieldKey }: { lead: CrmLead; fieldKey: string }) {
+  const value = fieldValue(lead, fieldKey);
+  if (value === '' || value === null || value === undefined) return null;
+  return <label className="block text-sm text-slate-500">{labelForKey(fieldKey)} (disabled)<input disabled value={String(value)} className="mt-1 w-full rounded-2xl border bg-slate-50 p-3 text-slate-500" /></label>;
+}
+
 export function LeadForm({ lead, onDone }: { lead?: CrmLead; onDone: (lead: CrmLead) => void }) {
+  const definitionQuery = usePublishedLeadFormQuery();
+  const definition = definitionQuery.data;
+  const fields = useMemo(() => definition?.published?.fields ?? [], [definition]);
   const mutation = lead ? useUpdateCrmLeadMutation() : useCreateCrmLeadMutation();
-  const [form, setForm] = useState<Record<string, string>>({ lead_name: lead?.lead_name ?? '', phone: lead?.phone ?? '', location: lead?.location ?? '', business_type: lead?.business_type ?? '', lead_source: lead?.lead_source ?? '', captured_at: lead?.captured_at ?? new Date().toISOString().slice(0, 10), status: lead?.status ?? 'new', notes: lead?.notes ?? '', next_follow_up_date: lead?.next_follow_up_date ?? '' });
+  const [form, setForm] = useState<Record<string, unknown>>({});
   const [error, setError] = useState('');
-  useEffect(() => { if (lead) setForm(current => ({ ...current, lead_id: lead.lead_id, lead_name: lead.lead_name, captured_at: lead.captured_at, status: lead.status, ...current, next_follow_up_date: lead.next_follow_up_date ?? '', phone: lead.phone ?? '', location: lead.location ?? '', business_type: lead.business_type ?? '', lead_source: lead.lead_source ?? '', notes: lead.notes ?? '' })); }, [lead]);
-  const set = (key: string, value: string) => setForm(current => ({ ...current, [key]: value }));
-  async function submit(event: React.FormEvent) { event.preventDefault(); setError(''); try { const result = lead ? await (mutation as any).mutateAsync({ leadId: lead.lead_id, payload: form }) : await (mutation as any).mutateAsync(form); onDone(result); } catch (e) { setError(e instanceof Error ? e.message : 'Unable to save lead.'); } }
-  return <form onSubmit={submit} className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-soft"><h2 className="text-xl font-semibold">{lead ? 'Edit lead' : 'Create lead'}</h2>{error ? <p role="alert" className="rounded-2xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}<label className="block text-sm">Lead name<input required value={form.lead_name} onChange={e => set('lead_name', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><div className="grid gap-4 sm:grid-cols-2"><label className="block text-sm">Phone<input value={form.phone} onChange={e => set('phone', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><label className="block text-sm">Location/address<input value={form.location} onChange={e => set('location', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><label className="block text-sm">Business type<input value={form.business_type} onChange={e => set('business_type', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><label className="block text-sm">Lead source<input value={form.lead_source} onChange={e => set('lead_source', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><label className="block text-sm">Capture date<input required type="date" value={form.captured_at} onChange={e => set('captured_at', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><label className="block text-sm">Status<select value={form.status} onChange={e => set('status', e.target.value)} className="mt-1 w-full rounded-2xl border p-3">{statuses.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="block text-sm">Next follow-up date<input type="date" value={form.next_follow_up_date} onChange={e => set('next_follow_up_date', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label></div><label className="block text-sm">Notes<textarea rows={4} value={form.notes} onChange={e => set('notes', e.target.value)} className="mt-1 w-full rounded-2xl border p-3" /></label><button disabled={mutation.isPending} className="rounded-2xl bg-sidrah-500 px-5 py-3 font-semibold text-white">{mutation.isPending ? 'Saving...' : 'Save lead'}</button></form>;
+
+  useEffect(() => {
+    if (!fields.length) return;
+    setForm(Object.fromEntries(fields.map(field => [field.system_key ?? field.field_key, fieldValue(lead, field.system_key ?? field.field_key)])));
+  }, [fields, lead]);
+
+  const set = (key: string, value: unknown) => setForm(current => ({ ...current, [key]: value }));
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    setError('');
+    for (const field of fields) {
+      const key = field.system_key ?? field.field_key;
+      const value = form[key];
+      if (field.is_required && (value === undefined || value === null || value === '' || Array.isArray(value) && value.length === 0)) {
+        setError(`${field.label} is required.`);
+        return;
+      }
+      if (field.field_type === 'dropdown' && value !== undefined && value !== '' && !(field.options ?? []).includes(String(value))) {
+        setError(`${field.label} has an invalid option.`);
+        return;
+      }
+    }
+    try {
+      const payload = { ...form };
+      if (lead && payload.status === lead.status) delete payload.status;
+      const result = lead ? await (mutation as any).mutateAsync({ leadId: lead.lead_id, payload }) : await (mutation as any).mutateAsync(payload);
+      onDone(result);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Unable to save lead.');
+    }
+  }
+
+  if (definitionQuery.isLoading) return <p className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">Loading Lead form configuration…</p>;
+  if (definitionQuery.isError || !definition) return <p role="alert" className="rounded-2xl bg-rose-50 p-4 text-sm text-rose-700">Unable to load the published Lead form configuration.</p>;
+
+  const configuredKeys = new Set(fields.map(field => field.system_key ?? field.field_key));
+  const disabledFields = lead ? Array.from(knownLeadKeys).filter(key => !configuredKeys.has(key)) : [];
+  return <form onSubmit={submit} className="space-y-4 rounded-3xl border border-slate-200 bg-white p-5 shadow-soft"><h2 className="text-xl font-semibold">{lead ? 'Edit lead' : 'Create lead'}</h2>{error ? <p role="alert" className="rounded-2xl bg-rose-50 p-3 text-sm text-rose-700">{error}</p> : null}<div className="grid gap-4 sm:grid-cols-2">{fields.map(field => <LeadField key={field.field_id} field={field} value={form[field.system_key ?? field.field_key]} onChange={value => set(field.system_key ?? field.field_key, value)} />)}{disabledFields.map(key => <DisabledLeadField key={key} lead={lead!} fieldKey={key} />)}</div><button disabled={mutation.isPending} className="rounded-2xl bg-sidrah-500 px-5 py-3 font-semibold text-white">{mutation.isPending ? 'Saving...' : 'Save lead'}</button></form>;
 }

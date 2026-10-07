@@ -1,0 +1,6 @@
+import { NextRequest } from 'next/server';
+import { getVerifiedSession, unauthorizedResponse, forbiddenResponse } from '@/lib/session';
+import { createForm, listForms } from '@/services/formDefinitionService';
+import { isAdminRole } from '@/lib/authorization';
+export async function GET(request: NextRequest) { const session = await getVerifiedSession(request); if (!session) return unauthorizedResponse(); if (!isAdminRole(session.role)) return forbiddenResponse(); try { return Response.json({ status: 'success', data: await listForms(session.role) }); } catch (error) { return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 500 }); } }
+export async function POST(request: NextRequest) { const session = await getVerifiedSession(request); if (!session) return unauthorizedResponse(); if (!isAdminRole(session.role)) return forbiddenResponse(); try { return Response.json({ status: 'success', data: await createForm(await request.json(), session.userId!, session.role) }, { status: 201 }); } catch (error) { const status = error instanceof Error && error.message === 'Forbidden' ? 403 : 400; return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status }); } }

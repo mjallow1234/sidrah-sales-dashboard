@@ -1,0 +1,5 @@
+import { NextRequest } from 'next/server';
+import { getVerifiedSession, unauthorizedResponse } from '@/lib/session';
+import { getPublishedForm, submitForm } from '@/services/formDefinitionService';
+export async function GET(request: NextRequest, context: { params: Promise<{ formKey: string }> }) { const session = await getVerifiedSession(request); if (!session) return unauthorizedResponse(); try { return Response.json({ status: 'success', data: await getPublishedForm((await context.params).formKey) }); } catch (error) { return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 404 }); } }
+export async function POST(request: NextRequest, context: { params: Promise<{ formKey: string }> }) { const session = await getVerifiedSession(request); if (!session) return unauthorizedResponse(); try { await submitForm((await context.params).formKey, await request.json(), session.userId!); return Response.json({ status: 'success' }, { status: 201 }); } catch (error) { return Response.json({ status: 'error', message: error instanceof Error ? error.message : String(error) }, { status: 400 }); } }

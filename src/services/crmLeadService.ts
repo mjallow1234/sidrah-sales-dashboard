@@ -3,6 +3,7 @@ import { getPool, transaction } from '@/lib/db';
 import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary } from '@/lib/types/crm';
 import { CrmLeadRepository } from '@/repositories/CrmLeadRepository';
 import { ValidationError, NotFoundError } from './errors';
+import { getPublishedForm } from './formDefinitionService';
 
 const statuses = new Set<string>(['new', 'follow_up_required', 'converted', 'not_interested', 'lost']);
 const dateOnly = /^\d{4}-\d{2}-\d{2}$/;
@@ -23,6 +24,23 @@ function date(value: unknown, field: string, required = false): string | null {
 function status(value: unknown): CrmLeadStatus { const result = text(value, 'status', true) as string; if (!statuses.has(result)) throw new ValidationError('Invalid lead status.'); return result as CrmLeadStatus; }
 function now() { return new Date().toISOString().slice(0, 19).replace('T', ' '); }
 function todayDateOnly() { const current = new Date(); return `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, '0')}-${String(current.getDate()).padStart(2, '0')}`; }
+
+const crmLeadKeys = new Set(['lead_name', 'phone', 'location', 'business_type', 'lead_source', 'captured_at', 'status', 'next_follow_up_date', 'notes']);
+async function validateConfiguredLeadInput(input: Record<string, unknown>, partial: boolean): Promise<void> {
+  const form = await getPublishedForm('crm-lead');
+  const fields = form.published?.fields ?? [];
+  for (const field of fields) {
+    const key = field.system_key ?? field.field_key;
+    if (!crmLeadKeys.has(key)) throw new ValidationError(`Unsupported CRM Lead field configuration: ${key}.`);
+    const value = input[key];
+    if (value === undefined && partial) continue;
+    if (field.is_required && (value === undefined || value === null || value === '')) throw new ValidationError(`${field.label} is required.`);
+    if (value === undefined || value === null || value === '') continue;
+    if (field.field_type === 'dropdown' && !(field.options ?? []).includes(String(value))) throw new ValidationError(`${field.label} must be one of the published options.`);
+    if (field.field_type === 'date') date(value, key, field.is_required);
+    if (field.field_type === 'number' && (!Number.isFinite(Number(value)))) throw new ValidationError(`${field.label} must be a number.`);
+  }
+}
 
 async function validateAgent(connection: any, userId: string): Promise<void> {
   const [rows] = await connection.execute('SELECT user_id FROM app_users WHERE user_id = ? AND role = \'agent\' AND status = \'active\' LIMIT 1', [userId]);
@@ -57,6 +75,7 @@ export async function getActivities(leadId: string, session: { userId: string; r
 }
 
 export async function createLead(input: Record<string, unknown>, session: { userId: string; role?: string }): Promise<CrmLead> {
+  await validateConfiguredLeadInput(input, false);
   const leadName = text(input.lead_name, 'lead_name', true) as string;
   const capturedAt = date(input.captured_at, 'captured_at', true) as string;
   const leadStatus = status(input.status ?? 'new');
@@ -77,6 +96,7 @@ export async function createLead(input: Record<string, unknown>, session: { user
 }
 
 export async function updateLead(leadId: string, input: Record<string, unknown>, session: { userId: string; role?: string }): Promise<CrmLead> {
+  await validateConfiguredLeadInput(input, true);
   const existing = await getLead(leadId, session);
   if (session.role === 'agent' && input.assigned_agent_user_id !== undefined && input.assigned_agent_user_id !== session.userId) throw new Error('Agents may only assign leads to themselves.');
   const nextStatus = input.status === undefined ? existing.status : status(input.status);

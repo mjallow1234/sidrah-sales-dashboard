@@ -104,6 +104,7 @@ export const config = {
     '/crm/:path*',
     '/outlets/:path*',
     '/accountability/:path*',
+    '/forms/:path*',
     '/api/:path*',
   ],
 };
