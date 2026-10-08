@@ -22,7 +22,7 @@ import {
   Store,
 } from 'lucide-react';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
-import { canViewLink } from '@/lib/authorization';
+import { canViewLink, isAdminOrSupervisorRole } from '@/lib/authorization';
 import { useAuthQuery } from '@/lib/hooks/queries';
 import { useEffectivePermissionQuery } from '@/lib/hooks/userQueries';
 
@@ -37,6 +37,7 @@ const navSections = [
     title: 'CRM',
     links: [
       { label: 'Leads', href: '/crm/leads', icon: Users },
+      { label: 'Lead Overview', href: '/crm/overview', icon: BarChart3 },
     ],
   },
   {
@@ -197,7 +198,8 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               (item.href.startsWith('/factory') ? factoryPermission.data !== false : true) &&
               (item.href.startsWith('/crm') ? crmPermission.data !== false : true) &&
               (item.href.startsWith('/outlets') ? outletsPermission.data !== false : true) &&
-              (item.href.startsWith('/accountability') ? accountabilityPermission.data !== false : true)),
+              (item.href.startsWith('/accountability') ? accountabilityPermission.data !== false : true) &&
+              (item.href === '/crm/overview' ? isAdminOrSupervisorRole(userRole ?? undefined) : true)),
         }))
         .filter((section) => section.links.length > 0),
     [userRole, vendorsPermission.data, deliveriesPermission.data, factoryPermission.data, crmPermission.data, outletsPermission.data, accountabilityPermission.data],

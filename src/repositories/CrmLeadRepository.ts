@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary } from '@/lib/types/crm';
+import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary, CrmOverview, CrmOverviewFilters } from '@/lib/types/crm';
 import type { RepositoryDbClient } from './types';
 import { BaseRepository } from './BaseRepository';
 
@@ -41,15 +41,21 @@ export class CrmLeadRepository extends BaseRepository {
     if (ownAgentUserId) { conditions.push('l.assigned_agent_user_id = :own_agent'); params.own_agent = ownAgentUserId; }
     if (filters.status) { conditions.push('l.status = :status'); params.status = filters.status; }
     if (filters.assignedAgentUserId) { conditions.push('l.assigned_agent_user_id = :assigned_agent'); params.assigned_agent = filters.assignedAgentUserId; }
+    if (filters.salesRepId) { conditions.push('aa.sales_rep_id = :sales_rep_id'); params.sales_rep_id = filters.salesRepId; }
     if (filters.search) { conditions.push('(l.lead_name LIKE :search OR l.phone LIKE :search OR l.location LIKE :search)'); params.search = `%${filters.search}%`; }
-    if (filters.businessType) { conditions.push('l.business_type LIKE :business_type'); params.business_type = `%${filters.businessType}%`; }
-    if (filters.location) { conditions.push('l.location LIKE :location'); params.location = `%${filters.location}%`; }
+    if (filters.businessType === '__blank__') conditions.push("(l.business_type IS NULL OR TRIM(l.business_type) = '')");
+    else if (filters.businessType) { conditions.push('l.business_type LIKE :business_type'); params.business_type = `%${filters.businessType}%`; }
+    if (filters.location === '__blank__') conditions.push("(l.location IS NULL OR TRIM(l.location) = '')");
+    else if (filters.location) { conditions.push('l.location LIKE :location'); params.location = `%${filters.location}%`; }
+    if (filters.leadSource === '__blank__') conditions.push("(l.lead_source IS NULL OR TRIM(l.lead_source) = '')");
+    else if (filters.leadSource) { conditions.push('l.lead_source LIKE :lead_source'); params.lead_source = `%${filters.leadSource}%`; }
     if (filters.capturedFrom) { conditions.push('l.captured_at >= :captured_from'); params.captured_from = filters.capturedFrom; }
     if (filters.capturedTo) { conditions.push('l.captured_at <= :captured_to'); params.captured_to = filters.capturedTo; }
     if (filters.followUpDate) { conditions.push('l.next_follow_up_date = :follow_up_date'); params.follow_up_date = filters.followUpDate; }
     if (filters.followUpBucket === 'overdue') { conditions.push("l.next_follow_up_date < :follow_up_today AND l.status IN ('new', 'follow_up_required')"); params.follow_up_today = today; }
     if (filters.followUpBucket === 'today') { conditions.push("l.next_follow_up_date = :follow_up_today AND l.status IN ('new', 'follow_up_required')"); params.follow_up_today = today; }
     if (filters.followUpBucket === 'upcoming') { conditions.push("l.next_follow_up_date > :follow_up_today AND l.status IN ('new', 'follow_up_required')"); params.follow_up_today = today; }
+    if (filters.followUpBucket === 'no_follow_up') { conditions.push("l.next_follow_up_date IS NULL AND l.status IN ('new', 'follow_up_required')"); }
     const [rows] = await this.execute<any[]>(this.selectSql(conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''), params);
     return rows.map((row) => this.mapLead(row));
   }
@@ -68,6 +74,43 @@ export class CrmLeadRepository extends BaseRepository {
       FROM crm_leads WHERE 1=1${scope}`, params);
     const row = rows[0] ?? {};
     return { follow_up_today: Number(row.follow_up_today ?? 0), overdue_follow_ups: Number(row.overdue_follow_ups ?? 0), upcoming_follow_ups: Number(row.upcoming_follow_ups ?? 0), new_leads: Number(row.new_leads ?? 0), converted_leads: Number(row.converted_leads ?? 0), lost_leads: Number(row.lost_leads ?? 0) };
+  }
+
+  public async adminOverview(filters: CrmOverviewFilters, today: string): Promise<CrmOverview> {
+    const conditions: string[] = [];
+    const params: Record<string, unknown> = { today };
+    if (filters.capturedFrom) { conditions.push('l.captured_at >= :captured_from'); params.captured_from = filters.capturedFrom; }
+    if (filters.capturedTo) { conditions.push('l.captured_at <= :captured_to'); params.captured_to = filters.capturedTo; }
+    if (filters.salesRepId) { conditions.push('au.sales_rep_id = :sales_rep_id'); params.sales_rep_id = filters.salesRepId; }
+    if (filters.status) { conditions.push('l.status = :status'); params.status = filters.status; }
+    if (filters.leadSource === '__blank__') conditions.push("(l.lead_source IS NULL OR TRIM(l.lead_source) = '')");
+    else if (filters.leadSource) { conditions.push('l.lead_source LIKE :lead_source'); params.lead_source = `%${filters.leadSource}%`; }
+    if (filters.businessType === '__blank__') conditions.push("(l.business_type IS NULL OR TRIM(l.business_type) = '')");
+    else if (filters.businessType) { conditions.push('l.business_type LIKE :business_type'); params.business_type = `%${filters.businessType}%`; }
+    if (filters.location === '__blank__') conditions.push("(l.location IS NULL OR TRIM(l.location) = '')");
+    else if (filters.location) { conditions.push('l.location LIKE :location'); params.location = `%${filters.location}%`; }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const leadConditions = conditions.filter((condition) => !condition.includes('au.sales_rep_id'));
+    const base = `FROM crm_leads l LEFT JOIN app_users au ON au.user_id = l.assigned_agent_user_id LEFT JOIN sales_reps sr ON sr.sales_rep_id = au.sales_rep_id ${where}`;
+    const [summaryRows] = await this.execute<any[]>(`SELECT COUNT(*) AS total, SUM(l.status = 'new') AS new_leads, SUM(l.next_follow_up_date = :today AND l.status IN ('new','follow_up_required')) AS follow_up_today, SUM(l.next_follow_up_date < :today AND l.status IN ('new','follow_up_required')) AS overdue, SUM(l.next_follow_up_date > :today AND l.status IN ('new','follow_up_required')) AS upcoming, SUM(l.status = 'converted') AS converted, SUM(l.status = 'lost') AS lost ${base}`, params);
+    const [pipelineRows] = await this.execute<any[]>(`SELECT l.status AS label, COUNT(*) AS count ${base} GROUP BY l.status ORDER BY FIELD(l.status, 'new','follow_up_required','converted','not_interested','lost')`, params);
+    const [healthRows] = await this.execute<any[]>(`SELECT COUNT(CASE WHEN l.status IN ('new','follow_up_required') THEN 1 END) AS active, SUM(l.next_follow_up_date < :today AND l.status IN ('new','follow_up_required')) AS overdue, SUM(l.next_follow_up_date = :today AND l.status IN ('new','follow_up_required')) AS today, SUM(l.next_follow_up_date > :today AND l.status IN ('new','follow_up_required')) AS upcoming, SUM(l.next_follow_up_date IS NULL AND l.status IN ('new','follow_up_required')) AS no_follow_up ${base}`, params);
+    const [salesRepRows] = await this.execute<any[]>(`SELECT COALESCE(sr.sales_rep_id, 'UNASSIGNED') AS sales_rep_id, COALESCE(sr.name, 'Unassigned') AS name, COUNT(l.lead_id) AS total, SUM(l.status = 'new') AS new_count, SUM(l.status = 'follow_up_required') AS follow_up_required, SUM(l.status = 'converted') AS converted, SUM(l.status = 'not_interested') AS not_interested, SUM(l.status = 'lost') AS lost, SUM(l.next_follow_up_date < :today AND l.status IN ('new','follow_up_required')) AS overdue FROM sales_reps sr LEFT JOIN app_users au ON au.sales_rep_id = sr.sales_rep_id LEFT JOIN crm_leads l ON l.assigned_agent_user_id = au.user_id ${where ? `WHERE ${conditions.join(' AND ')}` : ''} GROUP BY sr.sales_rep_id, sr.name UNION ALL SELECT 'UNASSIGNED', 'Unassigned', COUNT(l.lead_id), SUM(l.status = 'new'), SUM(l.status = 'follow_up_required'), SUM(l.status = 'converted'), SUM(l.status = 'not_interested'), SUM(l.status = 'lost'), SUM(l.next_follow_up_date < :today AND l.status IN ('new','follow_up_required')) FROM crm_leads l LEFT JOIN app_users au ON au.user_id = l.assigned_agent_user_id LEFT JOIN sales_reps sr ON sr.sales_rep_id = au.sales_rep_id WHERE ${filters.salesRepId ? '1 = 0' : `sr.sales_rep_id IS NULL${leadConditions.length ? ` AND ${leadConditions.join(' AND ')}` : ''}`} HAVING COUNT(l.lead_id) > 0 ORDER BY total DESC, name ASC`, params);
+    const [sourceRows] = await this.execute<any[]>(`SELECT COALESCE(NULLIF(TRIM(l.lead_source), ''), 'Unknown / Not Specified') AS label, COUNT(*) AS count ${base} GROUP BY COALESCE(NULLIF(TRIM(l.lead_source), ''), 'Unknown / Not Specified') ORDER BY count DESC, label ASC`, params);
+    const [businessRows] = await this.execute<any[]>(`SELECT COALESCE(NULLIF(TRIM(l.business_type), ''), 'Unknown / Not Specified') AS label, COUNT(*) AS count ${base} GROUP BY COALESCE(NULLIF(TRIM(l.business_type), ''), 'Unknown / Not Specified') ORDER BY count DESC, label ASC`, params);
+    const [locationRows] = await this.execute<any[]>(`SELECT COALESCE(NULLIF(TRIM(l.location), ''), 'Unknown / Not Specified') AS label, COUNT(*) AS count ${base} GROUP BY COALESCE(NULLIF(TRIM(l.location), ''), 'Unknown / Not Specified') ORDER BY count DESC, label ASC`, params);
+    const number = (value: unknown) => Number(value ?? 0);
+    const summary = summaryRows[0] ?? {};
+    const health = healthRows[0] ?? {};
+    return {
+      summary: { total: number(summary.total), new_leads: number(summary.new_leads), follow_up_today: number(summary.follow_up_today), overdue: number(summary.overdue), upcoming: number(summary.upcoming), converted: number(summary.converted), lost: number(summary.lost), conversion_rate: number(summary.total) ? Number(((number(summary.converted) / number(summary.total)) * 100).toFixed(2)) : 0 },
+      pipeline: ['new', 'follow_up_required', 'converted', 'not_interested', 'lost'].map((label) => ({ label, count: number(pipelineRows.find((row) => String(row.label) === label)?.count) })),
+      follow_up_health: { active: number(health.active), overdue: number(health.overdue), today: number(health.today), upcoming: number(health.upcoming), no_follow_up: number(health.no_follow_up) },
+      sales_reps: salesRepRows.map((row) => { const total = number(row.total); return { sales_rep_id: String(row.sales_rep_id), name: String(row.name), total, new_count: number(row.new_count), follow_up_required: number(row.follow_up_required), converted: number(row.converted), not_interested: number(row.not_interested), lost: number(row.lost), overdue: number(row.overdue), conversion_rate: total ? Number(((number(row.converted) / total) * 100).toFixed(2)) : 0 }; }),
+      sources: sourceRows.map((row) => ({ label: String(row.label), count: number(row.count) })),
+      business_types: businessRows.map((row) => ({ label: String(row.label), count: number(row.count) })),
+      locations: locationRows.map((row) => ({ label: String(row.label), count: number(row.count) })),
+    };
   }
 
   public async updateLead(leadId: string, updates: Record<string, unknown>): Promise<CrmLead | null> {

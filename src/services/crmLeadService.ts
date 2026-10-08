@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getPool, transaction } from '@/lib/db';
-import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary } from '@/lib/types/crm';
+import type { CrmLead, CrmLeadActivity, CrmLeadFilters, CrmLeadStatus, CrmLeadSummary, CrmOverview, CrmOverviewFilters } from '@/lib/types/crm';
 import { CrmLeadRepository } from '@/repositories/CrmLeadRepository';
 import { ValidationError, NotFoundError } from './errors';
 import { getPublishedForm } from './formDefinitionService';
@@ -59,6 +59,11 @@ export async function getSummary(session: { userId: string; role?: string }): Pr
   const own = session.role === 'agent' ? session.userId : undefined;
   if (!own && !canManage(session.role)) throw new Error('Insufficient permissions.');
   return new CrmLeadRepository(getPool()).summary(own, todayDateOnly());
+}
+
+export async function getAdminOverview(filters: CrmOverviewFilters, session: { userId: string; role?: string }): Promise<CrmOverview> {
+  if (!canManage(session.role)) throw new Error('Insufficient permissions.');
+  return new CrmLeadRepository(getPool()).adminOverview(filters, todayDateOnly());
 }
 
 export async function getLead(leadId: string, session: { userId: string; role?: string }): Promise<CrmLead> {

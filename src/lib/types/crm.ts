@@ -39,13 +39,68 @@ export interface CrmLeadActivity {
 export interface CrmLeadFilters {
   status?: CrmLeadStatus;
   assignedAgentUserId?: string;
+  salesRepId?: string;
   search?: string;
   businessType?: string;
   location?: string;
+  leadSource?: string;
   capturedFrom?: string;
   capturedTo?: string;
   followUpDate?: string;
-  followUpBucket?: 'overdue' | 'today' | 'upcoming';
+  followUpBucket?: 'overdue' | 'today' | 'upcoming' | 'no_follow_up' | (string & {});
+}
+
+export interface CrmOverviewFilters {
+  capturedFrom?: string;
+  capturedTo?: string;
+  salesRepId?: string;
+  status?: CrmLeadStatus;
+  leadSource?: string;
+  businessType?: string;
+  location?: string;
+}
+
+export interface CrmOverviewRow {
+  label: string;
+  count: number;
+}
+
+export interface CrmOverviewSalesRepRow {
+  sales_rep_id: string;
+  name: string;
+  total: number;
+  new_count: number;
+  follow_up_required: number;
+  converted: number;
+  not_interested: number;
+  lost: number;
+  overdue: number;
+  conversion_rate: number;
+}
+
+export interface CrmOverview {
+  summary: {
+    total: number;
+    new_leads: number;
+    follow_up_today: number;
+    overdue: number;
+    upcoming: number;
+    converted: number;
+    lost: number;
+    conversion_rate: number;
+  };
+  pipeline: CrmOverviewRow[];
+  follow_up_health: {
+    active: number;
+    overdue: number;
+    today: number;
+    upcoming: number;
+    no_follow_up: number;
+  };
+  sales_reps: CrmOverviewSalesRepRow[];
+  sources: CrmOverviewRow[];
+  business_types: CrmOverviewRow[];
+  locations: CrmOverviewRow[];
 }
 
 export interface CrmLeadSummary {
