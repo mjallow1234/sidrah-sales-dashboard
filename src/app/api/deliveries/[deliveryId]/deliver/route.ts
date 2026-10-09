@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
     const deliveryId = getDeliveryId(request);
     const payload = await request.json().catch(() => ({}));
     const result = isAdminOrSupervisorRole(session.role)
-      ? await completeDeliveryAsAdmin(deliveryId, session.userId ?? '', payload?.comment)
-      : await markDeliveryDelivered(deliveryId, session.userId ?? '', payload?.comment);
+      ? await completeDeliveryAsAdmin(deliveryId, session.userId ?? '', payload?.comment, payload?.empty_gallons_received)
+      : await markDeliveryDelivered(deliveryId, session.userId ?? '', payload?.comment, payload?.empty_gallons_received);
     return Response.json({ status: 'success', data: result });
   } catch (error: unknown) {
     if (error instanceof Error && 'status' in error) {

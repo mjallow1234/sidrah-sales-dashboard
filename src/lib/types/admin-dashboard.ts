@@ -74,6 +74,22 @@ export interface AdminDashboardDeliverySummary {
   unassignedRequests: number;
 }
 
+export interface AdminDashboardGallonsVendorRow {
+  vendorId?: string;
+  vendorName: string;
+  gallonsDelivered: number;
+  emptyReturned: number;
+  outstanding: number;
+}
+
+export interface AdminDashboardGallonsSummary {
+  totalGallonsDelivered: number;
+  totalEmptyGallonsReturned: number;
+  outstandingGallons: number;
+  vendorsWithOutstandingGallons: number;
+  vendors: AdminDashboardGallonsVendorRow[];
+}
+
 export interface AdminDashboardFactoryProduct {
   productId: string;
   productName: string;
@@ -138,6 +154,7 @@ export interface AdminDashboardSummary {
   products: AdminDashboardProductRow[];
   salesReps: AdminDashboardSalesRepRow[];
   deliveries: AdminDashboardDeliverySummary;
+  outstandingGallons: AdminDashboardGallonsSummary;
   factory: AdminDashboardFactorySummary;
   attention: AdminDashboardAttention;
   dataQuality: AdminDashboardDataQuality;

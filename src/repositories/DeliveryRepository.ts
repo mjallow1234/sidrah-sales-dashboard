@@ -97,6 +97,7 @@ export class DeliveryRepository extends BaseRepository {
       claimed_by_name: this.resolveUserName(row.claimed_by, row.claimed_by_name),
       claimed_at: row.claimed_at === null ? undefined : String(row.claimed_at),
       delivered_at: row.delivered_at === null ? undefined : String(row.delivered_at),
+      empty_gallons_received: row.empty_gallons_received === null || row.empty_gallons_received === undefined ? undefined : Number(row.empty_gallons_received),
       cancelled_at: row.cancelled_at === null ? undefined : String(row.cancelled_at),
       cancelled_by: row.cancelled_by === null ? undefined : String(row.cancelled_by),
       cancelled_by_name: this.resolveUserName(row.cancelled_by, row.cancelled_by_name),
@@ -131,7 +132,8 @@ export class DeliveryRepository extends BaseRepository {
         (SELECT COALESCE(-SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted' AND e.event_type = 'stock_return') AS accountability_stock_returned,
         (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted') AS accountability_remaining_value
         ,v.location_latitude AS vendor_location_latitude,
-        v.location_longitude AS vendor_location_longitude
+        v.location_longitude AS vendor_location_longitude,
+        eg.quantity_received AS empty_gallons_received
       FROM deliveries d
       LEFT JOIN vendors v ON v.vendor_id = COALESCE(d.vendor_id, (
         SELECT v2.vendor_id
@@ -146,6 +148,7 @@ export class DeliveryRepository extends BaseRepository {
       LEFT JOIN app_users canceller ON canceller.user_id = d.cancelled_by
       LEFT JOIN agent_accountability_cases ac ON ac.delivery_id = d.delivery_id
       LEFT JOIN app_users accountability_agent ON accountability_agent.user_id = ac.accountable_agent_user_id
+      LEFT JOIN delivery_empty_gallon_returns eg ON eg.delivery_id = d.delivery_id
       ${whereClause}`;
   }
 
@@ -478,9 +481,14 @@ export class DeliveryRepository extends BaseRepository {
     return this.findById(deliveryId);
   }
 
-  public async deliver(deliveryId: string, claimedBy: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+  public async deliver(deliveryId: string, claimedBy: string, updatedBy: string, activityId: string, comment?: string, emptyGallonsReceived = 0, returnId?: string): Promise<DeliveryRecord> {
     const current = await this.lockDelivery(deliveryId);
     if (String(current.status) !== 'ongoing' || String(current.claimed_by) !== claimedBy) throw new Error('Delivery cannot be marked as delivered by this user.');
+    await (this.db.execute as any)(
+      `INSERT INTO delivery_empty_gallon_returns (return_id, delivery_id, quantity_received, recorded_by)
+       VALUES (:return_id, :delivery_id, :quantity_received, :recorded_by)`,
+      { return_id: returnId, delivery_id: deliveryId, quantity_received: emptyGallonsReceived, recorded_by: updatedBy },
+    );
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'delivered', delivered_at = NOW(), updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status = 'ongoing' AND claimed_by = :claimed_by`,
@@ -509,9 +517,14 @@ export class DeliveryRepository extends BaseRepository {
     return this.findById(deliveryId);
   }
 
-  public async completeAsAdmin(deliveryId: string, updatedBy: string, activityId: string, comment?: string): Promise<DeliveryRecord> {
+  public async completeAsAdmin(deliveryId: string, updatedBy: string, activityId: string, comment?: string, emptyGallonsReceived = 0, returnId?: string): Promise<DeliveryRecord> {
     const current = await this.lockDelivery(deliveryId);
     if (!['pending', 'ongoing'].includes(String(current.status))) throw new Error('Delivery cannot be marked as delivered in its current status.');
+    await (this.db.execute as any)(
+      `INSERT INTO delivery_empty_gallon_returns (return_id, delivery_id, quantity_received, recorded_by)
+       VALUES (:return_id, :delivery_id, :quantity_received, :recorded_by)`,
+      { return_id: returnId, delivery_id: deliveryId, quantity_received: emptyGallonsReceived, recorded_by: updatedBy },
+    );
     const [result] = await (this.db.execute as any)(
       `UPDATE deliveries SET status = 'delivered', delivered_at = NOW(), updated_by = :updated_by, last_updated = NOW()
        WHERE delivery_id = :delivery_id AND status IN ('pending', 'ongoing')`,

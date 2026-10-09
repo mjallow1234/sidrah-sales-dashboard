@@ -86,6 +86,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [reassignTarget, setReassignTarget] = useState('');
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [actionComment, setActionComment] = useState('');
+  const [emptyGallonsReceived, setEmptyGallonsReceived] = useState('0');
   const [standaloneComment, setStandaloneComment] = useState('');
   const [showCommentForm, setShowCommentForm] = useState(false);
   const [showItemsForm, setShowItemsForm] = useState(false);
@@ -111,6 +112,8 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   }, [delivery]);
 
   const canAddComment = currentRole === 'agent' || currentRole === 'admin' || currentRole === 'super_admin' || currentRole === 'supervisor' || (currentRole === 'delivery' && (delivery?.status === 'pending' || delivery?.claimed_by === currentUserId));
+  const parsedEmptyGallons = Number(emptyGallonsReceived);
+  const validEmptyGallons = Number.isInteger(parsedEmptyGallons) && parsedEmptyGallons >= 0;
 
   if (isLoading) {
     return <div className="rounded-3xl border border-slate-200 bg-white p-6 text-slate-600">Loading delivery details…</div>;
@@ -119,6 +122,11 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   if (isError || !delivery) {
     return <div className="rounded-3xl border border-rose-200 bg-rose-50 p-6 text-rose-700">Unable to load delivery details.</div>;
   }
+
+  const handleDeliver = () => {
+    if (!validEmptyGallons) return;
+    deliverMutation.mutate({ deliveryId: delivery.delivery_id, comment: actionComment, emptyGallonsReceived: parsedEmptyGallons });
+  };
 
   const handleReassign = () => {
     if (!reassignTarget) {
@@ -359,6 +367,13 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
 
       {isActionable && (canClaim || canMarkDelivered || canReassign || canCancel) ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+          {canMarkDelivered ? (
+            <label htmlFor="empty-gallons-received" className="block text-sm font-semibold text-slate-900">
+              Empty gallons received
+              <input id="empty-gallons-received" type="number" min="0" step="1" inputMode="numeric" value={emptyGallonsReceived} onChange={(event) => setEmptyGallonsReceived(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 font-normal outline-none focus:ring-2 focus:ring-sidrah-500 sm:max-w-xs" />
+              <span className="mt-1 block text-xs font-normal text-slate-500">Include empty gallons received from previous deliveries. Enter 0 if none.</span>
+            </label>
+          ) : null}
           <label htmlFor="delivery-action-comment" className="text-sm font-semibold text-slate-900">Activity comment <span className="font-normal text-slate-500">(optional)</span></label>
           <textarea id="delivery-action-comment" value={actionComment} onChange={(event) => setActionComment(event.target.value)} maxLength={2000} rows={3} className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-sidrah-500" placeholder="Add context for this action" />
         </div>
@@ -371,7 +386,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
           </Button>
         ) : null}
         {canMarkDelivered ? (
-          <Button type="button" onClick={() => deliverMutation.mutate({ deliveryId: delivery.delivery_id, comment: actionComment })} disabled={deliverMutation.isPending}>
+          <Button type="button" onClick={handleDeliver} disabled={deliverMutation.isPending || !validEmptyGallons}>
             {deliverMutation.isPending ? 'Marking…' : 'Mark as Delivered'}
           </Button>
         ) : null}

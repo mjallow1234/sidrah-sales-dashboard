@@ -123,9 +123,9 @@ export async function claimDelivery(deliveryId: string, comment?: string): Promi
   return result.data;
 }
 
-export async function markDeliveryDelivered(deliveryId: string, comment?: string): Promise<DeliveryRecord> {
+export async function markDeliveryDelivered(deliveryId: string, comment?: string, emptyGallonsReceived = 0): Promise<DeliveryRecord> {
   const result = await fetchJson<{ status: string; data: DeliveryRecord }>(`/api/deliveries/${encodeURIComponent(deliveryId)}/deliver`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment }),
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ comment, empty_gallons_received: emptyGallonsReceived }),
   });
   return result.data;
 }

@@ -11,6 +11,7 @@ import type {
   AdminDashboardFilters,
   AdminDashboardLocationRow,
   AdminDashboardProductRow,
+  AdminDashboardGallonsVendorRow,
   AdminDashboardSalesRepRow,
   AdminDashboardTrendMetric,
   AdminDashboardTrendPoint,
@@ -88,9 +89,9 @@ function formatCurrency(value: number) {
   return `GMD ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
-type DetailKind = 'transactions' | 'vendors' | 'deliveries' | 'inventory' | 'movements' | 'summary';
+type DetailKind = 'transactions' | 'vendors' | 'deliveries' | 'inventory' | 'movements' | 'summary' | 'gallons';
 type DetailRow = { label: string; value: string; detail?: string; href?: string };
-type DetailSpec = { title: string; kind: DetailKind; value: string; filters?: AdminDashboardFilters; transactionMetric?: 'cash' | 'quantity' | 'value'; deliveryFilters?: { status?: string; productId?: string; unassigned?: boolean }; productId?: string; movementType?: 'production' | 'leaving_factory'; vendorBalanceFilter?: 'owing' | 'credit'; rows?: DetailRow[] };
+type DetailSpec = { title: string; kind: DetailKind; value: string; filters?: AdminDashboardFilters; transactionMetric?: 'cash' | 'quantity' | 'value'; deliveryFilters?: { status?: string; productId?: string; unassigned?: boolean }; productId?: string; movementType?: 'production' | 'leaving_factory'; vendorBalanceFilter?: 'owing' | 'credit'; rows?: DetailRow[]; gallonRows?: AdminDashboardGallonsVendorRow[] };
 
 function ModalShell({ title, value, onClose, children }: { title: string; value: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
@@ -143,6 +144,8 @@ function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void 
     body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : <TransactionDetailRows rows={transactions.data ?? []} metric={spec.transactionMetric} />;
   } else if (spec.kind === 'summary') {
     body = spec.rows?.length ? <div className="space-y-2">{spec.rows.map((row) => { const content = <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-sidrah-300"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{row.label}</p><p className="font-semibold text-slate-800">{row.value}</p></div>{row.detail ? <p className="mt-1 text-sm text-slate-600">{row.detail}</p> : null}</div>; return row.href ? <Link key={`${row.label}-${row.detail}`} href={row.href} className="block">{content}</Link> : <div key={`${row.label}-${row.detail}`}>{content}</div>; })}</div> : <EmptyState text="No records contribute to this dashboard value." />;
+  } else if (spec.kind === 'gallons') {
+    body = spec.gallonRows?.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase tracking-[0.12em] text-slate-500"><th className="px-3 py-3">Vendor</th><th className="px-3 py-3">Gallons delivered</th><th className="px-3 py-3">Empty returned</th><th className="px-3 py-3">Outstanding</th></tr></thead><tbody>{spec.gallonRows.map((row) => <tr key={row.vendorId ?? 'unlinked'} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-900">{row.vendorId ? <Link href={`/vendors/${row.vendorId}`} className="text-sidrah-700 hover:underline">{row.vendorName}</Link> : row.vendorName}</td><td className="px-3 py-3">{formatNumber(row.gallonsDelivered)}</td><td className="px-3 py-3">{formatNumber(row.emptyReturned)}</td><td className="px-3 py-3 font-semibold">{formatNumber(row.outstanding)}</td></tr>)}</tbody></table></div> : <EmptyState text="No vendors currently have outstanding gallons." />;
   } else if (false) {
     const rows = (transactions.data ?? []).filter((row) => spec.transactionMetric === 'cash' ? row.cash_collected > 0 : row.stock_added > 0);
     body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p><p className="font-semibold text-slate-800">{spec.transactionMetric === 'cash' ? formatCurrency(row.cash_collected) : spec.transactionMetric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p></div><p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No matching visit records." />;
@@ -472,6 +475,24 @@ export function AdminControlCenter() {
                 </div>
               </Panel>
             </div>
+
+            <Panel>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Container accountability</p>
+                  <h2 className="mt-1 text-xl font-semibold text-slate-900">Outstanding Gallons</h2>
+                  <p className="mt-2 text-sm text-slate-600">DEYGEH products of 18kg or above from completed deliveries. Empty returns reflect quantities explicitly recorded since tracking began.</p>
+                </div>
+                <button type="button" onClick={() => setDetail({ title: 'Outstanding Gallons by Vendor', value: formatQuantity(summary.outstandingGallons.outstandingGallons, 'gallons'), kind: 'gallons', gallonRows: summary.outstandingGallons.vendors })} className="rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">View details</button>
+              </div>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <button type="button" onClick={() => setDetail({ title: 'Gallons Delivered', value: formatQuantity(summary.outstandingGallons.totalGallonsDelivered, 'gallons'), kind: 'gallons', gallonRows: summary.outstandingGallons.vendors })} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-sidrah-200"><p className="text-sm text-slate-500">Total Gallons Delivered</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(summary.outstandingGallons.totalGallonsDelivered)}</p></button>
+                <button type="button" onClick={() => setDetail({ title: 'Empty Gallons Returned', value: formatQuantity(summary.outstandingGallons.totalEmptyGallonsReturned, 'gallons'), kind: 'gallons', gallonRows: summary.outstandingGallons.vendors })} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-sidrah-200"><p className="text-sm text-slate-500">Empty Gallons Returned</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(summary.outstandingGallons.totalEmptyGallonsReturned)}</p></button>
+                <button type="button" onClick={() => setDetail({ title: 'Outstanding Gallons', value: formatQuantity(summary.outstandingGallons.outstandingGallons, 'gallons'), kind: 'gallons', gallonRows: summary.outstandingGallons.vendors })} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-amber-950 hover:border-amber-300"><p className="text-sm text-amber-800">Outstanding Gallons</p><p className="mt-2 text-2xl font-semibold">{formatNumber(summary.outstandingGallons.outstandingGallons)}</p></button>
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm text-slate-500">Vendors with Outstanding Gallons</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(summary.outstandingGallons.vendorsWithOutstandingGallons)}</p></div>
+              </div>
+              <div className="mt-5 max-h-[280px] overflow-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="sticky top-0 z-10 bg-white"><tr className="border-b border-slate-200 text-xs uppercase tracking-[0.12em] text-slate-500"><th className="px-3 py-3">Vendor</th><th className="px-3 py-3">Delivered</th><th className="px-3 py-3">Returned</th><th className="px-3 py-3">Outstanding</th></tr></thead><tbody>{summary.outstandingGallons.vendors.map((row) => <tr key={row.vendorId ?? 'unlinked'} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-900">{row.vendorId ? <Link href={`/vendors/${row.vendorId}`} className="text-sidrah-700 hover:underline">{row.vendorName}</Link> : row.vendorName}</td><td className="px-3 py-3">{formatNumber(row.gallonsDelivered)}</td><td className="px-3 py-3">{formatNumber(row.emptyReturned)}</td><td className="px-3 py-3 font-semibold">{formatNumber(row.outstanding)}</td></tr>)}</tbody></table>{summary.outstandingGallons.vendors.length === 0 ? <div className="py-5"><EmptyState text="No vendors currently have outstanding gallons." /></div> : null}</div>
+            </Panel>
 
             <div className="grid gap-6 xl:grid-cols-2">
               <Panel>

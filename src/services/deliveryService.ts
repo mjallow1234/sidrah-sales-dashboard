@@ -212,6 +212,13 @@ function requireComment(value: unknown): string {
   return comment;
 }
 
+function validateEmptyGallons(value: unknown): number {
+  if (value === undefined) return 0;
+  const quantity = typeof value === 'number' ? value : typeof value === 'string' && value.trim() !== '' ? Number(value) : NaN;
+  if (!Number.isInteger(quantity) || quantity < 0) throw new HttpError(400, 'Empty gallons received must be a whole number greater than or equal to zero.');
+  return quantity;
+}
+
 export async function getDeliveryPreparationSummary(): Promise<DeliveryPreparationSummary> {
   const repository = new DeliveryRepository(getPool());
   return repository.getPreparationSummary();
@@ -257,11 +264,12 @@ export async function claimDelivery(deliveryId: string, deliveryUserId: string, 
   }
 }
 
-export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: string, comment?: unknown): Promise<DeliveryRecord> {
+export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: string, comment?: unknown, emptyGallonsReceived?: unknown): Promise<DeliveryRecord> {
   const normalizedComment = normalizeComment(comment);
+  const quantity = validateEmptyGallons(emptyGallonsReceived);
   try {
     return await transaction(async (connection) => {
-      const result = await new DeliveryRepository(connection).deliver(deliveryId, deliveryUserId, deliveryUserId, buildId('DA'), normalizedComment);
+      const result = await new DeliveryRepository(connection).deliver(deliveryId, deliveryUserId, deliveryUserId, buildId('DA'), normalizedComment, quantity, buildId('EGR'));
       await new AgentAccountabilityRepository(connection).activateDelivery(deliveryId, deliveryUserId, new Date().toISOString().slice(0, 19).replace('T', ' '));
       return result;
     });
@@ -276,11 +284,12 @@ export async function markDeliveryDelivered(deliveryId: string, deliveryUserId: 
   }
 }
 
-export async function completeDeliveryAsAdmin(deliveryId: string, actingUserId: string, comment?: unknown): Promise<DeliveryRecord> {
+export async function completeDeliveryAsAdmin(deliveryId: string, actingUserId: string, comment?: unknown, emptyGallonsReceived?: unknown): Promise<DeliveryRecord> {
   const normalizedComment = normalizeComment(comment);
+  const quantity = validateEmptyGallons(emptyGallonsReceived);
   try {
     return await transaction(async (connection) => {
-      const result = await new DeliveryRepository(connection).completeAsAdmin(deliveryId, actingUserId, buildId('DA'), normalizedComment);
+      const result = await new DeliveryRepository(connection).completeAsAdmin(deliveryId, actingUserId, buildId('DA'), normalizedComment, quantity, buildId('EGR'));
       await new AgentAccountabilityRepository(connection).activateDelivery(deliveryId, actingUserId, new Date().toISOString().slice(0, 19).replace('T', ' '));
       return result;
     });

@@ -4,6 +4,7 @@ import type {
   AdminDashboardDeliverySummary,
   AdminDashboardFactoryProduct,
   AdminDashboardFactorySummary,
+  AdminDashboardGallonsSummary,
   AdminDashboardFilters,
   AdminDashboardFilterOptions,
   AdminDashboardLocationRow,
@@ -83,6 +84,7 @@ export class AdminDashboardRepository extends BaseRepository {
       products,
       salesReps,
       deliveries,
+      outstandingGallons,
       factory,
       topVendorsOwing,
       vendorCredits,
@@ -96,6 +98,7 @@ export class AdminDashboardRepository extends BaseRepository {
       this.getProducts(filters),
       this.getSalesReps(filters),
       this.getDeliveries(filters),
+      this.getOutstandingGallons(filters),
       this.getFactory(filters),
       this.getVendorAttention(filters, 'owing'),
       this.getVendorAttention(filters, 'credit'),
@@ -112,6 +115,7 @@ export class AdminDashboardRepository extends BaseRepository {
       products,
       salesReps,
       deliveries,
+      outstandingGallons,
       factory,
       attention: {
         topVendorsOwing,
@@ -392,6 +396,92 @@ export class AdminDashboardRepository extends BaseRepository {
       outstandingRequests: toNumber(row.outstandingRequests),
       outstandingQuantity: toNumber(row.outstandingQuantity),
       unassignedRequests: toNumber(row.unassignedRequests),
+    };
+  }
+
+  private async getOutstandingGallons(filters: AdminDashboardFilters): Promise<AdminDashboardGallonsSummary> {
+    const params: QueryParams = { completedDeliveryStatus: "delivered" };
+    const productFilter = filters.productId ? 'AND item.product_id = :gallonProductId' : '';
+    if (filters.productId) params.gallonProductId = filters.productId;
+    const vendorFilter = [
+      filters.location ? "COALESCE(NULLIF(TRIM(v.location), ''), 'Unknown location') = :gallonLocation" : '',
+      filters.salesRepId ? 'v.sales_rep_id = :gallonSalesRepId' : '',
+    ].filter(Boolean).join(' AND ');
+    if (filters.location) params.gallonLocation = filters.location;
+    if (filters.salesRepId) params.gallonSalesRepId = filters.salesRepId;
+    const vendorWhere = vendorFilter ? `WHERE ${vendorFilter}` : '';
+    const [rows] = await this.execute<any[]>(
+      `WITH phone_matches AS (
+         SELECT d0.delivery_id, MIN(v0.vendor_id) AS phone_vendor_id, COUNT(v0.vendor_id) AS phone_match_count
+         FROM deliveries d0
+         LEFT JOIN vendors v0 ON v0.phone = d0.customer_phone
+         WHERE d0.vendor_id IS NULL
+         GROUP BY d0.delivery_id
+       ), resolved_deliveries AS (
+         SELECT d.delivery_id, d.vendor_id, d.customer_phone,
+                CASE WHEN d.vendor_id IS NOT NULL THEN d.vendor_id
+                     WHEN pm.phone_match_count = 1 THEN pm.phone_vendor_id
+                     ELSE NULL END AS resolved_vendor_id
+         FROM deliveries d
+         LEFT JOIN phone_matches pm ON pm.delivery_id = d.delivery_id
+         WHERE d.status = :completedDeliveryStatus
+       ), delivered AS (
+         SELECT rd.resolved_vendor_id AS vendor_id, COALESCE(SUM(item.quantity), 0) AS gallons_delivered
+         FROM resolved_deliveries rd
+         INNER JOIN deliveries d ON d.delivery_id = rd.delivery_id
+         JOIN JSON_TABLE(d.items, '$[*]' COLUMNS (
+           product_id VARCHAR(64) PATH '$.product_id',
+           quantity DECIMAL(18, 3) PATH '$.quantity'
+         )) AS item ON TRUE
+         INNER JOIN products p ON p.product_id = item.product_id
+         LEFT JOIN vendors v ON v.vendor_id = rd.resolved_vendor_id
+         ${vendorWhere}
+         ${vendorWhere ? 'AND' : 'WHERE'} UPPER(p.product_name) LIKE '%DEYGEH%'
+           AND CAST(REGEXP_SUBSTR(p.unit, '[0-9]+(?:\\.[0-9]+)?') AS DECIMAL(10, 2)) >= 18
+           ${productFilter}
+         GROUP BY rd.resolved_vendor_id
+       ), returned AS (
+         SELECT rd.resolved_vendor_id AS vendor_id, COALESCE(SUM(r.quantity_received), 0) AS empty_returned
+         FROM resolved_deliveries rd
+         INNER JOIN delivery_empty_gallon_returns r ON r.delivery_id = rd.delivery_id
+         LEFT JOIN vendors v ON v.vendor_id = rd.resolved_vendor_id
+         ${vendorWhere}
+         GROUP BY rd.resolved_vendor_id
+       ), vendor_totals AS (
+         SELECT vendor_id FROM delivered
+         UNION
+         SELECT vendor_id FROM returned
+       )
+       SELECT vt.vendor_id,
+              COALESCE(v.vendor_name, 'Unlinked') AS vendor_name,
+              COALESCE(d.gallons_delivered, 0) AS gallons_delivered,
+              COALESCE(r.empty_returned, 0) AS empty_returned
+       FROM vendor_totals vt
+       LEFT JOIN delivered d ON d.vendor_id <=> vt.vendor_id
+       LEFT JOIN returned r ON r.vendor_id <=> vt.vendor_id
+       LEFT JOIN vendors v ON v.vendor_id = vt.vendor_id
+       ORDER BY (COALESCE(d.gallons_delivered, 0) - COALESCE(r.empty_returned, 0)) DESC, vendor_name ASC`,
+      params,
+    );
+    const vendors = (rows ?? []).map((row) => {
+      const gallonsDelivered = toNumber(row.gallons_delivered);
+      const emptyReturned = toNumber(row.empty_returned);
+      return {
+        vendorId: row.vendor_id == null ? undefined : String(row.vendor_id),
+        vendorName: String(row.vendor_name || 'Unlinked'),
+        gallonsDelivered,
+        emptyReturned,
+        outstanding: gallonsDelivered - emptyReturned,
+      };
+    });
+    const totalGallonsDelivered = vendors.reduce((sum, row) => sum + row.gallonsDelivered, 0);
+    const totalEmptyGallonsReturned = vendors.reduce((sum, row) => sum + row.emptyReturned, 0);
+    return {
+      totalGallonsDelivered,
+      totalEmptyGallonsReturned,
+      outstandingGallons: totalGallonsDelivered - totalEmptyGallonsReturned,
+      vendorsWithOutstandingGallons: vendors.filter((row) => row.outstanding > 0).length,
+      vendors: vendors.filter((row) => row.outstanding > 0),
     };
   }
 

@@ -222,6 +222,7 @@ export interface DeliveryRecord {
   claimed_by_name?: string;
   claimed_at?: string;
   delivered_at?: string;
+  empty_gallons_received?: number;
   cancelled_at?: string;
   cancelled_by?: string;
   cancelled_by_name?: string;

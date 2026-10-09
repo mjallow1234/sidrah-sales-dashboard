@@ -456,9 +456,9 @@ export function useClaimDeliveryMutation() {
 
 export function useMarkDeliveryDeliveredMutation() {
   const queryClient = useQueryClient();
-  return useMutation<DeliveryRecord, Error, { deliveryId: string; comment?: string }>(
+  return useMutation<DeliveryRecord, Error, { deliveryId: string; comment?: string; emptyGallonsReceived?: number }>(
     {
-      mutationFn: ({ deliveryId, comment }) => markDeliveryDelivered(deliveryId, comment),
+      mutationFn: ({ deliveryId, comment, emptyGallonsReceived }) => markDeliveryDelivered(deliveryId, comment, emptyGallonsReceived ?? 0),
       onSuccess: (_data, variables) => {
         queryClient.invalidateQueries({ queryKey: ['deliveries'] });
         queryClient.invalidateQueries({ queryKey: ['delivery'] });
