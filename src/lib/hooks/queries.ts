@@ -109,7 +109,7 @@ export function useVendorBalanceQuery(vendorId: string) {
   });
 }
 
-export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string; missingSalesRep?: boolean }, enabled = true) {
+export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string; missingSalesRep?: boolean; dateBasis?: 'visit' | 'cash_collection' }, enabled = true) {
   return useQuery<Transaction[]>({
     queryKey: ['transactions', filters],
     queryFn: async () => {

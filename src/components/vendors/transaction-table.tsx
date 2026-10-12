@@ -93,7 +93,8 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
                   <span className="shrink-0 text-xl text-slate-400" aria-hidden="true">›</span>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
-                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.date)}</p></div>
+                  <div><p className="text-xs uppercase tracking-wide text-slate-500">Visit Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.date)}</p></div>
+                  {transaction.cash_collected > 0 ? <div><p className="text-xs uppercase tracking-wide text-slate-500">Collection Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.cash_collection_date ?? undefined)}</p></div> : null}
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Supplied</p><p className="mt-1 font-medium text-slate-800">{transaction.stock_added}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Cash</p><p className="mt-1 font-medium text-slate-800">{formatCurrency(transaction.cash_collected)}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Recorded By</p><p className="mt-1 truncate font-medium text-slate-800">{actor}</p></div>

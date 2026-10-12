@@ -72,6 +72,7 @@ export async function GET(request: NextRequest) {
     const productId = query.get('productId') || query.get('product_id');
     const paymentMethod = query.get('paymentMethod') || query.get('payment_method');
     const market = query.get('market');
+    const cashCollectionDateBasis = query.get('dateBasis') === 'cash_collection';
 
     if (vendorId) {
       const [[vendorRow]] = await dbQuery<any[]>(
@@ -123,11 +124,11 @@ export async function GET(request: NextRequest) {
       params.payment_method = paymentMethod;
     }
     if (startDate) {
-      filters.push('vl.date >= :startDate');
+      filters.push(`${cashCollectionDateBasis ? 'vl.cash_collection_date' : 'vl.date'} >= :startDate`);
       params.startDate = startDate;
     }
     if (endDate) {
-      filters.push('vl.date <= :endDate');
+      filters.push(`${cashCollectionDateBasis ? 'vl.cash_collection_date' : 'vl.date'} <= :endDate`);
       params.endDate = endDate;
     }
     if (market) {
@@ -146,7 +147,10 @@ export async function GET(request: NextRequest) {
       .filter(Boolean)
       .join(' ');
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const sql = `SELECT vl.*, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY vl.date DESC, vl.timestamp DESC`;
+    const orderBy = cashCollectionDateBasis
+      ? 'CASE WHEN vl.cash_collection_date IS NULL THEN 1 ELSE 0 END, vl.cash_collection_date DESC, vl.timestamp DESC'
+      : 'vl.date DESC, vl.timestamp DESC';
+    const sql = `SELECT vl.*, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY ${orderBy}`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
     return Response.json({ status: 'success', data: rows.map(mapVisitLogRow) });

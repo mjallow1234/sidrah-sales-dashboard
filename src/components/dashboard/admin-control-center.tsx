@@ -120,6 +120,7 @@ function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?:
         <p className="font-semibold text-slate-800">{metric === 'cash' ? formatCurrency(row.cash_collected) : metric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p>
       </div>
       <p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p>
+      {metric === 'cash' ? <p className="mt-1 text-sm text-slate-600">Collection date: {row.cash_collection_date || 'Not recorded'} · Recorded at: {row.timestamp || 'Not available'}</p> : null}
       <div className="mt-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
       {reversed ? <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
         <p><span className="font-semibold text-slate-700">Reversed by:</span> {row.reversed_by_name || 'Reversing user unavailable'}</p>
@@ -131,7 +132,7 @@ function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?:
 }
 
 function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void }) {
-  const transactionFilters = spec.filters ? { startDate: spec.filters.startDate, endDate: spec.filters.endDate, productId: spec.filters.productId, market: spec.filters.location, salesRepId: spec.filters.salesRepId } : undefined;
+  const transactionFilters = spec.filters ? { startDate: spec.filters.startDate, endDate: spec.filters.endDate, productId: spec.filters.productId, market: spec.filters.location, salesRepId: spec.filters.salesRepId, dateBasis: spec.transactionMetric === 'cash' ? 'cash_collection' as const : 'visit' as const } : undefined;
   const transactions = useTransactionsQuery(transactionFilters, spec.kind === 'transactions');
   const vendors = usePaginatedVendorsQuery({ location: spec.filters?.location, salesRepId: spec.filters?.salesRepId, balance: spec.vendorBalanceFilter }, 1, 1000, spec.kind === 'vendors');
   const balances = useVendorBalancesQuery(spec.kind === 'vendors');

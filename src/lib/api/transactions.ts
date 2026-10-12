@@ -48,7 +48,7 @@ async function fetchJson(path: string, options: RequestInit = {}) {
   return json;
 }
 
-export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string; missingSalesRep?: boolean }): Promise<Transaction[]> {
+export async function getTransactions(params?: { vendorId?: string; salesRepId?: string; productId?: string; startDate?: string; endDate?: string; market?: string; missingSalesRep?: boolean; dateBasis?: 'visit' | 'cash_collection' }): Promise<Transaction[]> {
   const query = params ? Object.entries(params)
     .filter(([, value]) => value !== undefined && value !== null && value !== '')
     .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`)
