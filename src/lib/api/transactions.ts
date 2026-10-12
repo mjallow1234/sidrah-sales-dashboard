@@ -16,6 +16,7 @@ function mapVisitLogToTransaction(log: any): Transaction {
     stock_added: Number(log.stock_added) || 0,
     unit_price: Number(log.unit_price) || 0,
     cash_collected: Number(log.cash_collected) || 0,
+    cash_collection_date: log.cash_collection_date,
     closing_stock: Number(log.closing_stock) || 0,
     sales_rep: log.sales_rep_id || '',
     actor: log.actor || '',
@@ -67,6 +68,7 @@ export async function createVisit(payload: {
   sales_rep_id?: string | null;
   stock_added: number;
   cash_collected: number;
+  cash_collection_date?: string | null;
   unit_price: number;
   payment_method: string;
   payment_reference?: string;

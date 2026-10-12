@@ -32,6 +32,7 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
     stock_sold: Number(row.stock_sold) || 0,
     stock_added: Number(row.stock_added) || 0,
     cash_collected: Number(row.cash_collected) || 0,
+    cash_collection_date: row.cash_collection_date === null ? undefined : formatDateValue(row.cash_collection_date),
     expected_cash: Number(row.expected_cash) || 0,
     unit_price: Number(row.unit_price) || 0,
     closing_stock: Number(row.closing_stock) || 0,

@@ -710,6 +710,7 @@ export interface Transaction {
   stock_added: number;
   unit_price?: number;
   cash_collected: number;
+  cash_collection_date?: string | null;
   closing_stock: number;
   sales_rep: string;
   actor: string;

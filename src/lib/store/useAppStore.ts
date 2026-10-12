@@ -9,8 +9,14 @@ interface VisitDraft {
   payment_method: string;
   payment_reference: string;
   cash_collected: number;
+  cash_collection_date: string;
   stock_added: number;
   notes: string;
+}
+
+function getLocalDateString(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 }
 
 interface AppState {
@@ -36,6 +42,7 @@ export const useAppStore = create<AppState>((set) => ({
     payment_method: 'cash',
     payment_reference: '',
     cash_collected: 0,
+    cash_collection_date: getLocalDateString(),
     stock_added: 0,
     notes: '',
   },
@@ -53,6 +60,7 @@ export const useAppStore = create<AppState>((set) => ({
         payment_method: 'cash',
         payment_reference: '',
         cash_collected: 0,
+        cash_collection_date: getLocalDateString(),
         stock_added: 0,
         notes: '',
       },

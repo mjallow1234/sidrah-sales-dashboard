@@ -13,6 +13,7 @@ export interface VisitLogRecord {
   stock_sold: number;
   stock_added: number;
   cash_collected: number;
+  cash_collection_date?: string | null;
   expected_cash: number;
   unit_price: number;
   closing_stock: number;
@@ -44,6 +45,7 @@ export interface CreateVisitPayload {
   stock_sold: number;
   stock_added: number;
   cash_collected: number;
+  cash_collection_date?: string | null;
   expected_cash: number;
   unit_price: number;
   closing_stock: number;
@@ -152,6 +154,7 @@ export class VisitRepository extends BaseRepository {
         stock_sold,
         stock_added,
         cash_collected,
+        cash_collection_date,
         expected_cash,
         unit_price,
         closing_stock,
@@ -165,7 +168,8 @@ export class VisitRepository extends BaseRepository {
         last_updated,
         created_by,
         updated_by
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ,
       [
         payload.visit_id,
@@ -178,6 +182,7 @@ export class VisitRepository extends BaseRepository {
         payload.stock_sold,
         payload.stock_added,
         payload.cash_collected,
+        payload.cash_collection_date ?? null,
         payload.expected_cash,
         payload.unit_price,
         payload.closing_stock,

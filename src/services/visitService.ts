@@ -17,6 +17,7 @@ export interface CreateVisitPayload {
   stock_sold?: number;
   stock_added: number;
   cash_collected: number;
+  cash_collection_date?: string | null;
   unit_price?: number;
   payment_method: string;
   payment_reference?: string;
@@ -87,6 +88,17 @@ function validateClientTransactionId(value: unknown): string {
   return validateRequiredString(value, 'client_transaction_id');
 }
 
+function validateDateOnly(value: unknown, fieldName: string): string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    throw new HttpError(400, `${fieldName} must be a valid date.`);
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new HttpError(400, `${fieldName} must be a valid date.`);
+  }
+  return value;
+}
+
 function isDuplicateEntry(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && (error as { code?: string }).code === 'ER_DUP_ENTRY');
 }
@@ -142,6 +154,9 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
 
   const now = new Date();
   const nowDate = getDateString(now);
+  const cashCollectionDate = cashCollected > 0
+    ? validateDateOnly(payload.cash_collection_date ?? nowDate, 'cash_collection_date')
+    : null;
   const nowDateTime = getDateTimeString(now);
   const transactionId = generateId('T');
   const journalPayload = {
@@ -494,6 +509,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
       stock_sold: stockSold,
       stock_added: stockAdded,
       cash_collected: cashCollected,
+      cash_collection_date: cashCollectionDate,
       expected_cash: addedStockValue,
       unit_price: unitPrice,
       closing_stock: closingStock,
@@ -517,7 +533,7 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
         payment_method: paymentMethod,
         collector_user_id: payload.actor_user_id,
         recorded_by: payload.actor_user_id,
-        occurred_at: nowDateTime,
+        occurred_at: `${cashCollectionDate ?? nowDate} 00:00:00`,
       });
     }
     await idempotencyRepo.markCompleted(clientTransactionId, visitId, nowDateTime);

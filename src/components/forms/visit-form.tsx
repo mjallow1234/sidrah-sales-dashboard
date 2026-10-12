@@ -14,6 +14,7 @@ const visitSchema = z.object({
   unit_price: z.number().min(0, 'Unit price must be 0 or more'),
   payment_method: z.string().min(1, 'Payment method is required'),
   cash_collected: z.number().min(0, 'Cash collected must be 0 or more'),
+  cash_collection_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Cash collection date is invalid'),
   stock_added: z.number().min(0, 'Stock added must be 0 or more'),
   notes: z.string().max(200).optional(),
 });
@@ -122,6 +123,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
       sales_rep_id: salesRepIdToSubmit,
       stock_added: visitDraft.stock_added,
       cash_collected: visitDraft.cash_collected,
+      cash_collection_date: visitDraft.cash_collected > 0 ? visitDraft.cash_collection_date : null,
       unit_price: visitDraft.unit_price,
       payment_method: visitDraft.payment_method,
       payment_reference: visitDraft.payment_reference,
@@ -194,6 +196,17 @@ export function VisitForm({ vendors }: VisitFormProps) {
                 </option>
               ))}
             </select>
+          </label>
+          <label className="block text-sm text-slate-700">
+            Date Cash Was Collected
+            <input
+              type="date"
+              value={visitDraft.cash_collection_date}
+              onChange={(event) => setVisitDraft({ cash_collection_date: event.target.value })}
+              className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
+              disabled={visitDraft.cash_collected <= 0 || !hasVendorInventory || !visitDraft.product_id}
+            />
+            <span className="mt-1 block text-xs text-slate-500">Use the date the cash was actually collected.</span>
           </label>
 
           <div className="rounded-3xl bg-slate-50 p-4">
@@ -373,7 +386,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
                     {previewDraft.payment_reference ? <div className="text-sm text-slate-600">Ref: {previewDraft.payment_reference}</div> : null}
                   </div>
                 </div>
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <div className="mt-6 grid gap-4 sm:grid-cols-4">
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
                     <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Stock added</div>
                     <div className="mt-2 text-2xl font-semibold text-slate-900">{previewDraft.stock_added}</div>
@@ -381,6 +394,10 @@ export function VisitForm({ vendors }: VisitFormProps) {
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
                     <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Cash collected</div>
                     <div className="mt-2 text-2xl font-semibold text-slate-900">GMD {Number(previewDraft.cash_collected).toLocaleString()}</div>
+                  </div>
+                  <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-center">
+                    <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Cash collection date</div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">{previewDraft.cash_collection_date || 'Not applicable'}</div>
                   </div>
                 </div>
                 <div className="mt-6 space-y-4">

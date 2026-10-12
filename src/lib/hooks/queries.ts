@@ -129,6 +129,7 @@ export function useTransactionsQuery(filters?: { vendorId?: string; salesRepId?:
         stock_added: Number(log.stock_added) || 0,
         unit_price: Number(log.unit_price) || 0,
         cash_collected: Number(log.cash_collected) || 0,
+        cash_collection_date: log.cash_collection_date,
         closing_stock: Number(log.closing_stock) || 0,
         sales_rep: log.sales_rep_id || '',
         actor: log.actor || '',

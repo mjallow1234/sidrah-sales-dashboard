@@ -117,6 +117,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <Detail label="Status" value={selectedTransaction.is_reversed ? 'Reversed' : 'Active'} />
               <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
+              <Detail label="Cash collection date" value={selectedTransaction.cash_collected > 0 ? formatVisitDate(selectedTransaction.cash_collection_date ?? undefined) : 'Not applicable'} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
               <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Vendor unavailable — historical record'} />
               <Detail label="Recorded By" value={selectedTransaction.actor || 'Actor unavailable — historical record'} />
