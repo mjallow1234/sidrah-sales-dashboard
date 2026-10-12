@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await requirePermission(request, 'vendors.edit');
+  const session = await requirePermission(request, 'vendors.view');
   if (session instanceof Response) return session;
   if (!session.userId) return forbiddenResponse();
   try {

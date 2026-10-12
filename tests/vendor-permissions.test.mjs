@@ -16,7 +16,8 @@ test('vendor APIs enforce the corresponding permission keys', () => {
   assert.match(detail, /requirePermission\(request, 'vendors\.edit'\)/);
   assert.match(assignment, /requirePermission\(request, 'vendors\.assign'\)/);
   assert.match(location, /requirePermission\(request, 'vendors\.view'\)/);
-  assert.match(location, /requirePermission\(request, 'vendors\.edit'\)/);
+  assert.match(location, /export async function POST[\s\S]*requirePermission\(request, 'vendors\.view'\)/);
+  assert.match(location, /submitVendorLocation/);
 });
 
 test('vendor page guards and navigation apply vendors.view without replacing role checks', () => {
@@ -34,6 +35,15 @@ test('role ceiling still prevents specialized roles from gaining vendor access',
   assert.equal(roleAllowsAccess('agent', ACCESS_CATALOG.vendorsView), true);
   assert.equal(roleAllowsAccess('delivery', ACCESS_CATALOG.vendorsView), false);
   assert.equal(roleAllowsAccess('foreman', ACCESS_CATALOG.vendorsView), false);
+});
+
+test('agent vendor location writes use view permission plus service-side ownership checks', () => {
+  const location = read('src/app/api/vendors/[id]/location/route.ts');
+  const service = read('src/services/vendorLocationService.ts');
+  assert.match(location, /requirePermission\(request, 'vendors\.view'\)/);
+  assert.match(location, /session\.sales_rep_id/);
+  assert.match(service, /isAgentRole\(actor\.role\).*vendor\.sales_rep_id === actor\.salesRepId/s);
+  assert.match(service, /submitVendorLocation/);
 });
 
 test('vendor permission endpoint never accepts a user id from the browser', () => {
