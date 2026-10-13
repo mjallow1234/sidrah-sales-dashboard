@@ -20,10 +20,12 @@ test('explicit collection dates remain authoritative and historical values remai
   assert.match(types, /cash_collection_date\?: string \| null/);
 });
 
-test('cash drill-down distinguishes fallback dates from recording timestamps', () => {
+test('cash drill-down displays effective dates and recording timestamps separately', () => {
   const dashboard = read('src/components/dashboard/admin-control-center.tsx');
   const table = read('src/components/vendors/transaction-table.tsx');
-  assert.match(dashboard, /recording-date fallback/);
+  assert.doesNotMatch(dashboard, /recording-date fallback/);
+  assert.doesNotMatch(dashboard, /Collection date: \{row\.effective_cash_collection_date \|\| 'Not available'/);
+  assert.match(dashboard, /row\.timestamp\?\.slice\(0, 10\)/);
   assert.match(dashboard, /Recorded at:/);
   assert.match(table, /effective_cash_collection_date/);
   assert.match(table, /Recorded timestamp/);
