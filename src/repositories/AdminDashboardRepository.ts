@@ -40,10 +40,10 @@ export class AdminDashboardRepository extends BaseRepository {
     super(db);
   }
 
-  private visitConditions(filters: AdminDashboardFilters, params: QueryParams, vendorAlias = 'v'): string[] {
+  private visitConditions(filters: AdminDashboardFilters, params: QueryParams, vendorAlias = 'v', dateExpression = 'vl.date'): string[] {
     const conditions = ['COALESCE(vl.is_reversed, 0) = 0'];
-    conditions.push('vl.date >= :startDate');
-    conditions.push('vl.date <= :endDate');
+    conditions.push(`${dateExpression} >= :startDate`);
+    conditions.push(`${dateExpression} <= :endDate`);
     params.startDate = filters.startDate;
     params.endDate = filters.endDate;
 
@@ -177,6 +177,8 @@ export class AdminDashboardRepository extends BaseRepository {
   private async getSnapshot(filters: AdminDashboardFilters): Promise<AdminDashboardSnapshot> {
     const visitParams: QueryParams = {};
     const visitWhere = this.visitConditions(filters, visitParams).join(' AND ');
+    const cashParams: QueryParams = {};
+    const cashWhere = this.visitConditions(filters, cashParams, 'v', 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp))').join(' AND ');
     const [visitRows] = await this.execute<Array<NumberRow>>(
       `SELECT
          COALESCE(SUM(vl.cash_collected), 0) AS cashCollected,
@@ -188,6 +190,13 @@ export class AdminDashboardRepository extends BaseRepository {
        INNER JOIN vendors v ON v.vendor_id = vl.vendor_id
        WHERE ${visitWhere}`,
       visitParams,
+    );
+    const [cashRows] = await this.execute<Array<NumberRow>>(
+      `SELECT COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
+       FROM visit_logs vl
+       INNER JOIN vendors v ON v.vendor_id = vl.vendor_id
+       WHERE ${cashWhere}`,
+      cashParams,
     );
 
     const vendorParams: QueryParams = {};
@@ -208,11 +217,12 @@ export class AdminDashboardRepository extends BaseRepository {
     const deliveries = await this.getDeliveries(filters);
     const factory = await this.getFactory(filters);
     const visit = visitRows[0] ?? {};
+    const cash = cashRows[0] ?? {};
     const receivables = receivableRows[0] ?? {};
 
     return {
       period: {
-        cashCollected: toNumber(visit.cashCollected),
+        cashCollected: toNumber(cash.cashCollected),
         suppliedQuantity: toNumber(visit.suppliedQuantity),
         suppliedValue: toNumber(visit.suppliedValue),
         visitCount: toNumber(visit.visitCount),
@@ -231,28 +241,46 @@ export class AdminDashboardRepository extends BaseRepository {
   }
 
   private async getTrends(filters: AdminDashboardFilters): Promise<AdminDashboardTrendPoint[]> {
-    const params: QueryParams = {};
-    const where = this.visitConditions(filters, params).join(' AND ');
-    const [rows] = await this.execute<Array<NumberRow & { date: string }>>(
+    const visitParams: QueryParams = {};
+    const visitWhere = this.visitConditions(filters, visitParams).join(' AND ');
+    const [visitRows] = await this.execute<Array<NumberRow & { date: string }>>(
       `SELECT
          vl.date AS date,
-         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected,
          COALESCE(SUM(vl.stock_added), 0) AS suppliedQuantity,
          COALESCE(SUM(vl.expected_cash), 0) AS suppliedValue
        FROM visit_logs vl
        INNER JOIN vendors v ON v.vendor_id = vl.vendor_id
-       WHERE ${where}
+       WHERE ${visitWhere}
        GROUP BY vl.date
        ORDER BY vl.date ASC`,
-      params,
+      visitParams,
     );
+    const cashParams: QueryParams = {};
+    const cashWhere = this.visitConditions(filters, cashParams, 'v', 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp))').join(' AND ');
+    const [cashRows] = await this.execute<Array<NumberRow & { date: string }>>(
+      `SELECT
+         COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) AS date,
+         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
+       FROM visit_logs vl
+       INNER JOIN vendors v ON v.vendor_id = vl.vendor_id
+       WHERE ${cashWhere}
+       GROUP BY COALESCE(vl.cash_collection_date, DATE(vl.timestamp))
+       ORDER BY date ASC`,
+      cashParams,
+    );
+    const byDate = new Map<string, AdminDashboardTrendPoint>();
+    for (const row of visitRows) {
+      const date = String(row.date).slice(0, 10);
+      byDate.set(date, { date, cashCollected: 0, suppliedQuantity: toNumber(row.suppliedQuantity), suppliedValue: toNumber(row.suppliedValue) });
+    }
+    for (const row of cashRows) {
+      const date = String(row.date).slice(0, 10);
+      const current = byDate.get(date) ?? { date, cashCollected: 0, suppliedQuantity: 0, suppliedValue: 0 };
+      current.cashCollected = toNumber(row.cashCollected);
+      byDate.set(date, current);
+    }
 
-    return rows.map((row) => ({
-      date: String(row.date).slice(0, 10),
-      cashCollected: toNumber(row.cashCollected),
-      suppliedQuantity: toNumber(row.suppliedQuantity),
-      suppliedValue: toNumber(row.suppliedValue),
-    }));
+    return [...byDate.values()].sort((left, right) => left.date.localeCompare(right.date));
   }
 
   private async getLocations(filters: AdminDashboardFilters): Promise<AdminDashboardLocationRow[]> {

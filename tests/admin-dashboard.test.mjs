@@ -91,6 +91,17 @@ test('dashboard filters are explicit and preserve current-state versus period se
   assert.match(ui, /startDate: '', endDate: '', productId: '', location: '', salesRepId: ''/);
 });
 
+test('cash summary and trends use effective collection dates while non-cash metrics use visit dates', () => {
+  const repository = read('src/repositories/AdminDashboardRepository.ts');
+  assert.match(repository, /const cashWhere = this\.visitConditions/);
+  assert.match(repository, /'COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\)'/);
+  assert.match(repository, /COALESCE\(SUM\(vl\.cash_collected\), 0\) AS cashCollected/);
+  assert.match(repository, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\) AS date/);
+  assert.match(repository, /GROUP BY COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\)/);
+  assert.match(repository, /vl\.date AS date/);
+  assert.match(repository, /COALESCE\(SUM\(vl\.stock_added\), 0\) AS suppliedQuantity/);
+});
+
 test('management UI avoids completed-sales and revenue terminology for supply metrics', () => {
   const ui = read('src/components/dashboard/admin-control-center.tsx');
   assert.match(ui, /Cash Collected/);
