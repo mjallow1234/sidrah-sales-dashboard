@@ -94,7 +94,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-5">
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Visit Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.date)}</p></div>
-                  {transaction.cash_collected > 0 ? <div><p className="text-xs uppercase tracking-wide text-slate-500">Collection Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.cash_collection_date ?? undefined)}</p></div> : null}
+                  {transaction.cash_collected > 0 ? <div><p className="text-xs uppercase tracking-wide text-slate-500">Collection Date</p><p className="mt-1 font-medium text-slate-800">{formatVisitDate(transaction.effective_cash_collection_date ?? transaction.cash_collection_date ?? undefined)}{transaction.cash_collection_date_is_fallback ? ' (recorded date)' : ''}</p></div> : null}
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Supplied</p><p className="mt-1 font-medium text-slate-800">{transaction.stock_added}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Cash</p><p className="mt-1 font-medium text-slate-800">{formatCurrency(transaction.cash_collected)}</p></div>
                   <div><p className="text-xs uppercase tracking-wide text-slate-500">Recorded By</p><p className="mt-1 truncate font-medium text-slate-800">{actor}</p></div>
@@ -118,7 +118,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
             <dl className="mt-5 grid gap-3 sm:grid-cols-2">
               <Detail label="Status" value={selectedTransaction.is_reversed ? 'Reversed' : 'Active'} />
               <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
-              <Detail label="Cash collection date" value={selectedTransaction.cash_collected > 0 ? formatVisitDate(selectedTransaction.cash_collection_date ?? undefined) : 'Not applicable'} />
+              <Detail label="Cash collection date" value={selectedTransaction.cash_collected > 0 ? `${formatVisitDate(selectedTransaction.effective_cash_collection_date ?? selectedTransaction.cash_collection_date ?? undefined)}${selectedTransaction.cash_collection_date_is_fallback ? ' (recording-date fallback)' : ''}` : 'Not applicable'} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
               <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Vendor unavailable — historical record'} />
               <Detail label="Recorded By" value={selectedTransaction.actor || 'Actor unavailable — historical record'} />

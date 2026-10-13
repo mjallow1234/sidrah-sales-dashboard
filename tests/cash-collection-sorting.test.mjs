@@ -4,35 +4,27 @@ import fs from 'node:fs';
 
 const read = (path) => fs.readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
 
-test('cash audit queries use collection date filters and newest-first ordering', () => {
+test('cash audit includes historical records using the recording-date fallback', () => {
   const route = read('src/app/api/transactions/route.ts');
-  assert.match(route, /dateBasis.*cash_collection/);
-  assert.match(route, /vl\.cash_collection_date.*:startDate/);
-  assert.match(route, /vl\.cash_collection_date.*:endDate/);
-  assert.match(route, /CASE WHEN vl\.cash_collection_date IS NULL THEN 1 ELSE 0 END/);
-  assert.match(route, /vl\.cash_collection_date DESC, vl\.timestamp DESC/);
-  assert.match(route, /vl\.date DESC, vl\.timestamp DESC/);
+  assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\).*:startDate/);
+  assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\).*:endDate/);
+  assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\) DESC, vl\.timestamp DESC/);
+  assert.match(route, /cash_collection_date_is_fallback/);
 });
 
-test('cash dashboard drill-down opts into collection-date semantics', () => {
+test('explicit collection dates remain authoritative and historical values remain nullable', () => {
+  const route = read('src/app/api/transactions/route.ts');
+  const types = read('src/lib/types/index.ts');
+  assert.match(route, /cash_collection_date: row\.cash_collection_date === null \? undefined/);
+  assert.match(route, /effective_cash_collection_date/);
+  assert.match(types, /cash_collection_date\?: string \| null/);
+});
+
+test('cash drill-down distinguishes fallback dates from recording timestamps', () => {
   const dashboard = read('src/components/dashboard/admin-control-center.tsx');
-  assert.match(dashboard, /dateBasis: spec\.transactionMetric === 'cash' \? 'cash_collection'/);
-  assert.match(dashboard, /Collection date:/);
-  assert.match(dashboard, /Recorded at:/);
-});
-
-test('cash collection API supports an explicit date basis without changing the client contract', () => {
-  const client = read('src/lib/api/transactions.ts');
-  const hooks = read('src/lib/hooks/queries.ts');
-  assert.match(client, /dateBasis\?: 'visit' \| 'cash_collection'/);
-  assert.match(hooks, /dateBasis\?: 'visit' \| 'cash_collection'/);
-});
-
-test('historical cash records remain distinguishable when collection date is null', () => {
   const table = read('src/components/vendors/transaction-table.tsx');
-  assert.match(table, /Cash collection date/);
-  assert.match(table, /Visit Date/);
-  assert.match(table, /Collection Date/);
-  assert.match(table, /cash_collection_date \?\? undefined/);
+  assert.match(dashboard, /recording-date fallback/);
+  assert.match(dashboard, /Recorded at:/);
+  assert.match(table, /effective_cash_collection_date/);
   assert.match(table, /Recorded timestamp/);
 });

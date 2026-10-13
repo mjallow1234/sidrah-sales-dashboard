@@ -120,7 +120,7 @@ function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?:
         <p className="font-semibold text-slate-800">{metric === 'cash' ? formatCurrency(row.cash_collected) : metric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p>
       </div>
       <p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p>
-      {metric === 'cash' ? <p className="mt-1 text-sm text-slate-600">Collection date: {row.cash_collection_date || 'Not recorded'} · Recorded at: {row.timestamp || 'Not available'}</p> : null}
+      {metric === 'cash' ? <p className="mt-1 text-sm text-slate-600">Collection date: {row.effective_cash_collection_date || 'Not available'}{row.cash_collection_date_is_fallback ? ' (recording-date fallback)' : ''} · Recorded at: {row.timestamp || 'Not available'}</p> : null}
       <div className="mt-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
       {reversed ? <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
         <p><span className="font-semibold text-slate-700">Reversed by:</span> {row.reversed_by_name || 'Reversing user unavailable'}</p>

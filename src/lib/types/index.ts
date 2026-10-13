@@ -711,6 +711,8 @@ export interface Transaction {
   unit_price?: number;
   cash_collected: number;
   cash_collection_date?: string | null;
+  effective_cash_collection_date?: string;
+  cash_collection_date_is_fallback?: boolean;
   closing_stock: number;
   sales_rep: string;
   actor: string;

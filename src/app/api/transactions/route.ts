@@ -33,6 +33,8 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
     stock_added: Number(row.stock_added) || 0,
     cash_collected: Number(row.cash_collected) || 0,
     cash_collection_date: row.cash_collection_date === null ? undefined : formatDateValue(row.cash_collection_date),
+    effective_cash_collection_date: formatDateValue(row.effective_cash_collection_date),
+    cash_collection_date_is_fallback: row.cash_collection_date === null,
     expected_cash: Number(row.expected_cash) || 0,
     unit_price: Number(row.unit_price) || 0,
     closing_stock: Number(row.closing_stock) || 0,
@@ -124,11 +126,11 @@ export async function GET(request: NextRequest) {
       params.payment_method = paymentMethod;
     }
     if (startDate) {
-      filters.push(`${cashCollectionDateBasis ? 'vl.cash_collection_date' : 'vl.date'} >= :startDate`);
+      filters.push(`${cashCollectionDateBasis ? 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp))' : 'vl.date'} >= :startDate`);
       params.startDate = startDate;
     }
     if (endDate) {
-      filters.push(`${cashCollectionDateBasis ? 'vl.cash_collection_date' : 'vl.date'} <= :endDate`);
+      filters.push(`${cashCollectionDateBasis ? 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp))' : 'vl.date'} <= :endDate`);
       params.endDate = endDate;
     }
     if (market) {
@@ -148,7 +150,7 @@ export async function GET(request: NextRequest) {
       .join(' ');
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
     const orderBy = cashCollectionDateBasis
-      ? 'CASE WHEN vl.cash_collection_date IS NULL THEN 1 ELSE 0 END, vl.cash_collection_date DESC, vl.timestamp DESC'
+      ? 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) DESC, vl.timestamp DESC'
       : 'vl.date DESC, vl.timestamp DESC';
     const sql = `SELECT vl.*, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY ${orderBy}`;
     const [rows] = await dbQuery<any[]>(sql, params);
