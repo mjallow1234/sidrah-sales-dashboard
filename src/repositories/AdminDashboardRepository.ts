@@ -372,19 +372,42 @@ export class AdminDashboardRepository extends BaseRepository {
          COUNT(*) AS visits,
          COUNT(DISTINCT vl.vendor_id) AS vendorsVisited,
          COALESCE(SUM(vl.stock_added), 0) AS suppliedQuantity,
-         COALESCE(SUM(vl.expected_cash), 0) AS suppliedValue,
-         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
+         COALESCE(SUM(vl.expected_cash), 0) AS suppliedValue
        FROM visit_logs vl
        INNER JOIN vendors v ON v.vendor_id = vl.vendor_id
        LEFT JOIN sales_reps sr ON sr.sales_rep_id = vl.sales_rep_id
        WHERE ${where}
-       GROUP BY vl.sales_rep_id, sr.name
-       ORDER BY cashCollected DESC, suppliedQuantity DESC
-       LIMIT 12`,
+       GROUP BY vl.sales_rep_id, sr.name`,
       params,
     );
 
-    return rows.map((row) => {
+    const cashParams: QueryParams = {};
+    const cashWhere = this.visitConditions(filters, cashParams, 'v', 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp))').join(' AND ');
+    const [cashRows] = await this.execute<Array<NumberRow & { salesRepId: string | null; salesRepName: string | null }>>(
+      `SELECT
+         vl.sales_rep_id AS salesRepId,
+         sr.name AS salesRepName,
+         COALESCE(SUM(vl.cash_collected), 0) AS cashCollected
+       FROM visit_logs vl
+       INNER JOIN vendors v ON v.vendor_id = vl.vendor_id
+       LEFT JOIN sales_reps sr ON sr.sales_rep_id = vl.sales_rep_id
+       WHERE ${cashWhere}
+       GROUP BY vl.sales_rep_id, sr.name`,
+      cashParams,
+    );
+
+    const byRep = new Map<string, NumberRow & { salesRepId: string | null; salesRepName: string | null }>();
+    for (const row of rows) {
+      byRep.set(String(row.salesRepId ?? '__unassigned'), { ...row, cashCollected: 0 });
+    }
+    for (const row of cashRows) {
+      const key = String(row.salesRepId ?? '__unassigned');
+      const current = byRep.get(key) ?? { salesRepId: row.salesRepId, salesRepName: row.salesRepName, visits: 0, vendorsVisited: 0, suppliedQuantity: 0, suppliedValue: 0, cashCollected: 0 };
+      current.cashCollected = toNumber(row.cashCollected);
+      byRep.set(key, current);
+    }
+
+    return [...byRep.values()].sort((left, right) => toNumber(right.cashCollected) - toNumber(left.cashCollected) || toNumber(right.suppliedQuantity) - toNumber(left.suppliedQuantity)).slice(0, 12).map((row) => {
       const hasIdentity = Boolean(row.salesRepId && row.salesRepName);
       return {
         salesRepId: row.salesRepId ? String(row.salesRepId) : undefined,

@@ -100,6 +100,8 @@ test('cash summary and trends use effective collection dates while non-cash metr
   assert.match(repository, /GROUP BY COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\)/);
   assert.match(repository, /vl\.date AS date/);
   assert.match(repository, /COALESCE\(SUM\(vl\.stock_added\), 0\) AS suppliedQuantity/);
+  assert.match(repository, /private async getSalesReps/);
+  assert.match(repository, /current\.cashCollected = toNumber\(row\.cashCollected\)/);
 });
 
 test('management UI avoids completed-sales and revenue terminology for supply metrics', () => {
