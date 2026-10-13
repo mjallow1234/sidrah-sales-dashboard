@@ -33,3 +33,14 @@ test('transactions API continues returning reversal fields', () => {
   assert.match(route, /reversed_by_name:/);
   assert.match(route, /reversal_reason:/);
 });
+
+test('visit detail cards show vendor and recording identity without exposing visit IDs', () => {
+  const ui = read('src/components/dashboard/admin-control-center.tsx');
+  const card = ui.slice(ui.indexOf('function TransactionDetailRows'), ui.indexOf('function DetailModal'));
+  assert.match(card, /Vendor ID: \{row\.vendor_id/);
+  assert.match(card, /Recorded at: \{formatRecordedAt\(row\.timestamp\)/);
+  assert.doesNotMatch(card, /Visit \{row\.visit_id \|\|/);
+  assert.match(card, /Collection date:/);
+  assert.match(card, /row\.date/);
+  assert.match(card, /row\.sales_rep_name/);
+});

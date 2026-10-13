@@ -89,6 +89,12 @@ function formatCurrency(value: number) {
   return `GMD ${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 }
 
+function formatRecordedAt(value?: string) {
+  if (!value) return 'Not available';
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
+}
+
 type DetailKind = 'transactions' | 'vendors' | 'deliveries' | 'inventory' | 'movements' | 'summary' | 'gallons';
 type DetailRow = { label: string; value: string; detail?: string; href?: string };
 type DetailSpec = { title: string; kind: DetailKind; value: string; filters?: AdminDashboardFilters; transactionMetric?: 'cash' | 'quantity' | 'value'; deliveryFilters?: { status?: string; productId?: string; unassigned?: boolean }; productId?: string; movementType?: 'production' | 'leaving_factory'; vendorBalanceFilter?: 'owing' | 'credit'; rows?: DetailRow[]; gallonRows?: AdminDashboardGallonsVendorRow[] };
@@ -119,10 +125,10 @@ function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?:
         <p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p>
         <p className="font-semibold text-slate-800">{metric === 'cash' ? formatCurrency(row.cash_collected) : metric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p>
       </div>
-      <p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p>
+      <p className="mt-1 text-sm text-slate-600">Vendor ID: {row.vendor_id || 'Not available'} · Visit date: {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p>
       {metric === 'cash' ? <>
         <p className="mt-1 text-sm text-slate-600">Collection date: {row.effective_cash_collection_date || row.cash_collection_date || row.timestamp?.slice(0, 10) || ''}</p>
-        <p className="mt-1 text-sm text-slate-600">Recorded at: {row.timestamp || ''}</p>
+        <p className="mt-1 text-sm text-slate-600">Recorded at: {formatRecordedAt(row.timestamp)}</p>
       </> : null}
       <div className="mt-3"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${reversed ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>{reversed ? 'Reversed' : 'Active'}</span></div>
       {reversed ? <div className="mt-3 grid gap-2 text-sm text-slate-600 sm:grid-cols-3">
