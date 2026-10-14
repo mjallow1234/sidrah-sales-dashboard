@@ -50,6 +50,14 @@ test('vendor balances use vendor_balances and do not recompute balances in React
   assert.doesNotMatch(ui, /total_expected_cash.*cash_collected/);
 });
 
+test('vendor balances sort numerically with a vendor-name tie-breaker and link to vendor details', () => {
+  const repository = read('src/repositories/AdminDashboardRepository.ts');
+  const ui = read('src/components/dashboard/admin-control-center.tsx');
+  assert.match(repository, /ORDER BY amount DESC, v\.vendor_name ASC/);
+  assert.match(ui, /\.sort\(\(a, b\) => b\.amount - a\.amount \|\| a\.vendorName\.localeCompare\(b\.vendorName\)\)/);
+  assert.match(ui, /href=\{`\/vendors\/\$\{vendor\.vendorId\}`\}/);
+});
+
 test('outstanding deliveries use pending and ongoing statuses through JSON item aggregation', () => {
   const repository = read('src/repositories/AdminDashboardRepository.ts');
   assert.match(repository, /JSON_TABLE/);
@@ -144,7 +152,7 @@ test('dashboard has loading, empty, error, metric switching, and modal drill-dow
   assert.match(ui, /kind: 'movements'/);
   assert.match(ui, /Vendor Status/);
   assert.match(ui, /status\.vendors\.map/);
-  assert.match(ui, /sort\(\(a, b\) => b\.amount - a\.amount\)/);
+  assert.match(ui, /sort\(\(a, b\) => b\.amount - a\.amount \|\| a\.vendorName\.localeCompare\(b\.vendorName\)\)/);
 });
 
 test('react query hook uses a scoped dashboard query key', () => {

@@ -531,9 +531,9 @@ export function AdminControlCenter() {
               <Panel>
                 <div className="flex items-center gap-3"><Boxes className="h-5 w-5 text-sidrah-600" /><div><p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Vendor Balances</p><h2 className="mt-1 text-xl font-semibold text-slate-900">Vendor Balances Owing</h2></div></div>
                 <div className="mt-5 space-y-3">
-                  {summary.attention.topVendorsOwing.length === 0 ? <EmptyState text="No positive vendor balances found for the current filters." /> : [...summary.attention.topVendorsOwing].sort((a, b) => b.amount - a.amount).map((vendor) => (
+                  {summary.attention.topVendorsOwing.length === 0 ? <EmptyState text="No positive vendor balances found for the current filters." /> : [...summary.attention.topVendorsOwing].sort((a, b) => b.amount - a.amount || a.vendorName.localeCompare(b.vendorName)).map((vendor) => (
                     <button key={vendor.vendorId} type="button" onClick={() => openSummary(`Vendor Balance · ${vendor.vendorName}`, formatCurrency(vendor.amount), [{ label: vendor.vendorName, value: formatCurrency(vendor.amount), detail: `${vendor.vendorId} · ${vendor.location}` }])} className="block w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-sidrah-200">
-                      <div className="flex items-start justify-between gap-4"><div><p className="font-semibold text-slate-900">{vendor.vendorName}</p><p className="mt-1 text-sm text-slate-500">{vendor.location}</p></div><p className="font-semibold text-slate-900">{formatCurrency(vendor.amount)}</p></div>
+                      <div className="flex items-start justify-between gap-4"><div><p className="font-semibold text-slate-900"><Link href={`/vendors/${vendor.vendorId}`} onClick={(event) => event.stopPropagation()} className="text-sidrah-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500">{vendor.vendorName}</Link></p><p className="mt-1 text-sm text-slate-500">{vendor.location}</p></div><p className="font-semibold text-slate-900">{formatCurrency(vendor.amount)}</p></div>
                     </button>
                   ))}
                 </div>
