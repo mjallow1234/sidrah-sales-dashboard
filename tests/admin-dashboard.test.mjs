@@ -56,6 +56,10 @@ test('vendor balances sort numerically with a vendor-name tie-breaker and link t
   assert.match(repository, /ORDER BY amount DESC, v\.vendor_name ASC/);
   assert.match(ui, /\.sort\(\(a, b\) => b\.amount - a\.amount \|\| a\.vendorName\.localeCompare\(b\.vendorName\)\)/);
   assert.match(ui, /href=\{`\/vendors\/\$\{vendor\.vendorId\}`\}/);
+  assert.match(ui, /kind: 'vendors', filters: periodFilters, vendorBalanceFilter: 'owing'/);
+  assert.match(ui, /spec\.kind === 'vendors'/);
+  assert.match(ui, /balanceMap\.get\(b\.vendor_id\).*balanceMap\.get\(a\.vendor_id\)/s);
+  assert.match(ui, /href=\{`\/vendors\/\$\{row\.vendor_id\}`\}/);
 });
 
 test('outstanding deliveries use pending and ongoing statuses through JSON item aggregation', () => {
