@@ -4,12 +4,13 @@ import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { TotalBucketsOutThereModal } from '@/components/dashboard/total-buckets-out-there-modal';
 import { VendorsOwingModal } from '@/components/dashboard/vendors-owing-modal';
-import { useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
+import { usePaginatedVendorsQuery, useStatsQuery, useVendorsOwingQuery } from '@/lib/hooks/queries';
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-provider';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
 import { useRouter } from 'next/navigation';
 import { AdminControlCenter } from '@/components/dashboard/admin-control-center';
+import { DormantVendorsModal } from '@/components/dashboard/dormant-vendors-modal';
 
 export function DashboardShell({ initialRole }: { initialRole?: string }) {
   const router = useRouter();
@@ -66,8 +67,10 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
 
   const [isVendorsOwingOpen, setIsVendorsOwingOpen] = useState(false);
   const [isTotalBucketsModalOpen, setIsTotalBucketsModalOpen] = useState(false);
+  const [isDormantOpen, setIsDormantOpen] = useState(false);
 
   const { data: vendorsOwing, isLoading: vendorsOwingLoading } = useVendorsOwingQuery();
+  const { data: dormantVendors } = usePaginatedVendorsQuery({ status: 'dormant' }, 1, 1, isAgent);
 
   if (isManagement) {
     return <AdminControlCenter />;
@@ -134,6 +137,13 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
           value: isLoading ? '...' : `GMD ${(stats?.totalVendorReceivables ?? 0).toLocaleString()}`,
           description: 'Total outstanding balance from your vendors.',
           action: () => setIsVendorsOwingOpen(true),
+          isClickable: true,
+        },
+        {
+          label: 'Dormant vendors',
+          value: isLoading ? '...' : dormantVendors?.data.totalCount ?? 0,
+          description: 'No qualifying payment visit in the last 14 days.',
+          action: () => setIsDormantOpen(true),
           isClickable: true,
         },
       ];
@@ -245,6 +255,7 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
             onClose={() => setIsVendorsOwingOpen(false)}
           />
         ) : null}
+        {isAgent && isDormantOpen ? <DormantVendorsModal onClose={() => setIsDormantOpen(false)} /> : null}
 
         {isTotalBucketsModalOpen ? (
           <TotalBucketsOutThereModal

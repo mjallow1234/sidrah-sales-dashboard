@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowRight, Boxes, Factory, Package, Users } from 'lucide-react';
 import { useDeliveriesQuery, useFactoryInventoryQuery, useFactoryMovementsQuery, usePaginatedVendorsQuery, useProductsQuery, useSalesRepsQuery, useTransactionsQuery } from '@/lib/hooks/queries';
 import { useVendorBalancesQuery } from '@/lib/hooks/queries';
+import { DormantVendorsModal } from '@/components/dashboard/dormant-vendors-modal';
 import { useAdminDashboardSummaryQuery } from '@/lib/hooks/use-admin-dashboard-summary';
 import type {
   AdminDashboardFilters,
@@ -95,7 +96,7 @@ function formatRecordedAt(value?: string) {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
-type DetailKind = 'transactions' | 'vendors' | 'deliveries' | 'inventory' | 'movements' | 'summary' | 'gallons';
+type DetailKind = 'transactions' | 'vendors' | 'deliveries' | 'inventory' | 'movements' | 'summary' | 'gallons' | 'dormant';
 type DetailRow = { label: string; value: string; detail?: string; href?: string };
 type DetailSpec = { title: string; kind: DetailKind; value: string; filters?: AdminDashboardFilters; transactionMetric?: 'cash' | 'quantity' | 'value'; deliveryFilters?: { status?: string; productId?: string; unassigned?: boolean }; productId?: string; movementType?: 'production' | 'leaving_factory'; vendorBalanceFilter?: 'owing' | 'credit'; rows?: DetailRow[]; gallonRows?: AdminDashboardGallonsVendorRow[] };
 
@@ -175,6 +176,7 @@ function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void 
     const rows = movements.data ?? [];
     body = movements.isLoading ? <p className="text-sm text-slate-500">Loading factory movements...</p> : rows.length ? <div className="space-y-2">{rows.map((row: FactoryStockMovement) => <div key={row.movement_id} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 p-3"><div><p className="font-semibold text-slate-900">{row.product_name || row.product_id}</p><p className="text-sm text-slate-600">{row.movement_type} · {String(row.occurred_at).slice(0, 10)}</p></div><span className="font-semibold text-slate-800">{formatNumber(row.quantity)} {row.unit || 'units'}</span></div>)}</div> : <EmptyState text="No factory movement records." />;
   }
+  if (spec.kind === 'dormant') return <DormantVendorsModal onClose={onClose} />;
   return <ModalShell title={spec.title} value={spec.value} onClose={onClose}>{body}</ModalShell>;
 }
 
@@ -455,7 +457,7 @@ export function AdminControlCenter() {
             <Panel>
               <div><p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Vendors</p><h2 className="mt-1 text-xl font-semibold text-slate-900">Vendor Status</h2><p className="mt-2 text-sm text-slate-600">Current vendor status counts. Status cards do not include balance amounts.</p></div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {(summary.vendorStatuses ?? []).map((status) => <button key={status.statusId} type="button" onClick={() => setDetail({ title: `${status.statusName} Vendors`, value: formatNumber(status.count), kind: 'summary', rows: status.vendors.map((vendor) => ({ label: vendor.vendorName, value: vendor.vendorId, detail: vendor.statusName, href: `/vendors/${vendor.vendorId}` })) })} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-sidrah-300 hover:bg-white"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">{status.statusName}</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(status.count)}</p><p className="mt-1 text-xs text-slate-500">vendors</p></button>)}
+                {(summary.vendorStatuses ?? []).map((status) => <button key={status.statusId} type="button" onClick={() => status.statusId === 'dormant' ? setDetail({ title: 'Dormant Vendors', value: formatNumber(status.count), kind: 'dormant' }) : setDetail({ title: `${status.statusName} Vendors`, value: formatNumber(status.count), kind: 'summary', rows: status.vendors.map((vendor) => ({ label: vendor.vendorName, value: vendor.vendorId, detail: vendor.statusName, href: `/vendors/${vendor.vendorId}` })) })} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-sidrah-300 hover:bg-white"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">{status.statusName}</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(status.count)}</p><p className="mt-1 text-xs text-slate-500">vendors</p></button>)}
               </div>
             </Panel>
 

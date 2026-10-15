@@ -37,7 +37,7 @@ export function useVendorsQuery(filters?: { salesRepId?: string; sales_rep_id?: 
 }
 
 export function usePaginatedVendorsQuery(
-  filters?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; location?: string; balance?: string },
+  filters?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; location?: string; vendorTypeId?: string; balance?: string },
   page = 1,
   pageSize = 50,
   enabled = true

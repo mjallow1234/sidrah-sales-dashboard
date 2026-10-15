@@ -26,12 +26,14 @@ export async function fetchVendors(params?: { salesRepId?: string; sales_rep_id?
   return [...vendors].sort((a, b) => a.vendor_name.localeCompare(b.vendor_name, undefined, { sensitivity: 'base' }));
 }
 
-export async function fetchPaginatedVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; page?: number; pageSize?: number }): Promise<{ status: string; data: { items: Vendor[]; totalCount: number; page: number; pageSize: number } }> {
+export async function fetchPaginatedVendors(params?: { salesRepId?: string; sales_rep_id?: string; status?: string; search?: string; location?: string; vendorTypeId?: string; page?: number; pageSize?: number }): Promise<{ status: string; data: { items: Vendor[]; totalCount: number; page: number; pageSize: number } }> {
   const query = buildQueryString({
     salesRepId: params?.salesRepId,
     sales_rep_id: params?.sales_rep_id,
     status: params?.status,
     search: params?.search,
+    location: params?.location,
+    vendorTypeId: params?.vendorTypeId,
     page: params?.page,
     pageSize: params?.pageSize,
   });

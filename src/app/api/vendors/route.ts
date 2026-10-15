@@ -56,6 +56,7 @@ function mapVendorRow(row: any): Vendor {
     status: String(row.status) as Vendor['status'],
     created_by: row.created_by === null ? undefined : String(row.created_by),
     updated_by: row.updated_by === null ? undefined : String(row.updated_by),
+    last_visit_date: row.last_visit_date === null || row.last_visit_date === undefined ? null : formatDateValue(row.last_visit_date),
   };
 }
 
@@ -77,6 +78,8 @@ export async function GET(request: NextRequest) {
     const salesRepId = query.get('salesRepId') || query.get('sales_rep_id');
     const status = query.get('status');
     const search = query.get('search');
+    const location = query.get('location');
+    const vendorTypeId = query.get('vendorTypeId') || query.get('vendor_type_id');
     const page = parsePositiveInt(query.get('page'));
     const pageSize = parsePositiveInt(query.get('pageSize'));
 
@@ -90,9 +93,20 @@ export async function GET(request: NextRequest) {
       params.sales_rep_id = salesRepId;
     }
 
-    if (status) {
+    if (status === 'dormant') {
+      filters.push("v.status <> 'inactive' AND latest_visit.latest_visit_date IS NOT NULL AND latest_visit.latest_visit_date < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 14 DAY)");
+    } else if (status) {
       filters.push('v.status = :status');
       params.status = status;
+    }
+
+    if (location && String(location).trim() !== '') {
+      filters.push("COALESCE(NULLIF(TRIM(v.location), ''), 'Unknown location') = :location");
+      params.location = String(location).trim();
+    }
+    if (vendorTypeId && String(vendorTypeId).trim() !== '') {
+      filters.push('v.vendor_type_id = :vendor_type_id');
+      params.vendor_type_id = String(vendorTypeId).trim();
     }
 
     if (search && String(search).trim() !== '') {
@@ -102,15 +116,17 @@ export async function GET(request: NextRequest) {
     }
 
     const whereClause = filters.length > 0 ? `WHERE ${filters.join(' AND ')}` : '';
-    const countSql = `SELECT COUNT(*) AS total FROM vendors v ${whereClause}`;
+    const latestVisitJoin = `LEFT JOIN (SELECT vendor_id, MAX(COALESCE(timestamp, date)) AS latest_visit_date FROM visit_logs WHERE COALESCE(is_reversed, 0) = 0 GROUP BY vendor_id) latest_visit ON latest_visit.vendor_id = v.vendor_id`;
+    const countSql = `SELECT COUNT(*) AS total FROM vendors v ${latestVisitJoin} ${whereClause}`;
     const [countRows] = await dbQuery<{ total: number }[]>(countSql, params);
     const total = countRows.length > 0 ? Number(countRows[0].total) : 0;
 
-    let sql = `SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.location_latitude, v.location_longitude, v.location_updated_at, v.location_updated_by, location_user.name AS location_updated_by_name, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by
+    let sql = `SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.location_latitude, v.location_longitude, v.location_updated_at, v.location_updated_by, location_user.name AS location_updated_by_name, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by, latest_visit.latest_visit_date AS last_visit_date
       FROM vendors v LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
       LEFT JOIN vendor_statuses vs ON vs.status_id = v.status
       LEFT JOIN app_users location_user ON location_user.user_id = v.location_updated_by
+      ${latestVisitJoin}
       ${whereClause}
       ORDER BY v.vendor_id ASC`;
 

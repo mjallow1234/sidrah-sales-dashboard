@@ -34,6 +34,7 @@ export interface Vendor {
   location_updated_by?: string | null;
   location_updated_by_name?: string;
   pending_location_request?: VendorLocationRequest | null;
+  last_visit_date?: string | null;
 }
 
 export type VendorLocationRequestStatus = 'pending' | 'approved' | 'rejected';
