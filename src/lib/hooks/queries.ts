@@ -591,6 +591,8 @@ export function useAddDeliveryCommentMutation() {
     mutationFn: ({ deliveryId, comment }) => addDeliveryComment(deliveryId, comment),
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['deliveryActivity', variables.deliveryId] });
+      queryClient.invalidateQueries({ queryKey: ['deliveries'] });
+      queryClient.invalidateQueries({ queryKey: ['delivery', variables.deliveryId] });
     },
   });
 }

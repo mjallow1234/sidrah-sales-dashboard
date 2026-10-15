@@ -237,6 +237,9 @@ export interface DeliveryRecord {
   accountability_cash_collected?: number;
   accountability_stock_returned?: number;
   accountability_remaining_value?: number;
+  latest_comment?: string;
+  latest_comment_at?: string;
+  latest_comment_actor_name?: string;
 }
 
 export type AgentAccountabilityEventType = 'pending_delivery' | 'delivery_activation' | 'cash_collection' | 'stock_return' | 'transfer_out' | 'transfer_in' | 'cash_handover' | 'correction' | 'reversal';

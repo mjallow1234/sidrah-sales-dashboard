@@ -112,6 +112,9 @@ export class DeliveryRepository extends BaseRepository {
       accountability_stock_returned: row.accountability_stock_returned === null || row.accountability_stock_returned === undefined ? undefined : Number(row.accountability_stock_returned),
       accountability_remaining_value: row.accountability_remaining_value === null || row.accountability_remaining_value === undefined ? undefined : Number(row.accountability_remaining_value),
       cooking_location: row.cooking_location === 'Home' || row.cooking_location === 'Workplace' ? row.cooking_location : undefined,
+      latest_comment: row.latest_comment === null || row.latest_comment === undefined ? undefined : String(row.latest_comment),
+      latest_comment_at: row.latest_comment_at === null || row.latest_comment_at === undefined ? undefined : String(row.latest_comment_at),
+      latest_comment_actor_name: row.latest_comment_actor_name === null || row.latest_comment_actor_name === undefined ? undefined : String(row.latest_comment_actor_name),
     };
   }
 
@@ -134,6 +137,31 @@ export class DeliveryRepository extends BaseRepository {
         ,v.location_latitude AS vendor_location_latitude,
         v.location_longitude AS vendor_location_longitude,
         eg.quantity_received AS empty_gallons_received
+        ,(SELECT a.comment
+            FROM delivery_activity a
+           WHERE a.delivery_id = d.delivery_id
+             AND a.activity_type = 'comment'
+             AND a.comment IS NOT NULL
+             AND TRIM(a.comment) <> ''
+           ORDER BY a.occurred_at DESC, a.activity_id DESC
+           LIMIT 1) AS latest_comment
+        ,(SELECT a.occurred_at
+            FROM delivery_activity a
+           WHERE a.delivery_id = d.delivery_id
+             AND a.activity_type = 'comment'
+             AND a.comment IS NOT NULL
+             AND TRIM(a.comment) <> ''
+           ORDER BY a.occurred_at DESC, a.activity_id DESC
+           LIMIT 1) AS latest_comment_at
+        ,(SELECT COALESCE(actor.name, actor.username)
+            FROM delivery_activity a
+            LEFT JOIN app_users actor ON actor.user_id = a.actor_user_id
+           WHERE a.delivery_id = d.delivery_id
+             AND a.activity_type = 'comment'
+             AND a.comment IS NOT NULL
+             AND TRIM(a.comment) <> ''
+           ORDER BY a.occurred_at DESC, a.activity_id DESC
+           LIMIT 1) AS latest_comment_actor_name
       FROM deliveries d
       LEFT JOIN vendors v ON v.vendor_id = COALESCE(d.vendor_id, (
         SELECT v2.vendor_id

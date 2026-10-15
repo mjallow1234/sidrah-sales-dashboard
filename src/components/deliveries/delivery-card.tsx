@@ -39,6 +39,11 @@ function formatDeliveredAt(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { dateStyle: 'medium' });
 }
 
+function formatCommentAt(value: string) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 export function DeliveryCard({ delivery, showNavigation = false }: { delivery: DeliveryRecord; showNavigation?: boolean }) {
   const [showAllProducts, setShowAllProducts] = useState(false);
   const searchParams = useSearchParams();
@@ -108,6 +113,14 @@ export function DeliveryCard({ delivery, showNavigation = false }: { delivery: D
               {paymentsQuery.isLoading ? 'Loading…' : `D${Number(paymentsQuery.data?.total_amount ?? 0).toLocaleString()}`}
             </p>
           </div>
+
+          {delivery.latest_comment ? (
+            <div className="rounded-2xl bg-slate-50 px-3 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">Latest comment</p>
+              <p className="mt-1 line-clamp-2 break-words text-sm text-slate-800" title={delivery.latest_comment}>{delivery.latest_comment}</p>
+              {delivery.latest_comment_at ? <p className="mt-1 text-xs text-slate-500">{formatCommentAt(delivery.latest_comment_at)}{delivery.latest_comment_actor_name ? ` · ${delivery.latest_comment_actor_name}` : ''}</p> : null}
+            </div>
+          ) : null}
 
           {delivery.created_by_name ? (
             <div>
