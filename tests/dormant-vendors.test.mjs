@@ -24,11 +24,12 @@ test('dormant card and modal are available to agents without bypassing vendor AP
   assert.match(modal, /last_visit_date/);
   assert.match(api, /isAgentRole\(session\.role\)/);
   assert.match(api, /session_sales_rep_id/);
+  assert.match(api, /status === 'active' \|\| status === 'inactive'/);
 });
 
 test('admin dormant status opens the shared filtered dormant modal', () => {
   const ui = read('src/components/dashboard/admin-control-center.tsx');
   assert.match(ui, /status\.statusId === 'dormant'/);
-  assert.match(ui, /kind: 'dormant'/);
   assert.match(ui, /DormantVendorsModal/);
+  assert.match(ui, /\['active', 'inactive', 'dormant'\]\.includes\(status\.statusId\)/);
 });

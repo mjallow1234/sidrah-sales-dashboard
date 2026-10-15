@@ -83,6 +83,10 @@ export async function GET(request: NextRequest) {
     const page = parsePositiveInt(query.get('page'));
     const pageSize = parsePositiveInt(query.get('pageSize'));
 
+    if (isAgentRole(session.role) && (status === 'active' || status === 'inactive')) {
+      return forbiddenResponse();
+    }
+
     if (isAgentRole(session.role)) {
       if (session.sales_rep_id) {
         filters.push('(v.sales_rep_id IS NULL OR v.sales_rep_id = :session_sales_rep_id)');
@@ -95,6 +99,8 @@ export async function GET(request: NextRequest) {
 
     if (status === 'dormant') {
       filters.push("v.status <> 'inactive' AND latest_visit.latest_visit_date IS NOT NULL AND latest_visit.latest_visit_date < DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 14 DAY)");
+    } else if (status === 'active') {
+      filters.push("(v.status = 'active' OR (v.status = 'dormant' AND (latest_visit.latest_visit_date IS NULL OR latest_visit.latest_visit_date >= DATE_SUB(CURRENT_TIMESTAMP, INTERVAL 14 DAY))))");
     } else if (status) {
       filters.push('v.status = :status');
       params.status = status;
