@@ -440,6 +440,19 @@ export interface DeliveryPayment {
   recorded_at: string;
 }
 
+export interface DeliveryPaymentCorrection {
+  correction_id: string;
+  operation_id: string;
+  payment_id: string;
+  delivery_id: string;
+  previous_amount: number;
+  corrected_amount: number;
+  reason: string;
+  corrected_by: string;
+  corrected_by_name?: string;
+  corrected_at: string;
+}
+
 export interface DeliveryPaymentHistory {
   payments: DeliveryPayment[];
   total_amount: number;

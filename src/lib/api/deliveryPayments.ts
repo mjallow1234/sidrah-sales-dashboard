@@ -1,4 +1,4 @@
-import type { DeliveryPaymentHistory, DeliveryPaymentOption, DeliveryPaymentSummary } from '@/lib/types';
+import type { DeliveryPaymentCorrection, DeliveryPaymentHistory, DeliveryPaymentOption, DeliveryPaymentSummary } from '@/lib/types';
 
 async function parse<T>(response: Response, fallback: string): Promise<T> {
   const body = await response.json().catch(() => null);
@@ -35,4 +35,8 @@ export async function getDeliveryPaymentSummary(filters: { date: string; locatio
 
 export async function recordDeliveryPayment(deliveryId: string, amount: number, paymentOptionId: string): Promise<DeliveryPaymentHistory> {
   return parse<DeliveryPaymentHistory>(await fetch(`/api/deliveries/${encodeURIComponent(deliveryId)}/payments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, payment_option_id: paymentOptionId }) }), 'Unable to record payment.');
+}
+
+export async function correctDeliveryPayment(deliveryId: string, paymentId: string, amount: number, reason: string, operationId?: string): Promise<DeliveryPaymentCorrection> {
+  return parse<DeliveryPaymentCorrection>(await fetch(`/api/deliveries/${encodeURIComponent(deliveryId)}/payments/${encodeURIComponent(paymentId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount, reason, operation_id: operationId }) }), 'Unable to correct payment.');
 }

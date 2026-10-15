@@ -17,8 +17,8 @@ import {
   useUpdateDeliveryDateMutation,
   useUpdateDeliveryDetailsMutation,
 } from '@/lib/hooks/queries';
-import { useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
-import { canRecordDeliveryPayment } from '@/lib/authorization';
+import { useCorrectDeliveryPaymentMutation, useDeliveryPaymentOptionsQuery, useDeliveryPaymentsQuery, useRecordDeliveryPaymentMutation } from '@/lib/hooks/deliveryPaymentQueries';
+import { canRecordDeliveryPayment, isAdminRole } from '@/lib/authorization';
 import { useEffectivePermissionQuery } from '@/lib/hooks/userQueries';
 import type { DeliveryItem } from '@/lib/types';
 import { DeliveryLocationReporter } from './delivery-location-reporter';
@@ -62,6 +62,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const updateDeliveryDateMutation = useUpdateDeliveryDateMutation();
   const updateDeliveryDetailsMutation = useUpdateDeliveryDetailsMutation();
   const recordPaymentMutation = useRecordDeliveryPaymentMutation();
+  const correctPaymentMutation = useCorrectDeliveryPaymentMutation();
   const { data: products = [], isLoading: productsLoading, isError: productsError } = useProductsQuery();
 
   const currentUserId = authQuery.data?.userId ?? '';
@@ -93,6 +94,9 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
   const [additionalItems, setAdditionalItems] = useState([{ product_id: '', quantity: 1 }]);
   const [paymentAmount, setPaymentAmount] = useState('');
   const [paymentOptionId, setPaymentOptionId] = useState('');
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [editingPaymentAmount, setEditingPaymentAmount] = useState('');
+  const [editingPaymentReason, setEditingPaymentReason] = useState('');
   const [editingDeliveryDate, setEditingDeliveryDate] = useState(false);
   const [deliveryDate, setDeliveryDate] = useState('');
   const [cookingLocation, setCookingLocation] = useState<'Home' | 'Workplace' | ''>('');
@@ -168,6 +172,15 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
     });
   };
 
+  const handleCorrectPayment = (paymentId: string) => {
+    const amount = Number(editingPaymentAmount);
+    if (!Number.isFinite(amount) || amount < 0 || Math.round(amount * 100) !== amount * 100 || !editingPaymentReason.trim()) return;
+    if (!window.confirm(`Correct this payment to ${amount.toLocaleString()}? The original amount will remain in the correction history.`)) return;
+    correctPaymentMutation.mutate({ deliveryId: delivery.delivery_id, paymentId, amount, reason: editingPaymentReason.trim() }, {
+      onSuccess: () => { setEditingPaymentId(null); setEditingPaymentAmount(''); setEditingPaymentReason(''); },
+    });
+  };
+
   return (
     <div className="space-y-6">
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
@@ -228,7 +241,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
         active={isDeliveryUser && delivery.status === 'ongoing' && delivery.claimed_by === currentUserId}
       />
 
-      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft">
+      <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-soft [&>div:nth-last-child(1)]:hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Payments received</h2>
@@ -246,6 +259,24 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
         {paymentsQuery.isLoading ? <p className="mt-4 text-sm text-slate-500">Loading payment history…</p> : null}
         {paymentsQuery.isError ? <p className="mt-4 text-sm text-rose-600">Unable to load payment history.</p> : null}
         {!paymentsQuery.isLoading && !paymentsQuery.isError && (paymentsQuery.data?.payments.length ?? 0) === 0 ? <p className="mt-4 text-sm text-slate-500">No payments recorded.</p> : null}
+        <div className="mt-4 max-h-96 overflow-y-auto space-y-3">
+          {(paymentsQuery.data?.payments ?? []).map((payment) => {
+            const editing = editingPaymentId === payment.payment_id;
+            const canEdit = isAdminRole(currentRole) && delivery.status === 'delivered';
+            return <div key={payment.payment_id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-slate-900">{Number(payment.amount).toLocaleString()} · {payment.payment_method}</span><span className="text-xs text-slate-500">{new Date(payment.recorded_at).toLocaleString()}</span></div>
+              <p className="mt-1 text-slate-600">Recorded by {payment.recorded_by_name || 'Unknown user'}</p>
+              {canEdit && !editing ? <Button type="button" variant="secondary" className="mt-3" onClick={() => { setEditingPaymentId(payment.payment_id); setEditingPaymentAmount(String(payment.amount)); setEditingPaymentReason(''); correctPaymentMutation.reset(); }}>Edit payment</Button> : null}
+              {editing ? <div className="mt-3 space-y-3 rounded-2xl border border-amber-200 bg-amber-50 p-3">
+                <p className="text-xs text-amber-800">Original amount: <span className="font-semibold">{Number(payment.amount).toLocaleString()}</span></p>
+                <label className="block text-sm font-semibold text-slate-900">Corrected amount<input type="number" min="0" step="0.01" value={editingPaymentAmount} onChange={(event) => setEditingPaymentAmount(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 font-normal" /></label>
+                <label className="block text-sm font-semibold text-slate-900">Reason<textarea required maxLength={2000} rows={3} value={editingPaymentReason} onChange={(event) => setEditingPaymentReason(event.target.value)} className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 font-normal" /></label>
+                <div className="flex flex-wrap gap-2"><Button type="button" onClick={() => handleCorrectPayment(payment.payment_id)} disabled={correctPaymentMutation.isPending || !editingPaymentReason.trim()}>{correctPaymentMutation.isPending ? 'Saving...' : 'Confirm correction'}</Button><Button type="button" variant="secondary" onClick={() => { setEditingPaymentId(null); setEditingPaymentAmount(''); setEditingPaymentReason(''); }}>Cancel</Button></div>
+                {correctPaymentMutation.error ? <p className="text-sm text-rose-600">{correctPaymentMutation.error.message}</p> : null}
+              </div> : null}
+            </div>;
+          })}
+        </div>
         <div className="mt-4 space-y-3">{(paymentsQuery.data?.payments ?? []).map((payment) => <div key={payment.payment_id} className="rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-semibold text-slate-900">{Number(payment.amount).toLocaleString()} · {payment.payment_method}</span><span className="text-xs text-slate-500">{new Date(payment.recorded_at).toLocaleString()}</span></div><p className="mt-1 text-slate-600">Recorded by {payment.recorded_by_name || 'Unknown user'}</p></div>)}</div>
       </div>
 

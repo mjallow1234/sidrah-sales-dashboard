@@ -1,6 +1,6 @@
 import { randomUUID } from 'crypto';
 import { getPool, transaction } from '@/lib/db';
-import type { DeliveryPaymentHistory, DeliveryPaymentOption, DeliveryPaymentSummary } from '@/lib/types';
+import type { DeliveryPaymentCorrection, DeliveryPaymentHistory, DeliveryPaymentOption, DeliveryPaymentSummary } from '@/lib/types';
 import { DeliveryPaymentRepository } from '@/repositories/DeliveryPaymentRepository';
 import { NotFoundError } from '@/repositories/errors';
 
@@ -9,7 +9,7 @@ export class DeliveryPaymentHttpError extends Error {
   constructor(status: number, message: string) { super(message); this.status = status; }
 }
 
-function buildId(): string { return `DPM_${randomUUID().replace(/-/g, '').slice(0, 20)}`; }
+function buildId(prefix = 'DPM'): string { return `${prefix}_${randomUUID().replace(/-/g, '').slice(0, 20)}`; }
 
 function todayUtcDate(): string { return new Date().toISOString().slice(0, 10); }
 
@@ -74,6 +74,36 @@ export async function recordDeliveryPayment(deliveryId: string, value: unknown, 
   } catch (error: unknown) {
     if (error instanceof DeliveryPaymentHttpError) throw error;
     if (error instanceof NotFoundError) throw new DeliveryPaymentHttpError(400, 'Delivery or active payment method was not found.');
+    throw error;
+  }
+}
+
+function correctionAmount(value: unknown): number {
+  if (value === '' || (typeof value === 'string' && !value.trim())) throw new DeliveryPaymentHttpError(400, 'Corrected amount is required.');
+  const amount = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(amount) || amount < 0) throw new DeliveryPaymentHttpError(400, 'Corrected amount must be zero or greater.');
+  if (Math.round(amount * 100) !== amount * 100) throw new DeliveryPaymentHttpError(400, 'Corrected amount can have at most two decimal places.');
+  return amount;
+}
+
+function correctionReason(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) throw new DeliveryPaymentHttpError(400, 'A correction reason is required.');
+  const reason = value.trim();
+  if (reason.length > 2000) throw new DeliveryPaymentHttpError(400, 'Correction reason is too long.');
+  return reason;
+}
+
+export async function correctDeliveryPayment(input: { deliveryId: string; paymentId: string; amount: unknown; reason: unknown; operationId?: unknown; actorUserId: string }): Promise<DeliveryPaymentCorrection> {
+  const amount = correctionAmount(input.amount);
+  const reason = correctionReason(input.reason);
+  const operationId = typeof input.operationId === 'string' && input.operationId.trim() ? input.operationId.trim() : buildId('DPC');
+  try {
+    return await transaction(async (connection) => new DeliveryPaymentRepository(connection).correctPayment({ correction_id: buildId('DPC'), operation_id: operationId, payment_id: input.paymentId, delivery_id: input.deliveryId, corrected_amount: amount, reason, corrected_by: input.actorUserId }));
+  } catch (error: unknown) {
+    if (error instanceof DeliveryPaymentHttpError) throw error;
+    if (error instanceof NotFoundError) throw new DeliveryPaymentHttpError(404, error.message);
+    if (error instanceof Error && error.message.includes('Only completed deliveries')) throw new DeliveryPaymentHttpError(409, error.message);
+    if ((error as any)?.code === 'ER_DUP_ENTRY') throw new DeliveryPaymentHttpError(409, 'This correction operation has already been recorded.');
     throw error;
   }
 }

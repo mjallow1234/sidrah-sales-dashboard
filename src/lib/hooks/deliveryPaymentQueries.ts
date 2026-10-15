@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
-import { createDeliveryPaymentOption, getAccountabilityPaymentOptions, getDeliveryPaymentOptions, getDeliveryPayments, getDeliveryPaymentSummary, recordDeliveryPayment, updateDeliveryPaymentOption } from '@/lib/api/deliveryPayments';
+import { correctDeliveryPayment, createDeliveryPaymentOption, getAccountabilityPaymentOptions, getDeliveryPaymentOptions, getDeliveryPayments, getDeliveryPaymentSummary, recordDeliveryPayment, updateDeliveryPaymentOption } from '@/lib/api/deliveryPayments';
 import type { DeliveryRecord } from '@/lib/types';
 
 export function useDeliveryPaymentOptionsQuery(includeInactive = false, enabled = true) {
@@ -57,4 +57,15 @@ export function useDeliveryPaymentSummaryQuery(filters: { date: string; location
 export function useRecordDeliveryPaymentMutation() {
   const client = useQueryClient();
   return useMutation({ mutationFn: ({ deliveryId, amount, paymentOptionId }: { deliveryId: string; amount: number; paymentOptionId: string }) => recordDeliveryPayment(deliveryId, amount, paymentOptionId), onSuccess: (_data, variables) => { client.invalidateQueries({ queryKey: ['deliveryPayments', variables.deliveryId] }); } });
+}
+
+export function useCorrectDeliveryPaymentMutation() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ deliveryId, paymentId, amount, reason, operationId }: { deliveryId: string; paymentId: string; amount: number; reason: string; operationId?: string }) => correctDeliveryPayment(deliveryId, paymentId, amount, reason, operationId),
+    onSuccess: (_data, variables) => {
+      client.invalidateQueries({ queryKey: ['deliveryPayments', variables.deliveryId] });
+      client.invalidateQueries({ queryKey: ['deliveryPaymentSummary'] });
+    },
+  });
 }
