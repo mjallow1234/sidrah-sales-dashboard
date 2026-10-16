@@ -49,29 +49,32 @@ function validateProductPayload(payload: Record<string, unknown>) {
 }
 
 function validateProductUpdatePayload(payload: Record<string, unknown>) {
-  if (!payload || Object.keys(payload).length === 0) {
+  const editableFields = ['product_name', 'category', 'unit', 'default_unit_price', 'currency', 'low_stock_threshold', 'active'];
+  if (!payload || !editableFields.some((field) => Object.prototype.hasOwnProperty.call(payload, field))) {
     throw new ValidationError('At least one product field must be provided.');
   }
 
-  if (payload.sku !== undefined) {
-    throw new ValidationError('sku cannot be updated.');
+  for (const field of ['product_id', 'sku', 'date_created', 'created_by', 'version']) {
+    if (payload[field] !== undefined) {
+      throw new ValidationError(`${field} cannot be updated.`);
+    }
   }
-  if (payload.product_name !== undefined && typeof payload.product_name !== 'string') {
+  if (payload.product_name !== undefined && (typeof payload.product_name !== 'string' || payload.product_name.trim() === '')) {
     throw new ValidationError('product_name must be a string.');
   }
-  if (payload.category !== undefined && typeof payload.category !== 'string') {
+  if (payload.category !== undefined && (typeof payload.category !== 'string' || payload.category.trim() === '')) {
     throw new ValidationError('category must be a string.');
   }
-  if (payload.unit !== undefined && typeof payload.unit !== 'string') {
+  if (payload.unit !== undefined && (typeof payload.unit !== 'string' || payload.unit.trim() === '')) {
     throw new ValidationError('unit must be a string.');
   }
-  if (payload.currency !== undefined && typeof payload.currency !== 'string') {
+  if (payload.currency !== undefined && (typeof payload.currency !== 'string' || payload.currency.trim() === '')) {
     throw new ValidationError('currency must be a string.');
   }
-  if (payload.default_unit_price !== undefined && (Number.isNaN(Number(payload.default_unit_price)) || Number(payload.default_unit_price) < 0)) {
+  if (payload.default_unit_price !== undefined && (!Number.isFinite(Number(payload.default_unit_price)) || (typeof payload.default_unit_price === 'string' && payload.default_unit_price.trim() === '') || Number(payload.default_unit_price) < 0)) {
     throw new ValidationError('default_unit_price must be a non-negative number.');
   }
-  if (payload.low_stock_threshold !== undefined && (Number.isNaN(Number(payload.low_stock_threshold)) || Number(payload.low_stock_threshold) < 0)) {
+  if (payload.low_stock_threshold !== undefined && (!Number.isFinite(Number(payload.low_stock_threshold)) || (typeof payload.low_stock_threshold === 'string' && payload.low_stock_threshold.trim() === '') || Number(payload.low_stock_threshold) < 0)) {
     throw new ValidationError('low_stock_threshold must be a non-negative number.');
   }
   if (payload.active !== undefined) {

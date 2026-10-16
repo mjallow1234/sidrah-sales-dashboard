@@ -10,7 +10,7 @@ const categoryOptions = ['Groundnut Products', 'Groundnut Ingredients'] as const
 
 const productSchema = z.object({
   product_name: z.string().min(1, 'Product name is required'),
-  category: z.enum(categoryOptions),
+  category: z.string().min(1, 'Category is required'),
   unit: z.string().min(1, 'Unit is required'),
   default_unit_price: z.number().min(0, 'Price must be at least 0'),
   currency: z.string().min(1, 'Currency is required'),
@@ -26,6 +26,9 @@ interface ProductFormProps {
 
 export function ProductForm({ initialValues, productId, onSuccess }: ProductFormProps) {
   const sku = initialValues?.sku ?? '';
+  const availableCategoryOptions = initialValues?.category && !categoryOptions.includes(initialValues.category as typeof categoryOptions[number])
+    ? [initialValues.category, ...categoryOptions]
+    : categoryOptions;
   const [formState, setFormState] = useState({
     product_name: initialValues?.product_name ?? '',
     category: (initialValues?.category as typeof categoryOptions[number]) ?? categoryOptions[0],
@@ -87,6 +90,7 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
           Product name
           <input
             type="text"
+            required
             value={formState.product_name}
             onChange={(event) => handleChange('product_name', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
@@ -95,11 +99,12 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
         <label className="block text-sm text-slate-700">
           Category
           <select
+            required
             value={formState.category}
             onChange={(event) => handleChange('category', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           >
-            {categoryOptions.map((option) => (
+            {availableCategoryOptions.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
@@ -110,6 +115,7 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
           Unit
           <input
             type="text"
+            required
             value={formState.unit}
             onChange={(event) => handleChange('unit', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
@@ -122,7 +128,8 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
             min="0"
             step="0.01"
             value={formState.default_unit_price}
-            onChange={(event) => handleChange('default_unit_price', Number(event.target.value))}
+            onChange={(event) => handleChange('default_unit_price', event.target.value === '' ? Number.NaN : Number(event.target.value))}
+            required
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           />
         </label>
@@ -130,6 +137,7 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
           Currency
           <input
             type="text"
+            required
             value={formState.currency}
             onChange={(event) => handleChange('currency', event.target.value)}
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
@@ -142,7 +150,8 @@ export function ProductForm({ initialValues, productId, onSuccess }: ProductForm
             min="0"
             step="1"
             value={formState.low_stock_threshold}
-            onChange={(event) => handleChange('low_stock_threshold', Number(event.target.value))}
+            onChange={(event) => handleChange('low_stock_threshold', event.target.value === '' ? Number.NaN : Number(event.target.value))}
+            required
             className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
           />
           <p className="mt-1 text-xs text-slate-500">0 means no informational threshold is configured. It is stored as a numeric value only.</p>
