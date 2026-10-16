@@ -72,6 +72,9 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     ? vendorInventory.reduce((sum, record) => sum + (record.retrieval_quantity ?? 0), 0)
     : 0;
   const totalSupplied = inventoryReceivedTotal + roleIndependentTransferInQuantity - roleIndependentTransferOutQuantity - reversedSupplied - roleIndependentRetrievalQuantity;
+  const currentStockTotal = hasVendorInventory
+    ? vendorInventory.reduce((sum, record) => sum + (record.current_stock ?? 0), 0)
+    : 0;
   const legacyOpeningQuantity = Math.max(inventoryReceivedTotal - activeVisitSupplied - roleIndependentTransferInQuantity, 0);
   const lastAddedStock = [...(transactions ?? [])]
     .filter((transaction) => !transaction.is_reversed && transaction.stock_added > 0)
@@ -139,7 +142,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-3xl bg-slate-50 p-4">
               <p className="text-sm text-slate-500">Current attributable quantity</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{totalSupplied}</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{currentStockTotal}</p>
               <p className="mt-1 text-xs text-slate-500">Currently payable after removals and reversals</p>
             </div>
             <div className="rounded-3xl bg-slate-50 p-4">
@@ -236,7 +239,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
                   <p className="font-semibold text-slate-900">{productNames?.[record.product_id] ?? 'Product unavailable — historical record'}</p>
                   <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
                     <div><dt className="text-slate-500">Product cash received</dt><dd className="mt-1 font-semibold text-slate-900">GMD {(productCashReceived[record.product_id] ?? 0).toLocaleString()}</dd></div>
-                    <div><dt className="text-slate-500">Current attributable quantity</dt><dd className="mt-1 font-semibold text-slate-900">{record.total_stock_received + (record.transfer_in_quantity ?? 0) - (record.transfer_out_quantity ?? 0) - (transactions ?? []).reduce((total, transaction) => transaction.product_id === record.product_id && transaction.is_reversed ? total + (transaction.stock_added ?? 0) : total, 0) - (record.retrieval_quantity ?? 0)}</dd></div>
+                    <div><dt className="text-slate-500">Current attributable quantity</dt><dd className="mt-1 font-semibold text-slate-900">{record.current_stock}</dd></div>
                     <div><dt className="text-slate-500">Last added stock</dt><dd className="mt-1 font-semibold text-slate-900">{record.last_supplied_quantity}</dd></div>
                   </dl>
                 </article>

@@ -13,10 +13,10 @@ test('vendor inventory response exposes retrieval quantities per vendor and prod
   assert.match(route, /AS retrieval_quantity/);
 });
 
-test('vendor detail subtracts retrievals from attributable quantity', () => {
+test('vendor detail displays authoritative stored stock after retrievals', () => {
   const shell = read('src/components/vendors/vendor-details-shell.tsx');
   assert.match(shell, /record\.retrieval_quantity/);
-  assert.match(shell, /- \(record\.retrieval_quantity \?\? 0\)/);
+  assert.match(shell, /Current attributable quantity[\s\S]*\{record\.current_stock\}/);
 });
 
 test('retrieval and transfer mutations refresh affected vendor data', () => {
