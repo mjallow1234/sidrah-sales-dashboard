@@ -7,6 +7,12 @@ import { useAppStore } from '@/lib/store/useAppStore';
 import { useAuthQuery, useCreateVisitMutation, useProductsQuery, useSalesRepsQuery, useVendorInventoryByVendorAndProductQuery } from '@/lib/hooks/queries';
 import type { Vendor, Product, SalesRep } from '@/lib/types';
 
+function getUtcDateOffset(offsetDays: number): string {
+  const date = new Date();
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date.toISOString().slice(0, 10);
+}
+
 const visitSchema = z.object({
   vendor_id: z.string().min(1, 'Vendor is required'),
   product_id: z.string().min(1, 'Product is required'),
@@ -39,6 +45,9 @@ export function VisitForm({ vendors }: VisitFormProps) {
 
   const authQuery = useAuthQuery();
   const authData = authQuery.data;
+  const isAgent = authData?.valid && authData.role === 'agent';
+  const agentCashDateMin = isAgent ? getUtcDateOffset(-1) : undefined;
+  const agentCashDateMax = isAgent ? getUtcDateOffset(0) : undefined;
   const productQuery = useProductsQuery();
   const salesRepsQuery = useSalesRepsQuery();
   const vendorInventoryQuery = useVendorInventoryByVendorAndProductQuery(visitDraft.vendor_id, visitDraft.product_id);
@@ -203,6 +212,8 @@ export function VisitForm({ vendors }: VisitFormProps) {
               type="date"
               value={visitDraft.cash_collection_date}
               onChange={(event) => setVisitDraft({ cash_collection_date: event.target.value })}
+              min={agentCashDateMin}
+              max={agentCashDateMax}
               className="mt-2 w-full rounded-3xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none"
               disabled={visitDraft.cash_collected <= 0 || !hasVendorInventory || !visitDraft.product_id}
             />

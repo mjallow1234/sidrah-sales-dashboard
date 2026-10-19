@@ -68,6 +68,12 @@ function getDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function getUtcDateOffset(date: Date, offsetDays: number): string {
+  const adjusted = new Date(date.getTime());
+  adjusted.setUTCDate(adjusted.getUTCDate() + offsetDays);
+  return getDateString(adjusted);
+}
+
 function getDateTimeString(date: Date): string {
   return date.toISOString().slice(0, 19).replace('T', ' ');
 }
@@ -157,6 +163,9 @@ export async function createVisit(payload: CreateVisitPayload): Promise<VisitRes
   const cashCollectionDate = cashCollected > 0
     ? validateDateOnly(payload.cash_collection_date ?? nowDate, 'cash_collection_date')
     : null;
+  if (cashCollectionDate && isAgentRole(payload.actor_role) && cashCollectionDate < getUtcDateOffset(now, -1)) {
+    throw new HttpError(400, 'Agents may only record cash collected today or yesterday.');
+  }
   const nowDateTime = getDateTimeString(now);
   const transactionId = generateId('T');
   const journalPayload = {
