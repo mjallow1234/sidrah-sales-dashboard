@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/ui/search-bar';
-import { useAppStore } from '@/lib/store/useAppStore';
 import { usePaginatedVendorsQuery } from '@/lib/hooks/queries';
 import type { Vendor } from '@/lib/types';
 import { vendorHref } from '@/lib/navigation/vendorNavigation';
@@ -25,24 +24,40 @@ export function VendorList() {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const searchQuery = useAppStore((state) => state.searchQuery);
-  const setSearchQuery = useAppStore((state) => state.setSearchQuery);
-  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page') || 1)));
-
-  const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+  const searchParamsString = searchParams.toString();
+  const appliedSearch = searchParams.get('search') || '';
+  const page = Math.max(1, Number(searchParams.get('page') || 1));
+  const [searchInput, setSearchInput] = useState(appliedSearch);
+  const returnTo = `${pathname}${searchParamsString ? `?${searchParamsString}` : ''}`;
   const scrollKey = `vendor-list-scroll:${returnTo}`;
   useEffect(() => {
-    const nextSearch = searchParams.get('search') || '';
-    if (nextSearch !== searchQuery) setSearchQuery(nextSearch);
-    setPage(Math.max(1, Number(searchParams.get('page') || 1)));
+    setSearchInput(appliedSearch);
+  }, [appliedSearch]);
+  useEffect(() => {
+    if (searchInput === appliedSearch) return;
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(searchParamsString);
+      if (searchInput) params.set('search', searchInput); else params.delete('search');
+      params.delete('page');
+      const nextSearchParamsString = params.toString();
+      if (nextSearchParamsString !== searchParamsString) {
+        router.replace(nextSearchParamsString ? `${pathname}?${nextSearchParamsString}` : pathname, { scroll: false });
+      }
+    }, 200);
+    return () => window.clearTimeout(timer);
+  }, [appliedSearch, pathname, router, searchInput, searchParamsString]);
+  useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
       const saved = Number(window.sessionStorage.getItem(scrollKey));
       if (Number.isFinite(saved)) window.scrollTo({ top: saved, behavior: 'auto' });
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [searchParams, searchQuery, setSearchQuery, scrollKey]);
+  }, [scrollKey]);
 
-  const { data, isLoading, isError } = usePaginatedVendorsQuery({ search: searchQuery }, page, PAGE_SIZE);
+  const location = searchParams.get('location') || undefined;
+  const salesRepId = searchParams.get('salesRepId') || undefined;
+  const balance = searchParams.get('balance') || undefined;
+  const { data, isLoading, isError } = usePaginatedVendorsQuery({ search: appliedSearch, location, salesRepId, balance }, page, PAGE_SIZE);
 
   const vendors = useMemo(() => {
     if (!data?.data?.items) return [] as Vendor[];
@@ -55,23 +70,17 @@ export function VendorList() {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
 
   const handleSearchChange = (value: string) => {
-    setSearchQuery(value);
-    setPage(1);
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set('search', value); else params.delete('search');
-    params.delete('page');
-    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    setSearchInput(value);
   };
   const changePage = (nextPage: number) => {
-    setPage(nextPage);
-    const params = new URLSearchParams(searchParams.toString());
+    const params = new URLSearchParams(searchParamsString);
     if (nextPage > 1) params.set('page', String(nextPage)); else params.delete('page');
     router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   };
 
   return (
     <div className="space-y-4">
-      <SearchBar value={searchQuery} placeholder="Search by ID, name, phone, or location" onChange={(event) => handleSearchChange(event.target.value)} />
+      <SearchBar value={searchInput} placeholder="Search by ID, name, phone, or location" onChange={(event) => handleSearchChange(event.target.value)} />
       {isLoading ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-4 text-slate-500">Loading vendors…</div>
       ) : isError ? (

@@ -29,6 +29,11 @@ assert.match(owing, /vendor-drilldown-scroll/);
 assert.match(list, /searchParams/);
 assert.match(list, /sessionStorage/);
 assert.match(list, /vendorHref/);
+assert.match(list, /setTimeout\(\(\) =>/);
+assert.match(list, /}, 200\)/);
+assert.match(list, /setSearchInput\(value\)/);
+assert.match(list, /router\.replace\(/);
+assert.match(list, /const appliedSearch = searchParams\.get\('search'\)/);
 assert.match(detail, /getSafeReturnTo/);
 assert.match(detail, /returnTo/);
 
