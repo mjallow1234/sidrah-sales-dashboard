@@ -143,7 +143,15 @@ async function getExistingVisitResult(clientTransactionId: string): Promise<Visi
 export async function createVisit(payload: CreateVisitPayload): Promise<VisitResult> {
   const vendorId = String(payload.vendor_id ?? '');
   const productId = String(payload.product_id ?? '');
-  const salesRepId = String(payload.sales_rep_id ?? '');
+  const rawSalesRepId = payload.sales_rep_id;
+  if (rawSalesRepId !== undefined && rawSalesRepId !== null && typeof rawSalesRepId !== 'string') {
+    throw new HttpError(400, 'sales_rep_id must be a valid sales representative ID or be omitted.');
+  }
+  const salesRepIdValue = typeof rawSalesRepId === 'string' ? rawSalesRepId.trim() : '';
+  if (isAgentRole(payload.actor_role) && !salesRepIdValue) {
+    throw new HttpError(400, 'sales_rep_id is required for agents.');
+  }
+  const salesRepId = salesRepIdValue || null;
   const paymentMethod = String(payload.payment_method ?? '');
 
   // Stock Sold is no longer part of the operational model; any client-supplied value is ignored.

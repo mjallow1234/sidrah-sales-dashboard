@@ -12,10 +12,18 @@ test('privileged users may submit a visit without a sales representative', () =>
   assert.match(form, /Sales Representative \(Optional\)/);
   assert.match(form, /: visitDraft\.sales_rep_id \|\| null/);
   assert.match(service, /sales_rep_id\?: string \| null/);
+  assert.match(service, /rawSalesRepId !== undefined && rawSalesRepId !== null && typeof rawSalesRepId !== 'string'/);
   assert.match(service, /const salesRepId = salesRepIdValue \|\| null/);
   assert.match(service, /if \(salesRepId\) \{\s+const \[salesRepRows\]/s);
   assert.match(route, /isSupervisorRole\(session\.role\)/);
   assert.match(route, /isAdminOrSupervisorRole\(session\.role\)/);
+});
+
+test('blank optional representative values become SQL NULL while malformed explicit values are rejected', () => {
+  const service = read('src/services/visitService.ts');
+  assert.match(service, /typeof rawSalesRepId === 'string' \? rawSalesRepId\.trim\(\) : ''/);
+  assert.match(service, /const salesRepId = salesRepIdValue \|\| null/);
+  assert.match(service, /Invalid sales_rep_id/);
 });
 
 test('agents still require their authenticated sales representative', () => {
