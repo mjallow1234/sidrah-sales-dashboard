@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { StatsCard } from '@/components/dashboard/stats-card';
 import { TotalBucketsOutThereModal } from '@/components/dashboard/total-buckets-out-there-modal';
 import { VendorsOwingModal } from '@/components/dashboard/vendors-owing-modal';
@@ -8,12 +8,13 @@ import { usePaginatedVendorsQuery, useStatsQuery, useVendorsOwingQuery } from '@
 import { useDashboardFilters } from '@/components/dashboard/dashboard-filters-provider';
 import { DashboardFilters } from '@/components/dashboard/dashboard-filters';
 import { DashboardFiltersSummary } from '@/components/dashboard/dashboard-filters-summary';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AdminControlCenter } from '@/components/dashboard/admin-control-center';
 import { DormantVendorsModal } from '@/components/dashboard/dormant-vendors-modal';
 
 export function DashboardShell({ initialRole }: { initialRole?: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { filters } = useDashboardFilters();
   const [role, setRole] = useState<string | undefined>(initialRole);
 
@@ -65,9 +66,22 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
     router.push('/login');
   };
 
-  const [isVendorsOwingOpen, setIsVendorsOwingOpen] = useState(false);
+  const [isVendorsOwingOpen, setIsVendorsOwingOpen] = useState(() => searchParams.get('detail') === 'vendor-owing');
   const [isTotalBucketsModalOpen, setIsTotalBucketsModalOpen] = useState(false);
-  const [isDormantOpen, setIsDormantOpen] = useState(false);
+  const [isDormantOpen, setIsDormantOpen] = useState(() => searchParams.get('detail') === 'dormant');
+
+  useEffect(() => {
+    setIsVendorsOwingOpen(searchParams.get('detail') === 'vendor-owing');
+    setIsDormantOpen(searchParams.get('detail') === 'dormant');
+  }, [searchParams]);
+
+  const updateAgentDetail = useCallback((detail: 'vendor-owing' | 'dormant' | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    ['detail', 'detailStatus', 'detailLocation', 'detailVendorTypeId'].forEach((key) => params.delete(key));
+    if (detail) params.set('detail', detail);
+    const query = params.toString();
+    router.replace(query ? `/dashboard?${query}` : '/dashboard', { scroll: false });
+  }, [router, searchParams]);
 
   const { data: vendorsOwing, isLoading: vendorsOwingLoading } = useVendorsOwingQuery();
   const { data: dormantVendors } = usePaginatedVendorsQuery({ status: 'dormant' }, 1, 1, isAgent);
@@ -136,14 +150,14 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
           label: 'Balance owed',
           value: isLoading ? '...' : `GMD ${(stats?.totalVendorReceivables ?? 0).toLocaleString()}`,
           description: 'Total outstanding balance from your vendors.',
-          action: () => setIsVendorsOwingOpen(true),
+          action: () => { setIsVendorsOwingOpen(true); updateAgentDetail('vendor-owing'); },
           isClickable: true,
         },
         {
           label: 'Dormant vendors',
           value: isLoading ? '...' : dormantVendors?.data.totalCount ?? 0,
           description: 'No qualifying payment visit in the last 14 days.',
-          action: () => setIsDormantOpen(true),
+          action: () => { setIsDormantOpen(true); updateAgentDetail('dormant'); },
           isClickable: true,
         },
       ];
@@ -178,7 +192,7 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
         description: 'Current cumulative outstanding product value minus cash received.',
       },
     ];
-  }, [isAgent, isLoading, stats, bucketsOutThereDescription]);
+  }, [isAgent, isLoading, stats, bucketsOutThereDescription, updateAgentDetail]);
 
   return (
     <div className="px-4 pb-24 pt-8 sm:px-6 sm:pb-8 lg:px-8">
@@ -252,10 +266,10 @@ export function DashboardShell({ initialRole }: { initialRole?: string }) {
           <VendorsOwingModal
             vendors={vendorsOwing ?? []}
             totalOwed={stats?.totalVendorReceivables ?? 0}
-            onClose={() => setIsVendorsOwingOpen(false)}
+            onClose={() => { setIsVendorsOwingOpen(false); updateAgentDetail(null); }}
           />
         ) : null}
-        {isAgent && isDormantOpen ? <DormantVendorsModal onClose={() => setIsDormantOpen(false)} /> : null}
+        {isAgent && isDormantOpen ? <DormantVendorsModal onClose={() => { setIsDormantOpen(false); updateAgentDetail(null); }} /> : null}
 
         {isTotalBucketsModalOpen ? (
           <TotalBucketsOutThereModal

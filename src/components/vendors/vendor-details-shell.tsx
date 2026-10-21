@@ -6,12 +6,16 @@ import { TransactionTable } from '@/components/vendors/transaction-table';
 import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { isAdminOrSupervisorRole } from '@/lib/authorization';
 import { VendorLocationPanel } from '@/components/vendors/vendor-location-panel';
+import { useSearchParams } from 'next/navigation';
+import { getSafeReturnTo } from '@/lib/navigation/vendorNavigation';
 
 interface VendorDetailsShellProps {
   vendorId: string;
 }
 
 export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
+  const searchParams = useSearchParams();
+  const returnTo = getSafeReturnTo(searchParams.get('returnTo'), '/vendors');
   const { data: session } = useAuthQuery();
   const canEditVendor = isAdminOrSupervisorRole(session?.role);
   const {
@@ -120,6 +124,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
     <main className="px-4 py-8 pb-24 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-4xl space-y-6">
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft">
+          <Link href={returnTo} className="mb-4 inline-flex rounded-2xl px-3 py-2 text-sm font-semibold text-sidrah-700 hover:bg-sidrah-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500">← Back</Link>
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Vendor details</p>

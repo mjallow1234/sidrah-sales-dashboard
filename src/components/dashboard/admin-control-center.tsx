@@ -7,6 +7,7 @@ import { AlertTriangle, ArrowRight, Boxes, Factory, Package, Users } from 'lucid
 import { useDeliveriesQuery, useFactoryInventoryQuery, useFactoryMovementsQuery, usePaginatedVendorsQuery, useProductsQuery, useSalesRepsQuery, useTransactionsQuery } from '@/lib/hooks/queries';
 import { useVendorBalancesQuery } from '@/lib/hooks/queries';
 import { DormantVendorsModal } from '@/components/dashboard/dormant-vendors-modal';
+import { vendorHref } from '@/lib/navigation/vendorNavigation';
 import { useAdminDashboardSummaryQuery } from '@/lib/hooks/use-admin-dashboard-summary';
 import type {
   AdminDashboardFilters,
@@ -100,6 +101,26 @@ type DetailKind = 'transactions' | 'vendors' | 'deliveries' | 'inventory' | 'mov
 type DetailRow = { label: string; value: string; detail?: string; href?: string };
 type DetailSpec = { title: string; kind: DetailKind; value: string; filters?: AdminDashboardFilters; transactionMetric?: 'cash' | 'quantity' | 'value'; deliveryFilters?: { status?: string; productId?: string; unassigned?: boolean }; productId?: string; movementType?: 'production' | 'leaving_factory'; vendorBalanceFilter?: 'owing' | 'credit'; rows?: DetailRow[]; gallonRows?: AdminDashboardGallonsVendorRow[]; vendorStatus?: 'active' | 'inactive' | 'dormant' };
 
+function detailFromSearchParams(params: { get(name: string): string | null }): DetailSpec | null {
+  const kind = params.get('detail');
+  if (kind === 'dormant' || kind === 'vendor-status') {
+    const status = params.get('detailStatus');
+    if (status !== 'active' && status !== 'inactive' && status !== 'dormant') return null;
+    return { title: `${status[0].toUpperCase()}${status.slice(1)} Vendors`, value: '', kind, vendorStatus: status };
+  }
+  if (kind === 'vendors') {
+    const balance = params.get('detailBalance');
+    return { title: balance === 'owing' ? 'Vendor Balances Owing' : 'Vendor Balances', value: '', kind: 'vendors', vendorBalanceFilter: balance === 'owing' ? 'owing' : undefined };
+  }
+  if (kind === 'transactions') {
+    const metric = params.get('detailMetric');
+    if (metric !== 'cash' && metric !== 'quantity' && metric !== 'value') return null;
+    const defaults = defaultFilters();
+    return { title: metric === 'cash' ? 'Cash Collected' : metric === 'quantity' ? 'Supplied Quantity' : 'Supplied Value', value: '', kind: 'transactions', transactionMetric: metric, filters: { startDate: validDateParam(params.get('startDate')) ?? defaults.startDate, endDate: validDateParam(params.get('endDate')) ?? defaults.endDate, productId: params.get('productId') || undefined, location: params.get('detailLocation') || params.get('location') || undefined, salesRepId: params.get('salesRepId') || undefined } };
+  }
+  return null;
+}
+
 function ModalShell({ title, value, onClose, children }: { title: string; value: string; onClose: () => void; children: React.ReactNode }) {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose(); };
@@ -116,14 +137,14 @@ function ModalShell({ title, value, onClose, children }: { title: string; value:
   );
 }
 
-function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?: 'cash' | 'quantity' | 'value' }) {
+function TransactionDetailRows({ rows, metric, returnTo }: { rows: Transaction[]; metric?: 'cash' | 'quantity' | 'value'; returnTo?: string }) {
   const filteredRows = rows.filter((row) => metric === 'cash' ? row.cash_collected > 0 : row.stock_added > 0);
   if (filteredRows.length === 0) return <EmptyState text="No matching visit records." />;
   return <div className="space-y-2">{filteredRows.map((row) => {
     const reversed = Boolean(row.is_reversed);
     return <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p>
+        <p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={vendorHref(row.vendor_id, returnTo)} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p>
         <p className="font-semibold text-slate-800">{metric === 'cash' ? formatCurrency(row.cash_collected) : metric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p>
       </div>
       <p className="mt-1 text-sm text-slate-600">Vendor ID: {row.vendor_id || 'Not available'} · Visit date: {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p>
@@ -141,7 +162,7 @@ function TransactionDetailRows({ rows, metric }: { rows: Transaction[]; metric?:
   })}</div>;
 }
 
-function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void }) {
+function DetailModal({ spec, onClose, returnTo }: { spec: DetailSpec; onClose: () => void; returnTo?: string }) {
   const transactionFilters = spec.filters ? { startDate: spec.filters.startDate, endDate: spec.filters.endDate, productId: spec.filters.productId, market: spec.filters.location, salesRepId: spec.filters.salesRepId, dateBasis: spec.transactionMetric === 'cash' ? 'cash_collection' as const : 'visit' as const } : undefined;
   const transactions = useTransactionsQuery(transactionFilters, spec.kind === 'transactions');
   const vendors = usePaginatedVendorsQuery({ location: spec.filters?.location, salesRepId: spec.filters?.salesRepId, balance: spec.vendorBalanceFilter }, 1, 1000, spec.kind === 'vendors');
@@ -152,11 +173,11 @@ function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void 
 
   let body: React.ReactNode;
   if (spec.kind === 'transactions') {
-    body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : <TransactionDetailRows rows={transactions.data ?? []} metric={spec.transactionMetric} />;
+    body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : <TransactionDetailRows rows={transactions.data ?? []} metric={spec.transactionMetric} returnTo={returnTo} />;
   } else if (spec.kind === 'summary') {
     body = spec.rows?.length ? <div className="space-y-2">{spec.rows.map((row) => { const content = <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 transition hover:border-sidrah-300"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{row.label}</p><p className="font-semibold text-slate-800">{row.value}</p></div>{row.detail ? <p className="mt-1 text-sm text-slate-600">{row.detail}</p> : null}</div>; return row.href ? <Link key={`${row.label}-${row.detail}`} href={row.href} className="block">{content}</Link> : <div key={`${row.label}-${row.detail}`}>{content}</div>; })}</div> : <EmptyState text="No records contribute to this dashboard value." />;
   } else if (spec.kind === 'gallons') {
-    body = spec.gallonRows?.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase tracking-[0.12em] text-slate-500"><th className="px-3 py-3">Vendor</th><th className="px-3 py-3">Gallons delivered</th><th className="px-3 py-3">Empty returned</th><th className="px-3 py-3">Outstanding</th></tr></thead><tbody>{spec.gallonRows.map((row) => <tr key={row.vendorId ?? 'unlinked'} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-900">{row.vendorId ? <Link href={`/vendors/${row.vendorId}`} className="text-sidrah-700 hover:underline">{row.vendorName}</Link> : row.vendorName}</td><td className="px-3 py-3">{formatNumber(row.gallonsDelivered)}</td><td className="px-3 py-3">{formatNumber(row.emptyReturned)}</td><td className="px-3 py-3 font-semibold">{formatNumber(row.outstanding)}</td></tr>)}</tbody></table></div> : <EmptyState text="No vendors currently have outstanding gallons." />;
+    body = spec.gallonRows?.length ? <div className="overflow-x-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead><tr className="border-b border-slate-200 text-xs uppercase tracking-[0.12em] text-slate-500"><th className="px-3 py-3">Vendor</th><th className="px-3 py-3">Gallons delivered</th><th className="px-3 py-3">Empty returned</th><th className="px-3 py-3">Outstanding</th></tr></thead><tbody>{spec.gallonRows.map((row) => <tr key={row.vendorId ?? 'unlinked'} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-900">{row.vendorId ? <Link href={vendorHref(row.vendorId, returnTo)} className="text-sidrah-700 hover:underline">{row.vendorName}</Link> : row.vendorName}</td><td className="px-3 py-3">{formatNumber(row.gallonsDelivered)}</td><td className="px-3 py-3">{formatNumber(row.emptyReturned)}</td><td className="px-3 py-3 font-semibold">{formatNumber(row.outstanding)}</td></tr>)}</tbody></table></div> : <EmptyState text="No vendors currently have outstanding gallons." />;
   } else if (false) {
     const rows = (transactions.data ?? []).filter((row) => spec.transactionMetric === 'cash' ? row.cash_collected > 0 : row.stock_added > 0);
     body = transactions.isLoading ? <p className="text-sm text-slate-500">Loading records...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={`${row.visit_id}-${row.product_id}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex flex-wrap items-center justify-between gap-2"><p className="font-semibold text-slate-900">{row.vendor_id ? <Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 hover:underline">{row.vendor_name || row.vendor_id}</Link> : row.vendor_name || 'Unknown vendor'}</p><p className="font-semibold text-slate-800">{spec.transactionMetric === 'cash' ? formatCurrency(row.cash_collected) : spec.transactionMetric === 'value' ? formatCurrency(row.stock_added * (row.unit_price ?? 0)) : formatNumber(row.stock_added)}</p></div><p className="mt-1 text-sm text-slate-600">Visit {row.visit_id || '—'} · {row.date} · {row.sales_rep_name || row.sales_rep_id || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No matching visit records." />;
@@ -165,7 +186,7 @@ function DetailModal({ spec, onClose }: { spec: DetailSpec; onClose: () => void 
     const rows = (vendors.data?.data.items ?? [])
       .filter((row: Vendor) => spec.vendorBalanceFilter === 'owing' ? (balanceMap.get(row.vendor_id) ?? 0) > 0 : true)
       .sort((a: Vendor, b: Vendor) => (balanceMap.get(b.vendor_id) ?? 0) - (balanceMap.get(a.vendor_id) ?? 0) || a.vendor_name.localeCompare(b.vendor_name));
-    body = vendors.isLoading ? <p className="text-sm text-slate-500">Loading vendors...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={row.vendor_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900"><Link href={`/vendors/${row.vendor_id}`} className="text-sidrah-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500">{row.vendor_name}</Link></p><p className="font-semibold text-slate-800">{formatCurrency(balanceMap.get(row.vendor_id) ?? 0)}</p></div><p className="mt-1 text-sm text-slate-600">{row.vendor_id} · {row.location || 'Unknown location'} · {row.sales_rep_name || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No vendors match this dashboard value." />;
+    body = vendors.isLoading ? <p className="text-sm text-slate-500">Loading vendors...</p> : rows.length ? <div className="space-y-2">{rows.map((row) => <div key={row.vendor_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900"><Link href={vendorHref(row.vendor_id, returnTo)} className="text-sidrah-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500">{row.vendor_name}</Link></p><p className="font-semibold text-slate-800">{formatCurrency(balanceMap.get(row.vendor_id) ?? 0)}</p></div><p className="mt-1 text-sm text-slate-600">{row.vendor_id} · {row.location || 'Unknown location'} · {row.sales_rep_name || 'Unassigned agent'}</p></div>)}</div> : <EmptyState text="No vendors match this dashboard value." />;
   } else if (spec.kind === 'deliveries') {
     const rows = deliveries.data ?? [];
     body = deliveries.isLoading ? <p className="text-sm text-slate-500">Loading deliveries...</p> : rows.length ? <div className="space-y-2">{rows.map((row: DeliveryRecord) => <div key={row.delivery_id} className="rounded-2xl border border-slate-200 bg-slate-50 p-3"><div className="flex items-center justify-between gap-3"><p className="font-semibold text-slate-900">{row.delivery_id}</p><p className="text-sm font-semibold capitalize text-slate-700">{row.status}</p></div><p className="mt-1 text-sm text-slate-600">{row.customer_name} · requested {String(row.date_created).slice(0, 10)}</p></div>)}</div> : <EmptyState text="No matching deliveries." />;
@@ -346,7 +367,7 @@ export function AdminControlCenter() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [filters, setFilters] = useState<AdminDashboardFilters>(() => filtersFromSearchParams(searchParams));
-  const [detail, setDetail] = useState<DetailSpec | null>(null);
+  const [detail, setDetail] = useState<DetailSpec | null>(() => detailFromSearchParams(searchParams));
   const [trendMetric, setTrendMetric] = useState<AdminDashboardTrendMetric>('cash_collected');
   const [locationMetric, setLocationMetric] = useState<LocationMetric>('suppliedQuantity');
   const [productMetric, setProductMetric] = useState<ProductMetric>('suppliedQuantity');
@@ -393,7 +414,28 @@ export function AdminControlCenter() {
     || Boolean(filters.salesRepId);
 
   const periodFilters = { startDate: filters.startDate, endDate: filters.endDate, productId: filters.productId, location: filters.location, salesRepId: filters.salesRepId };
-  const openTransactions = (title: string, value: string, transactionMetric: 'cash' | 'quantity' | 'value', extra?: Partial<AdminDashboardFilters>) => setDetail({ title, value, kind: 'transactions', filters: { ...periodFilters, ...extra }, transactionMetric });
+  const returnTo = `/dashboard?${searchParams.toString()}`;
+  function openDetail(spec: DetailSpec) {
+    setDetail(spec);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('detailLocation');
+    params.delete('detailVendorTypeId');
+    params.delete('detailMetric');
+    params.set('detail', spec.kind);
+    if (spec.vendorStatus) params.set('detailStatus', spec.vendorStatus); else params.delete('detailStatus');
+    if (spec.vendorBalanceFilter) params.set('detailBalance', spec.vendorBalanceFilter); else params.delete('detailBalance');
+    if (spec.transactionMetric) params.set('detailMetric', spec.transactionMetric); else params.delete('detailMetric');
+    if (spec.kind === 'transactions' && spec.filters?.location && spec.filters.location !== params.get('location')) params.set('detailLocation', spec.filters.location);
+    router.replace(`/dashboard?${params.toString()}`, { scroll: false });
+  }
+  function closeDetail() {
+    setDetail(null);
+    const params = new URLSearchParams(searchParams.toString());
+    ['detail', 'detailStatus', 'detailBalance', 'detailMetric', 'detailLocation', 'detailVendorTypeId'].forEach((key) => params.delete(key));
+    const query = params.toString();
+    router.replace(query ? `/dashboard?${query}` : '/dashboard', { scroll: false });
+  }
+  const openTransactions = (title: string, value: string, transactionMetric: 'cash' | 'quantity' | 'value', extra?: Partial<AdminDashboardFilters>) => openDetail({ title, value, kind: 'transactions', filters: { ...periodFilters, ...extra }, transactionMetric });
   const openSummary = (title: string, value: string, rows: DetailRow[]) => setDetail({ title, value, kind: 'summary', rows });
 
   return (
@@ -447,7 +489,7 @@ export function AdminControlCenter() {
           <>
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
               <KpiCard label="Cash Collected" value={formatCurrency(summary.snapshot.period.cashCollected)} note="Selected period, active visits only." onClick={() => openTransactions('Cash Collected', formatCurrency(summary.snapshot.period.cashCollected), 'cash')} />
-              <KpiCard label="Vendor Balances" value={formatCurrency(summary.snapshot.current.vendorReceivables)} note={`${formatNumber(summary.snapshot.current.vendorsOwing)} vendors owing now.`} onClick={() => setDetail({ title: 'Vendor Balances Owing', value: formatCurrency(summary.snapshot.current.vendorReceivables), kind: 'vendors', filters: periodFilters, vendorBalanceFilter: 'owing' })} tone={summary.snapshot.current.vendorsOwing > 0 ? 'attention' : 'default'} />
+          <KpiCard label="Vendor Balances" value={formatCurrency(summary.snapshot.current.vendorReceivables)} note={`${formatNumber(summary.snapshot.current.vendorsOwing)} vendors owing now.`} onClick={() => openDetail({ title: 'Vendor Balances Owing', value: formatCurrency(summary.snapshot.current.vendorReceivables), kind: 'vendors', filters: periodFilters, vendorBalanceFilter: 'owing' })} tone={summary.snapshot.current.vendorsOwing > 0 ? 'attention' : 'default'} />
               <KpiCard label="Supplied Quantity" value={formatQuantity(summary.snapshot.period.suppliedQuantity)} note="Selected period vendor supply." onClick={() => openTransactions('Supplied Quantity', formatQuantity(summary.snapshot.period.suppliedQuantity), 'quantity')} />
               <KpiCard label="Supplied Value" value={formatCurrency(summary.snapshot.period.suppliedValue)} note="Expected value of supplied stock." onClick={() => openTransactions('Supplied Value', formatCurrency(summary.snapshot.period.suppliedValue), 'value')} />
               <KpiCard label="Outstanding Deliveries" value={formatQuantity(summary.snapshot.current.outstandingDeliveryQuantity)} note={`${formatNumber(summary.snapshot.current.outstandingDeliveryRequests)} pending/ongoing requests.`} onClick={() => setDetail({ title: 'Outstanding Deliveries', value: formatQuantity(summary.snapshot.current.outstandingDeliveryQuantity), kind: 'deliveries', deliveryFilters: { status: 'pending,ongoing', productId: filters.productId } })} tone={summary.snapshot.current.outstandingDeliveryRequests > 0 ? 'attention' : 'default'} />
@@ -457,7 +499,7 @@ export function AdminControlCenter() {
             <Panel>
               <div><p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Vendors</p><h2 className="mt-1 text-xl font-semibold text-slate-900">Vendor Status</h2><p className="mt-2 text-sm text-slate-600">Current vendor status counts. Status cards do not include balance amounts.</p></div>
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {(summary.vendorStatuses ?? []).map((status) => <button key={status.statusId} type="button" onClick={() => ['active', 'inactive', 'dormant'].includes(status.statusId) ? setDetail({ title: `${status.statusName} Vendors`, value: formatNumber(status.count), kind: status.statusId === 'dormant' ? 'dormant' : 'vendor-status', vendorStatus: status.statusId as 'active' | 'inactive' | 'dormant' }) : setDetail({ title: `${status.statusName} Vendors`, value: formatNumber(status.count), kind: 'summary', rows: status.vendors.map((vendor) => ({ label: vendor.vendorName, value: vendor.vendorId, detail: vendor.statusName, href: `/vendors/${vendor.vendorId}` })) })} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-sidrah-300 hover:bg-white"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">{status.statusName}</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(status.count)}</p><p className="mt-1 text-xs text-slate-500">vendors</p></button>)}
+                {(summary.vendorStatuses ?? []).map((status) => <button key={status.statusId} type="button" onClick={() => ['active', 'inactive', 'dormant'].includes(status.statusId) ? openDetail({ title: `${status.statusName} Vendors`, value: formatNumber(status.count), kind: status.statusId === 'dormant' ? 'dormant' : 'vendor-status', vendorStatus: status.statusId as 'active' | 'inactive' | 'dormant' }) : setDetail({ title: `${status.statusName} Vendors`, value: formatNumber(status.count), kind: 'summary', rows: status.vendors.map((vendor) => ({ label: vendor.vendorName, value: vendor.vendorId, detail: vendor.statusName, href: vendorHref(vendor.vendorId, returnTo) })) })} className="rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-sidrah-300 hover:bg-white"><p className="text-sm font-semibold uppercase tracking-[0.16em] text-slate-500">{status.statusName}</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(status.count)}</p><p className="mt-1 text-xs text-slate-500">vendors</p></button>)}
               </div>
             </Panel>
 
@@ -505,7 +547,7 @@ export function AdminControlCenter() {
                 <button type="button" onClick={() => setDetail({ title: 'Outstanding Gallons', value: formatQuantity(summary.outstandingGallons.outstandingGallons, 'gallons'), kind: 'gallons', gallonRows: summary.outstandingGallons.vendors })} className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left text-amber-950 hover:border-amber-300"><p className="text-sm text-amber-800">Outstanding Gallons</p><p className="mt-2 text-2xl font-semibold">{formatNumber(summary.outstandingGallons.outstandingGallons)}</p></button>
                 <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4"><p className="text-sm text-slate-500">Vendors with Outstanding Gallons</p><p className="mt-2 text-2xl font-semibold text-slate-950">{formatNumber(summary.outstandingGallons.vendorsWithOutstandingGallons)}</p></div>
               </div>
-              <div className="mt-5 max-h-[280px] overflow-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="sticky top-0 z-10 bg-white"><tr className="border-b border-slate-200 text-xs uppercase tracking-[0.12em] text-slate-500"><th className="px-3 py-3">Vendor</th><th className="px-3 py-3">Delivered</th><th className="px-3 py-3">Returned</th><th className="px-3 py-3">Outstanding</th></tr></thead><tbody>{summary.outstandingGallons.vendors.map((row) => <tr key={row.vendorId ?? 'unlinked'} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-900">{row.vendorId ? <Link href={`/vendors/${row.vendorId}`} className="text-sidrah-700 hover:underline">{row.vendorName}</Link> : row.vendorName}</td><td className="px-3 py-3">{formatNumber(row.gallonsDelivered)}</td><td className="px-3 py-3">{formatNumber(row.emptyReturned)}</td><td className="px-3 py-3 font-semibold">{formatNumber(row.outstanding)}</td></tr>)}</tbody></table>{summary.outstandingGallons.vendors.length === 0 ? <div className="py-5"><EmptyState text="No vendors currently have outstanding gallons." /></div> : null}</div>
+              <div className="mt-5 max-h-[280px] overflow-auto"><table className="w-full min-w-[620px] text-left text-sm"><thead className="sticky top-0 z-10 bg-white"><tr className="border-b border-slate-200 text-xs uppercase tracking-[0.12em] text-slate-500"><th className="px-3 py-3">Vendor</th><th className="px-3 py-3">Delivered</th><th className="px-3 py-3">Returned</th><th className="px-3 py-3">Outstanding</th></tr></thead><tbody>{summary.outstandingGallons.vendors.map((row) => <tr key={row.vendorId ?? 'unlinked'} className="border-b border-slate-100"><td className="px-3 py-3 font-semibold text-slate-900">{row.vendorId ? <Link href={vendorHref(row.vendorId, returnTo)} className="text-sidrah-700 hover:underline">{row.vendorName}</Link> : row.vendorName}</td><td className="px-3 py-3">{formatNumber(row.gallonsDelivered)}</td><td className="px-3 py-3">{formatNumber(row.emptyReturned)}</td><td className="px-3 py-3 font-semibold">{formatNumber(row.outstanding)}</td></tr>)}</tbody></table>{summary.outstandingGallons.vendors.length === 0 ? <div className="py-5"><EmptyState text="No vendors currently have outstanding gallons." /></div> : null}</div>
             </Panel>
 
             <div className="grid gap-6 xl:grid-cols-2">
@@ -537,7 +579,7 @@ export function AdminControlCenter() {
                 <div className="mt-5 space-y-3">
                   {summary.attention.topVendorsOwing.length === 0 ? <EmptyState text="No positive vendor balances found for the current filters." /> : [...summary.attention.topVendorsOwing].sort((a, b) => b.amount - a.amount || a.vendorName.localeCompare(b.vendorName)).map((vendor) => (
                     <button key={vendor.vendorId} type="button" onClick={() => openSummary(`Vendor Balance · ${vendor.vendorName}`, formatCurrency(vendor.amount), [{ label: vendor.vendorName, value: formatCurrency(vendor.amount), detail: `${vendor.vendorId} · ${vendor.location}` }])} className="block w-full rounded-2xl border border-slate-200 bg-slate-50 p-4 text-left hover:border-sidrah-200">
-                      <div className="flex items-start justify-between gap-4"><div><p className="font-semibold text-slate-900"><Link href={`/vendors/${vendor.vendorId}`} onClick={(event) => event.stopPropagation()} className="text-sidrah-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500">{vendor.vendorName}</Link></p><p className="mt-1 text-sm text-slate-500">{vendor.location}</p></div><p className="font-semibold text-slate-900">{formatCurrency(vendor.amount)}</p></div>
+                      <div className="flex items-start justify-between gap-4"><div><p className="font-semibold text-slate-900"><Link href={vendorHref(vendor.vendorId, returnTo)} onClick={(event) => event.stopPropagation()} className="text-sidrah-700 underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500">{vendor.vendorName}</Link></p><p className="mt-1 text-sm text-slate-500">{vendor.location}</p></div><p className="font-semibold text-slate-900">{formatCurrency(vendor.amount)}</p></div>
                     </button>
                   ))}
                 </div>
@@ -576,7 +618,7 @@ export function AdminControlCenter() {
           </>
         ) : null}
       </div>
-      {detail ? <DetailModal spec={detail} onClose={() => setDetail(null)} /> : null}
+          {detail ? <DetailModal spec={detail} onClose={closeDetail} returnTo={returnTo} /> : null}
     </div>
   );
 }

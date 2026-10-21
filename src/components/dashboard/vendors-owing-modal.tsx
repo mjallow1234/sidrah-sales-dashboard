@@ -1,8 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import type { Vendor } from '@/lib/types';
+import { vendorHref } from '@/lib/navigation/vendorNavigation';
 
 interface VendorOwing {
   vendor_id: string;
@@ -19,6 +21,19 @@ interface VendorsOwingModalProps {
 
 export function VendorsOwingModal({ vendors, totalOwed, onClose }: VendorsOwingModalProps) {
   const positiveVendors = useMemo(() => vendors.filter((vendor) => vendor.balance_owed > 0), [vendors]);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const listRef = useRef<HTMLDivElement>(null);
+  const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+  const scrollKey = `vendor-drilldown-scroll:${pathname}:vendor-owing`;
+  useEffect(() => {
+    if (positiveVendors.length === 0) return;
+    const frame = window.requestAnimationFrame(() => {
+      const saved = Number(window.sessionStorage.getItem(scrollKey));
+      if (Number.isFinite(saved) && listRef.current) listRef.current.scrollTop = saved;
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [positiveVendors.length, scrollKey]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/40 p-4 sm:items-center">
@@ -37,7 +52,7 @@ export function VendorsOwingModal({ vendors, totalOwed, onClose }: VendorsOwingM
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-y-auto p-5">
+        <div ref={listRef} onScroll={(event) => window.sessionStorage.setItem(scrollKey, String(event.currentTarget.scrollTop))} className="max-h-[70vh] overflow-y-auto p-5">
           {positiveVendors.length === 0 ? (
             <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 text-center text-slate-600">
               No vendors currently owe a balance.
@@ -47,7 +62,7 @@ export function VendorsOwingModal({ vendors, totalOwed, onClose }: VendorsOwingM
               {positiveVendors.map((vendor) => (
                 <Link
                   key={vendor.vendor_id}
-                  href={`/vendors/${vendor.vendor_id}`}
+                  href={vendorHref(vendor.vendor_id, returnTo)}
                   className="block rounded-3xl border border-slate-200 bg-slate-50 p-4 transition hover:border-sidrah-300 hover:bg-slate-100"
                 >
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">

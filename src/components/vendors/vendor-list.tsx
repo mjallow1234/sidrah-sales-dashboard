@@ -1,11 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/ui/search-bar';
 import { useAppStore } from '@/lib/store/useAppStore';
 import { usePaginatedVendorsQuery } from '@/lib/hooks/queries';
 import type { Vendor } from '@/lib/types';
+import { vendorHref } from '@/lib/navigation/vendorNavigation';
 
 interface PaginatedResult<T> {
   status: string;
@@ -20,9 +22,25 @@ interface PaginatedResult<T> {
 const PAGE_SIZE = 50;
 
 export function VendorList() {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const searchQuery = useAppStore((state) => state.searchQuery);
   const setSearchQuery = useAppStore((state) => state.setSearchQuery);
-  const [page, setPage] = useState(1);
+  const [page, setPage] = useState(() => Math.max(1, Number(searchParams.get('page') || 1)));
+
+  const returnTo = `${pathname}${searchParams.toString() ? `?${searchParams.toString()}` : ''}`;
+  const scrollKey = `vendor-list-scroll:${returnTo}`;
+  useEffect(() => {
+    const nextSearch = searchParams.get('search') || '';
+    if (nextSearch !== searchQuery) setSearchQuery(nextSearch);
+    setPage(Math.max(1, Number(searchParams.get('page') || 1)));
+    const frame = window.requestAnimationFrame(() => {
+      const saved = Number(window.sessionStorage.getItem(scrollKey));
+      if (Number.isFinite(saved)) window.scrollTo({ top: saved, behavior: 'auto' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [searchParams, searchQuery, setSearchQuery, scrollKey]);
 
   const { data, isLoading, isError } = usePaginatedVendorsQuery({ search: searchQuery }, page, PAGE_SIZE);
 
@@ -39,6 +57,16 @@ export function VendorList() {
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     setPage(1);
+    const params = new URLSearchParams(searchParams.toString());
+    if (value) params.set('search', value); else params.delete('search');
+    params.delete('page');
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  };
+  const changePage = (nextPage: number) => {
+    setPage(nextPage);
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextPage > 1) params.set('page', String(nextPage)); else params.delete('page');
+    router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   };
 
   return (
@@ -55,7 +83,8 @@ export function VendorList() {
           {vendors.map((vendor) => (
             <Link
               key={vendor.vendor_id}
-              href={`/vendors/${vendor.vendor_id}`}
+              href={vendorHref(vendor.vendor_id, returnTo)}
+              onClick={() => window.sessionStorage.setItem(scrollKey, String(window.scrollY))}
               className="block rounded-3xl border border-slate-200 bg-white p-4 shadow-soft transition hover:border-sidrah-300"
             >
               <div className="flex items-center justify-between gap-4">
@@ -81,7 +110,7 @@ export function VendorList() {
           type="button"
           className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={currentPage <= 1}
-          onClick={() => setPage((current) => Math.max(1, current - 1))}
+          onClick={() => changePage(Math.max(1, currentPage - 1))}
         >
           Previous
         </button>
@@ -90,7 +119,7 @@ export function VendorList() {
           type="button"
           className="inline-flex items-center justify-center rounded-3xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 disabled:cursor-not-allowed disabled:opacity-50"
           disabled={currentPage >= totalPages}
-          onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+          onClick={() => changePage(Math.min(totalPages, currentPage + 1))}
         >
           Next
         </button>
