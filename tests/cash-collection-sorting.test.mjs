@@ -8,6 +8,7 @@ test('cash audit includes historical records using the recording-date fallback',
   const route = read('src/app/api/transactions/route.ts');
   assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\).*:startDate/);
   assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\).*:endDate/);
+  assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\) AS effective_cash_collection_date/);
   assert.match(route, /COALESCE\(vl\.cash_collection_date, DATE\(vl\.timestamp\)\) DESC, vl\.timestamp DESC/);
   assert.match(route, /cash_collection_date_is_fallback/);
 });
@@ -29,4 +30,12 @@ test('cash drill-down displays effective dates and recording timestamps separate
   assert.match(dashboard, /Recorded at:/);
   assert.match(table, /effective_cash_collection_date/);
   assert.match(table, /Recorded timestamp/);
+});
+
+test('cash cards keep zero-cash collection dates hidden and preserve the fallback contract', () => {
+  const table = read('src/components/vendors/transaction-table.tsx');
+  const route = read('src/app/api/transactions/route.ts');
+  assert.match(route, /effective_cash_collection_date: formatDateValue\(row\.effective_cash_collection_date\)/);
+  assert.match(table, /transaction\.cash_collected > 0 \? <div>.*Collection Date/s);
+  assert.match(table, /transaction\.effective_cash_collection_date \?\? transaction\.cash_collection_date/);
 });

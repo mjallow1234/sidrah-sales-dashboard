@@ -152,7 +152,7 @@ export async function GET(request: NextRequest) {
     const orderBy = cashCollectionDateBasis
       ? 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) DESC, vl.timestamp DESC'
       : 'vl.date DESC, vl.timestamp DESC';
-    const sql = `SELECT vl.*, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY ${orderBy}`;
+    const sql = `SELECT vl.*, COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) AS effective_cash_collection_date, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY ${orderBy}`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
     return Response.json({ status: 'success', data: rows.map(mapVisitLogRow) });
