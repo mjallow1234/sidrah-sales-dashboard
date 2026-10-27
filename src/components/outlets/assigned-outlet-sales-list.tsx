@@ -1,0 +1,5 @@
+'use client';
+import Link from 'next/link';
+import { useQuery } from '@tanstack/react-query';
+import { getAssignedOutlets } from '@/lib/api/outletsAssigned';
+export function AssignedOutletSalesList() { const q = useQuery({ queryKey: ['assignedSalesOutlets'], queryFn: getAssignedOutlets }); if (q.isLoading) return <p>Loading assigned outlets…</p>; if (q.isError) return <p className="text-rose-600">{q.error.message}</p>; return <div className="space-y-5"><h1 className="text-2xl font-semibold">Sales entry</h1><p className="text-slate-600">Choose an assigned outlet to record a sale.</p><div className="grid gap-4 sm:grid-cols-2">{(q.data ?? []).map((outlet) => <Link key={outlet.outlet_id} href={`/outlets/${outlet.outlet_id}/sales`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-soft hover:border-sidrah-300"><h2 className="font-semibold">{outlet.name}</h2><p className="mt-1 text-sm text-slate-600">{outlet.location || 'Location not specified'}</p></Link>)}{q.data?.length === 0 && <p className="text-slate-500">No assigned outlets.</p>}</div></div>; }

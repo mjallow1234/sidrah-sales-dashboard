@@ -109,6 +109,7 @@ export const ROLE_CEILING: Readonly<Record<AppUserRole, readonly AccessKey[]>> =
     ACCESS_CATALOG.crmFollowUpManage,
     ACCESS_CATALOG.visitsView,
     ACCESS_CATALOG.visitsCreate,
+    ACCESS_CATALOG.outletsSalesRecord,
   ],
   delivery: [ACCESS_CATALOG.deliveriesView, ACCESS_CATALOG.deliveriesClaim, ACCESS_CATALOG.deliveriesDeliver],
   foreman: [ACCESS_CATALOG.factoryView, ACCESS_CATALOG.factoryProductionCreate, ACCESS_CATALOG.productsView],
@@ -175,8 +176,9 @@ export function canAccessPath(role: string | undefined, pathname: string): boole
     return isAdminRole(role);
   }
   if (pathname === '/outlets' || pathname.startsWith('/outlets/')) {
-    return isAdminRole(role);
+    return isAdminRole(role) || (role === 'agent' && /^\/outlets\/[^/]+\/sales$/.test(pathname));
   }
+  if (pathname === '/outlet-sales') return role === 'agent';
 
   if (pathname === '/factory/expenses' || pathname.startsWith('/factory/expenses/')) {
     return isAdminRole(role);
@@ -261,8 +263,9 @@ export function canViewLink(role: string | undefined, href: string): boolean {
     return isAdminRole(role);
   }
   if (href === '/outlets' || href.startsWith('/outlets/')) {
-    return isAdminRole(role);
+    return isAdminRole(role) || (role === 'agent' && /^\/outlets\/[^/]+\/sales$/.test(href));
   }
+  if (href === '/outlet-sales') return role === 'agent';
 
   if (href === '/factory/expenses' || href.startsWith('/factory/expenses/')) {
     return isAdminRole(role);

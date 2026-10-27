@@ -25,6 +25,7 @@ import { MobileBottomNav } from '@/components/ui/mobile-bottom-nav';
 import { canViewLink, isAdminOrSupervisorRole } from '@/lib/authorization';
 import { useAuthQuery } from '@/lib/hooks/queries';
 import { useEffectivePermissionQuery } from '@/lib/hooks/userQueries';
+import { useAssignedOutletsQuery } from '@/lib/hooks/outletQueries';
 
 const navSections = [
   {
@@ -50,6 +51,7 @@ const navSections = [
     title: 'Outlets',
     links: [
       { label: 'Outlet sales', href: '/outlets', icon: Store },
+      { label: 'Trade-fair sales', href: '/outlet-sales', icon: Store },
     ],
   },
   {
@@ -151,6 +153,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   const factoryPermission = useEffectivePermissionQuery('factory.view', !!authQuery.data?.userId);
   const crmPermission = useEffectivePermissionQuery('crm.view', !!authQuery.data?.userId);
   const outletsPermission = useEffectivePermissionQuery('outlets.view', !!authQuery.data?.userId);
+  const assignedOutlets = useAssignedOutletsQuery(authQuery.data?.role === 'agent');
   const accountabilityPermission = useEffectivePermissionQuery('accountability.view', !!authQuery.data?.userId);
 
   const showAdminShell = pathname !== '/' && pathname !== '/login';
@@ -198,11 +201,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
               (item.href.startsWith('/factory') ? factoryPermission.data !== false : true) &&
               (item.href.startsWith('/crm') ? crmPermission.data !== false : true) &&
               (item.href.startsWith('/outlets') ? outletsPermission.data !== false : true) &&
+              (item.href === '/outlet-sales' ? (authQuery.data?.role === 'agent' && (assignedOutlets.data?.length ?? 0) > 0) : true) &&
               (item.href.startsWith('/accountability') ? accountabilityPermission.data !== false : true) &&
               (item.href === '/crm/overview' ? isAdminOrSupervisorRole(userRole ?? undefined) : true)),
         }))
         .filter((section) => section.links.length > 0),
-    [userRole, vendorsPermission.data, deliveriesPermission.data, factoryPermission.data, crmPermission.data, outletsPermission.data, accountabilityPermission.data],
+    [userRole, authQuery.data?.role, assignedOutlets.data, vendorsPermission.data, deliveriesPermission.data, factoryPermission.data, crmPermission.data, outletsPermission.data, accountabilityPermission.data],
   );
 
   const handleLogout = async () => {

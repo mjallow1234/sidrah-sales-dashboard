@@ -1,0 +1,2 @@
+export interface AssignedOutlet { outlet_id: string; name: string; location: string | null; }
+export async function getAssignedOutlets(): Promise<AssignedOutlet[]> { const response = await fetch('/api/outlets/assigned-sales'); const json = await response.json(); if (!response.ok || json.status === 'error') throw new Error(json.message || 'Unable to load assigned outlets.'); return json.data as AssignedOutlet[]; }

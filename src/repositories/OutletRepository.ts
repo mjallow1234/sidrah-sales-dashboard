@@ -40,14 +40,15 @@ export class OutletRepository extends BaseRepository {
     return (await this.sales(input.outlet_id, { saleId: input.sale_id }))[0];
   }
 
-  async sales(outletId: string, filters: { from?: string; to?: string; saleId?: string } = {}): Promise<OutletSale[]> {
+  async sales(outletId: string, filters: { from?: string; to?: string; saleId?: string; recordedBy?: string } = {}): Promise<OutletSale[]> {
     const conditions = ['s.outlet_id = :outlet_id'];
     const params: Record<string, unknown> = { outlet_id: outletId };
     if (filters.from) { conditions.push('s.sale_date >= :from'); params.from = filters.from; }
     if (filters.to) { conditions.push('s.sale_date <= :to'); params.to = filters.to; }
     if (filters.saleId) { conditions.push('s.sale_id = :sale_id'); params.sale_id = filters.saleId; }
-    const rows = await this.executeMany<any>(`SELECT s.*, i.product_id, i.quantity, i.selling_price, i.line_total, p.product_name, p.unit AS product_unit, u.name AS recorded_by_name FROM outlet_sales s JOIN outlet_sale_items i ON i.sale_id = s.sale_id JOIN products p ON p.product_id = i.product_id JOIN app_users u ON u.user_id = s.recorded_by WHERE ${conditions.join(' AND ')} ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC`, params);
-    return rows.map((row) => ({ sale_id: String(row.sale_id), outlet_id: String(row.outlet_id), sale_date: dateValue(row.sale_date), payment_method: String(row.payment_method), notes: nullable(row.notes), recorded_by: String(row.recorded_by), recorded_by_name: nullable(row.recorded_by_name), created_at: dateTimeValue(row.created_at), product_id: String(row.product_id), product_name: String(row.product_name), product_unit: String(row.product_unit), quantity: Number(row.quantity), selling_price: Number(row.selling_price), line_total: Number(row.line_total) }));
+    if (filters.recordedBy) { conditions.push('s.recorded_by = :recorded_by'); params.recorded_by = filters.recordedBy; }
+    const rows = await this.executeMany<any>(`SELECT s.*, i.product_id, i.quantity, i.selling_price, i.line_total, (SELECT COALESCE(SUM(i2.line_total),0) FROM outlet_sale_items i2 WHERE i2.sale_id=s.sale_id) AS sale_total, p.product_name, p.unit AS product_unit, u.name AS recorded_by_name FROM outlet_sales s JOIN outlet_sale_items i ON i.sale_id = s.sale_id JOIN products p ON p.product_id = i.product_id JOIN app_users u ON u.user_id = s.recorded_by WHERE ${conditions.join(' AND ')} ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC`, params);
+    return rows.map((row) => ({ sale_id: String(row.sale_id), outlet_id: String(row.outlet_id), sale_date: dateValue(row.sale_date), payment_method: String(row.payment_method), notes: nullable(row.notes), recorded_by: String(row.recorded_by), recorded_by_name: nullable(row.recorded_by_name), created_at: dateTimeValue(row.created_at), product_id: String(row.product_id), product_name: String(row.product_name), product_unit: String(row.product_unit), quantity: Number(row.quantity), selling_price: Number(row.selling_price), line_total: Number(row.line_total), sale_total: Number(row.sale_total ?? row.line_total) }));
   }
 
   async summary(outletId: string, today: string, monthStart: string): Promise<OutletSummary> {

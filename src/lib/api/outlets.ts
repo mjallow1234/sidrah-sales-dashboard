@@ -1,4 +1,4 @@
-import type { Outlet, OutletSale, OutletSummary } from '@/lib/types/outlets';
+import type { Outlet, OutletSale, OutletSummary, OutletSalesEntryContext } from '@/lib/types/outlets';
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> { const response = await fetch(path, options); const json = await response.json(); if (!response.ok || json.status === 'error') throw new Error(json.message || `Request failed: ${response.status}`); return json.data as T; }
 export const getOutlets = () => request<Outlet[]>('/api/outlets');
 export const getOutlet = (outletId: string) => request<Outlet>(`/api/outlets/${encodeURIComponent(outletId)}`);
@@ -6,3 +6,8 @@ export const createOutlet = (payload: Record<string, unknown>) => request<Outlet
 export const updateOutlet = (outletId: string, payload: Record<string, unknown>) => request<Outlet>(`/api/outlets/${encodeURIComponent(outletId)}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
 export const getOutletSales = (outletId: string, filters?: { from?: string; to?: string }) => { const params = new URLSearchParams(); if (filters?.from) params.set('from', filters.from); if (filters?.to) params.set('to', filters.to); return request<{ sales: OutletSale[]; summary: OutletSummary }>(`/api/outlets/${encodeURIComponent(outletId)}/sales${params.toString() ? `?${params}` : ''}`); };
 export const createOutletSale = (outletId: string, payload: Record<string, unknown>) => request<OutletSale>(`/api/outlets/${encodeURIComponent(outletId)}/sales`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+export const getOutletSalesEntryContext = (outletId: string) => request<OutletSalesEntryContext>(`/api/outlets/${encodeURIComponent(outletId)}/sales/entry`);
+export const getOutletSalesRepAccess = (outletId: string) => request<any>(`/api/outlets/${encodeURIComponent(outletId)}/sales-reps`);
+export const grantOutletSalesRepAccess = (outletId: string, userId: string) => request<any>(`/api/outlets/${encodeURIComponent(outletId)}/sales-reps`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: userId }) });
+export const revokeOutletSalesRepAccess = (outletId: string, userId: string) => request<any>(`/api/outlets/${encodeURIComponent(outletId)}/sales-reps/${encodeURIComponent(userId)}`, { method: 'DELETE' });
+export const getMyOutletSales = (outletId: string, filters?: { from?: string; to?: string }) => { const params = new URLSearchParams(); if (filters?.from) params.set('from', filters.from); if (filters?.to) params.set('to', filters.to); return request<OutletSale[]>(`/api/outlets/${encodeURIComponent(outletId)}/sales/mine${params.toString() ? `?${params}` : ''}`); };

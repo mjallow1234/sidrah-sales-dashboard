@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { canViewLink } from '@/lib/authorization';
 import { useEffectivePermissionQuery } from '@/lib/hooks/userQueries';
+import { useAssignedOutletsQuery } from '@/lib/hooks/outletQueries';
 
 const navItems = [
   { label: 'Factory', href: '/factory' },
@@ -9,6 +10,7 @@ const navItems = [
   { label: 'Deliveries', href: '/deliveries' },
   { label: 'Visits', href: '/visits' },
   { label: 'Outlets', href: '/outlets' },
+  { label: 'Outlet Sales', href: '/outlet-sales' },
   { label: 'Accountability', href: '/accountability' },
 ];
 
@@ -17,6 +19,7 @@ export function MobileBottomNav({ userRole }: { userRole?: string }) {
   const deliveriesPermission = useEffectivePermissionQuery('deliveries.view', !!userRole);
   const factoryPermission = useEffectivePermissionQuery('factory.view', !!userRole);
   const outletsPermission = useEffectivePermissionQuery('outlets.view', !!userRole);
+  const assignedOutlets = useAssignedOutletsQuery(userRole === 'agent');
   const accountabilityPermission = useEffectivePermissionQuery('accountability.view', !!userRole);
   const visibleLinks = navItems.filter((item) => {
     if (userRole) {
@@ -25,6 +28,7 @@ export function MobileBottomNav({ userRole }: { userRole?: string }) {
         (item.href.startsWith('/deliveries') ? deliveriesPermission.data !== false : true) &&
         (item.href.startsWith('/factory') ? factoryPermission.data !== false : true) &&
         (item.href.startsWith('/outlets') ? outletsPermission.data !== false : true) &&
+        (item.href === '/outlet-sales' ? (userRole === 'agent' && (assignedOutlets.data?.length ?? 0) > 0) : true) &&
         (item.href.startsWith('/accountability') ? accountabilityPermission.data !== false : true);
     }
     return true;

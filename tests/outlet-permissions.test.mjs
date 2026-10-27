@@ -44,7 +44,7 @@ test('Outlet permissions remain independent and role-ceiling limited', () => {
   }
   for (const role of ['supervisor', 'agent', 'delivery', 'foreman']) {
     for (const key of Object.values(ACCESS_CATALOG).filter((value) => value.startsWith('outlets.'))) {
-      assert.equal(roleAllowsAccess(role, key), false);
+      assert.equal(roleAllowsAccess(role, key), role === 'agent' && key === ACCESS_CATALOG.outletsSalesRecord);
     }
   }
   assert.doesNotMatch(read('src/lib/authorization.ts'), /outlets\.manage.*outlets\.view/);

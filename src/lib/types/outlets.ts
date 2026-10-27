@@ -28,6 +28,7 @@ export interface OutletSale {
   quantity: number;
   selling_price: number;
   line_total: number;
+  sale_total: number;
 }
 
 export interface OutletSummary {
@@ -36,3 +37,5 @@ export interface OutletSummary {
   month_sales: number;
   transaction_count: number;
 }
+export interface OutletSalesEntryProduct { product_id: string; product_name: string; unit: string; default_unit_price: number; available_stock: number; }
+export interface OutletSalesEntryContext { outlet: { outlet_id: string; name: string }; products: OutletSalesEntryProduct[]; }
