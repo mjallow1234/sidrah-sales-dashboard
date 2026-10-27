@@ -29,6 +29,10 @@ export interface OutletSale {
   selling_price: number;
   line_total: number;
   sale_total: number;
+  reversed: boolean;
+  reversal_reason: string | null;
+  reversed_by: string | null;
+  reversed_at: string | null;
 }
 
 export interface OutletSummary {

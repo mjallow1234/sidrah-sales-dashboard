@@ -34,7 +34,7 @@ export async function createSale(outletId: string, input: Record<string, unknown
     const [products] = await connection.execute<any[]>('SELECT product_id, default_unit_price FROM products WHERE product_id = :product_id AND active = 1 LIMIT 1', { product_id: productId });
     if (!products.length) throw new ValidationError('Product must be an active product.');
     const price = clientPrice;
-    const [stockRows] = await connection.execute<any[]>(`SELECT COALESCE((SELECT SUM(quantity_received) FROM outlet_stock_receipts WHERE outlet_id=:outlet_id AND product_id=:product_id),0) - COALESCE((SELECT SUM(i.quantity) FROM outlet_sales os JOIN outlet_sale_items i ON i.sale_id=os.sale_id WHERE os.outlet_id=:outlet_id AND i.product_id=:product_id),0) AS available_stock`, { outlet_id: outletId, product_id: productId });
+    const [stockRows] = await connection.execute<any[]>(`SELECT COALESCE((SELECT SUM(quantity_received) FROM outlet_stock_receipts WHERE outlet_id=:outlet_id AND product_id=:product_id),0) - COALESCE((SELECT SUM(i.quantity) FROM outlet_sales os JOIN outlet_sale_items i ON i.sale_id=os.sale_id WHERE os.outlet_id=:outlet_id AND i.product_id=:product_id AND NOT EXISTS (SELECT 1 FROM outlet_sale_reversals x WHERE x.sale_id=os.sale_id)),0) AS available_stock`, { outlet_id: outletId, product_id: productId });
     if (Number(stockRows[0]?.available_stock ?? 0) < quantity) throw new ValidationError('Insufficient stock available for this outlet.');
     const repo = new OutletRepository(connection); const saleId = `OSALE_${randomUUID().replace(/-/g,'').slice(0,20)}`; const itemId = `OSITEM_${randomUUID().replace(/-/g,'').slice(0,20)}`; const lineTotal = Math.round(quantity * price * 100) / 100;
     return repo.createSale({ sale_id: saleId, sale_item_id: itemId, outlet_id: outletId, product_id: productId, quantity, selling_price: price, line_total: lineTotal, sale_date: saleDate, payment_method: paymentMethod, notes, recorded_by: session.userId, created_at: timestamp });
@@ -52,6 +52,24 @@ export async function getSalesEntryContext(outletId: string, session: { userId: 
   if (!isAdmin(session.role) && !(session.role === 'agent' && await new OutletSalesRepAccessRepository(getPool()).hasActive(outletId, session.userId))) throw new Error('Forbidden');
   const outlet = await getOutlet(outletId, 'admin');
   if (!outlet.active) throw new ValidationError('Outlet is inactive.');
-  const [rows] = await getPool().execute<any[]>(`SELECT p.product_id,p.product_name,p.unit,p.default_unit_price,COALESCE(r.total_received,0)-COALESCE(s.total_sold,0) AS available_stock FROM products p LEFT JOIN (SELECT product_id,SUM(quantity_received) total_received FROM outlet_stock_receipts WHERE outlet_id=:outlet_id GROUP BY product_id) r ON r.product_id=p.product_id LEFT JOIN (SELECT i.product_id,SUM(i.quantity) total_sold FROM outlet_sales os JOIN outlet_sale_items i ON i.sale_id=os.sale_id WHERE os.outlet_id=:outlet_id GROUP BY i.product_id) s ON s.product_id=p.product_id WHERE p.active=1 ORDER BY p.product_name`, { outlet_id: outletId });
+  const [rows] = await getPool().execute<any[]>(`SELECT p.product_id,p.product_name,p.unit,p.default_unit_price,COALESCE(r.total_received,0)-COALESCE(s.total_sold,0) AS available_stock FROM products p LEFT JOIN (SELECT product_id,SUM(quantity_received) total_received FROM outlet_stock_receipts WHERE outlet_id=:outlet_id GROUP BY product_id) r ON r.product_id=p.product_id LEFT JOIN (SELECT i.product_id,SUM(i.quantity) total_sold FROM outlet_sales os JOIN outlet_sale_items i ON i.sale_id=os.sale_id WHERE os.outlet_id=:outlet_id AND NOT EXISTS (SELECT 1 FROM outlet_sale_reversals x WHERE x.sale_id=os.sale_id) GROUP BY i.product_id) s ON s.product_id=p.product_id WHERE p.active=1 ORDER BY p.product_name`, { outlet_id: outletId });
   return { outlet: { outlet_id: outlet.outlet_id, name: outlet.name }, products: rows.map((r) => ({ product_id: String(r.product_id), product_name: String(r.product_name), unit: String(r.unit), default_unit_price: Number(r.default_unit_price), available_stock: Number(r.available_stock ?? 0) })) };
+}
+
+export async function reverseSale(outletId: string, saleId: string, reason: unknown, session: { userId: string; role?: string }) {
+  assertAdmin(session.role);
+  const cleanReason = text(reason, 'reason', true) as string;
+  if (cleanReason.length < 5) throw new ValidationError('reason must be at least 5 characters.');
+  const timestamp = now();
+  return transaction(async (connection) => {
+    const [outlets] = await connection.execute<any[]>('SELECT outlet_id FROM outlets WHERE outlet_id=:outlet_id AND active=1 FOR UPDATE', { outlet_id: outletId });
+    if (!outlets.length) throw new ValidationError('Outlet is inactive or does not exist.');
+    const [sales] = await connection.execute<any[]>('SELECT sale_id FROM outlet_sales WHERE sale_id=:sale_id AND outlet_id=:outlet_id FOR UPDATE', { sale_id: saleId, outlet_id: outletId });
+    if (!sales.length) throw new NotFoundError('Sale', saleId);
+    const [existing] = await connection.execute<any[]>('SELECT reversal_id FROM outlet_sale_reversals WHERE sale_id=:sale_id LIMIT 1 FOR UPDATE', { sale_id: saleId });
+    if (existing.length) throw new Error('Sale has already been reversed.');
+    const reversalId = `OSREV_${randomUUID().replace(/-/g, '').slice(0, 19)}`;
+    await connection.execute('INSERT INTO outlet_sale_reversals (reversal_id,sale_id,reason,reversed_by,reversed_at) VALUES (:reversal_id,:sale_id,:reason,:reversed_by,:reversed_at)', { reversal_id: reversalId, sale_id: saleId, reason: cleanReason, reversed_by: session.userId, reversed_at: timestamp });
+    return { reversal_id: reversalId, sale_id: saleId, reversed_at: timestamp };
+  });
 }

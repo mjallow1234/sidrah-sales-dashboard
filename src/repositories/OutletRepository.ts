@@ -12,13 +12,13 @@ export class OutletRepository extends BaseRepository {
 
   async list(): Promise<Outlet[]> {
     const rows = await this.executeMany<any>(`SELECT o.*, COALESCE(SUM(i.line_total), 0) AS total_sales
-      FROM outlets o LEFT JOIN outlet_sales s ON s.outlet_id = o.outlet_id LEFT JOIN outlet_sale_items i ON i.sale_id = s.sale_id
+      FROM outlets o LEFT JOIN outlet_sales s ON s.outlet_id = o.outlet_id AND NOT EXISTS (SELECT 1 FROM outlet_sale_reversals x WHERE x.sale_id = s.sale_id) LEFT JOIN outlet_sale_items i ON i.sale_id = s.sale_id
       GROUP BY o.outlet_id ORDER BY o.active DESC, o.name ASC`);
     return rows.map((row) => this.mapOutlet(row));
   }
 
   async findById(outletId: string): Promise<Outlet | null> {
-    const rows = await this.executeMany<any>('SELECT o.*, COALESCE(SUM(i.line_total), 0) AS total_sales FROM outlets o LEFT JOIN outlet_sales s ON s.outlet_id = o.outlet_id LEFT JOIN outlet_sale_items i ON i.sale_id = s.sale_id WHERE o.outlet_id = :outlet_id GROUP BY o.outlet_id', { outlet_id: outletId });
+    const rows = await this.executeMany<any>('SELECT o.*, COALESCE(SUM(i.line_total), 0) AS total_sales FROM outlets o LEFT JOIN outlet_sales s ON s.outlet_id = o.outlet_id AND NOT EXISTS (SELECT 1 FROM outlet_sale_reversals x WHERE x.sale_id = s.sale_id) LEFT JOIN outlet_sale_items i ON i.sale_id = s.sale_id WHERE o.outlet_id = :outlet_id GROUP BY o.outlet_id', { outlet_id: outletId });
     return rows.length ? this.mapOutlet(rows[0]) : null;
   }
 
@@ -47,12 +47,12 @@ export class OutletRepository extends BaseRepository {
     if (filters.to) { conditions.push('s.sale_date <= :to'); params.to = filters.to; }
     if (filters.saleId) { conditions.push('s.sale_id = :sale_id'); params.sale_id = filters.saleId; }
     if (filters.recordedBy) { conditions.push('s.recorded_by = :recorded_by'); params.recorded_by = filters.recordedBy; }
-    const rows = await this.executeMany<any>(`SELECT s.*, i.product_id, i.quantity, i.selling_price, i.line_total, (SELECT COALESCE(SUM(i2.line_total),0) FROM outlet_sale_items i2 WHERE i2.sale_id=s.sale_id) AS sale_total, p.product_name, p.unit AS product_unit, u.name AS recorded_by_name FROM outlet_sales s JOIN outlet_sale_items i ON i.sale_id = s.sale_id JOIN products p ON p.product_id = i.product_id JOIN app_users u ON u.user_id = s.recorded_by WHERE ${conditions.join(' AND ')} ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC`, params);
-    return rows.map((row) => ({ sale_id: String(row.sale_id), outlet_id: String(row.outlet_id), sale_date: dateValue(row.sale_date), payment_method: String(row.payment_method), notes: nullable(row.notes), recorded_by: String(row.recorded_by), recorded_by_name: nullable(row.recorded_by_name), created_at: dateTimeValue(row.created_at), product_id: String(row.product_id), product_name: String(row.product_name), product_unit: String(row.product_unit), quantity: Number(row.quantity), selling_price: Number(row.selling_price), line_total: Number(row.line_total), sale_total: Number(row.sale_total ?? row.line_total) }));
+    const rows = await this.executeMany<any>(`SELECT s.*, i.product_id, i.quantity, i.selling_price, i.line_total, (SELECT COALESCE(SUM(i2.line_total),0) FROM outlet_sale_items i2 WHERE i2.sale_id=s.sale_id) AS sale_total, p.product_name, p.unit AS product_unit, u.name AS recorded_by_name, r.reason AS reversal_reason, r.reversed_by, r.reversed_at FROM outlet_sales s JOIN outlet_sale_items i ON i.sale_id = s.sale_id JOIN products p ON p.product_id = i.product_id JOIN app_users u ON u.user_id = s.recorded_by LEFT JOIN outlet_sale_reversals r ON r.sale_id = s.sale_id WHERE ${conditions.join(' AND ')} ORDER BY s.sale_date DESC, s.created_at DESC, s.sale_id DESC`, params);
+    return rows.map((row) => ({ sale_id: String(row.sale_id), outlet_id: String(row.outlet_id), sale_date: dateValue(row.sale_date), payment_method: String(row.payment_method), notes: nullable(row.notes), recorded_by: String(row.recorded_by), recorded_by_name: nullable(row.recorded_by_name), created_at: dateTimeValue(row.created_at), product_id: String(row.product_id), product_name: String(row.product_name), product_unit: String(row.product_unit), quantity: Number(row.quantity), selling_price: Number(row.selling_price), line_total: Number(row.line_total), sale_total: Number(row.sale_total ?? row.line_total), reversed: row.reversed_by != null, reversal_reason: nullable(row.reversal_reason), reversed_by: nullable(row.reversed_by), reversed_at: row.reversed_at == null ? null : dateTimeValue(row.reversed_at) }));
   }
 
   async summary(outletId: string, today: string, monthStart: string): Promise<OutletSummary> {
-    const rows = await this.executeMany<any>(`SELECT COALESCE(SUM(CASE WHEN s.sale_date = :today THEN i.line_total ELSE 0 END),0) AS today_sales, COALESCE(SUM(CASE WHEN s.sale_date = :today THEN i.quantity ELSE 0 END),0) AS today_quantity, COALESCE(SUM(CASE WHEN s.sale_date >= :month_start THEN i.line_total ELSE 0 END),0) AS month_sales, COUNT(DISTINCT CASE WHEN s.sale_date = :today THEN s.sale_id END) AS transaction_count FROM outlet_sales s JOIN outlet_sale_items i ON i.sale_id = s.sale_id WHERE s.outlet_id = :outlet_id`, { outlet_id: outletId, today, month_start: monthStart });
+    const rows = await this.executeMany<any>(`SELECT COALESCE(SUM(CASE WHEN s.sale_date = :today THEN i.line_total ELSE 0 END),0) AS today_sales, COALESCE(SUM(CASE WHEN s.sale_date = :today THEN i.quantity ELSE 0 END),0) AS today_quantity, COALESCE(SUM(CASE WHEN s.sale_date >= :month_start THEN i.line_total ELSE 0 END),0) AS month_sales, COUNT(DISTINCT CASE WHEN s.sale_date = :today THEN s.sale_id END) AS transaction_count FROM outlet_sales s JOIN outlet_sale_items i ON i.sale_id = s.sale_id WHERE s.outlet_id = :outlet_id AND NOT EXISTS (SELECT 1 FROM outlet_sale_reversals r WHERE r.sale_id = s.sale_id)`, { outlet_id: outletId, today, month_start: monthStart });
     const row = rows[0] ?? {};
     return { today_sales: Number(row.today_sales ?? 0), today_quantity: Number(row.today_quantity ?? 0), month_sales: Number(row.month_sales ?? 0), transaction_count: Number(row.transaction_count ?? 0) };
   }
