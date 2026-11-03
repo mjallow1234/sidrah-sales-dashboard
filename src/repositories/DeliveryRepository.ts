@@ -80,6 +80,7 @@ export class DeliveryRepository extends BaseRepository {
     return {
       delivery_id: String(row.delivery_id),
       vendor_id: row.vendor_id === null || row.vendor_id === undefined ? undefined : String(row.vendor_id),
+      vendor_secondary_vendor_id: row.vendor_secondary_vendor_id === null || row.vendor_secondary_vendor_id === undefined ? undefined : String(row.vendor_secondary_vendor_id),
       customer_name: String(row.customer_name),
       customer_phone: String(row.customer_phone),
       delivery_address: String(row.delivery_address),
@@ -136,6 +137,7 @@ export class DeliveryRepository extends BaseRepository {
         (SELECT COALESCE(SUM(e.amount_delta), 0) FROM agent_accountability_events e WHERE e.case_id = ac.case_id AND e.event_status = 'posted') AS accountability_remaining_value
         ,v.location_latitude AS vendor_location_latitude,
         v.location_longitude AS vendor_location_longitude,
+        v.secondary_vendor_id AS vendor_secondary_vendor_id,
         eg.quantity_received AS empty_gallons_received
         ,(SELECT a.comment
             FROM delivery_activity a

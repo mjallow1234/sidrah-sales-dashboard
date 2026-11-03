@@ -57,7 +57,7 @@ export function DeliveryCard({ delivery, showNavigation = false }: { delivery: D
     <article className="flex h-full flex-col rounded-3xl border border-slate-200 bg-white p-5 shadow-soft transition hover:border-sidrah-200 hover:shadow-md">
       <Link href={detailHref} className="block flex-1 rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-sidrah-500 focus-visible:ring-offset-2">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="min-w-0 break-words text-lg font-semibold text-slate-900">{delivery.customer_name}</h2>
+          <div className="min-w-0"><h2 className="break-words text-lg font-semibold text-slate-900">{delivery.customer_name}</h2>{delivery.vendor_id || delivery.vendor_secondary_vendor_id ? <p className="mt-1 text-xs text-slate-500">Vendor ID: {delivery.vendor_id || 'Not available'}{delivery.vendor_secondary_vendor_id ? ` · ${delivery.vendor_secondary_vendor_id}` : ''}</p> : null}</div>
           <span className={`shrink-0 rounded-full px-3 py-1 text-xs font-semibold ${statusClassNames[delivery.status]}`}>
             {statusLabels[delivery.status]}
           </span>

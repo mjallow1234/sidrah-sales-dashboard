@@ -129,6 +129,7 @@ export function VendorDetailsShell({ vendorId }: VendorDetailsShellProps) {
             <div>
               <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Vendor details</p>
               <h1 className="mt-2 text-2xl font-semibold text-slate-900">{vendor.vendor_name}</h1>
+              <p className="mt-1 text-sm font-medium text-sidrah-700">Vendor ID: {vendor.vendor_id}{vendor.secondary_vendor_id ? ` · Secondary ID: ${vendor.secondary_vendor_id}` : ''}</p>
               <p className="mt-1 text-sm text-slate-600">{vendor.location} • {vendor.phone}</p>
               <p className="mt-1 text-sm text-slate-600">Acquired By: {vendor.acquired_by_name || 'Not specified'}</p>
               <p className="mt-1 text-sm text-slate-600">Vendor Type: {vendor.vendor_type_name || 'Not specified'}</p>

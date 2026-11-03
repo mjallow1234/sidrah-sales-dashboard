@@ -23,6 +23,7 @@ function mapVisitLogRow(row: any): Record<string, unknown> {
     timestamp: formatDateTimeValue(row.timestamp),
     date: formatDateValue(row.date),
     vendor_id: String(row.vendor_id),
+    secondary_vendor_id: row.secondary_vendor_id == null ? undefined : String(row.secondary_vendor_id),
     vendor_name: row.vendor_name === null ? undefined : String(row.vendor_name),
     product_id: String(row.product_id),
     product_name: row.product_name === null ? undefined : String(row.product_name),
@@ -152,7 +153,7 @@ export async function GET(request: NextRequest) {
     const orderBy = cashCollectionDateBasis
       ? 'COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) DESC, vl.timestamp DESC'
       : 'vl.date DESC, vl.timestamp DESC';
-    const sql = `SELECT vl.*, COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) AS effective_cash_collection_date, vendor_info.vendor_name AS vendor_name, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY ${orderBy}`;
+    const sql = `SELECT vl.*, COALESCE(vl.cash_collection_date, DATE(vl.timestamp)) AS effective_cash_collection_date, vendor_info.vendor_name AS vendor_name, vendor_info.secondary_vendor_id AS secondary_vendor_id, product_info.product_name AS product_name, sr.name AS sales_rep_name, COALESCE(au.name, au.username) AS actor_name, COALESCE(reversal_user.name, reversal_user.username) AS reversed_by_name FROM visit_logs vl ${joinClause} ${whereClause} ORDER BY ${orderBy}`;
     const [rows] = await dbQuery<any[]>(sql, params);
 
     return Response.json({ status: 'success', data: rows.map(mapVisitLogRow) });

@@ -107,6 +107,7 @@ export interface AdminDashboardFactorySummary {
 
 export interface AdminDashboardVendorAttention {
   vendorId: string;
+  secondaryVendorId?: string;
   vendorName: string;
   location: string;
   amount: number;
@@ -134,6 +135,7 @@ export interface AdminDashboardFilterOptions {
 
 export interface AdminDashboardVendorStatusVendor {
   vendorId: string;
+  secondaryVendorId?: string;
   vendorName: string;
   statusId: string;
   statusName: string;

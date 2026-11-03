@@ -88,7 +88,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="truncate text-base font-semibold text-slate-900">{transaction.product_name || 'Visit transaction'}</p>
-                    <p className="mt-1 text-sm text-slate-600">Vendor: {transaction.vendor_name || 'Vendor unavailable — historical record'}</p>
+                    <p className="mt-1 text-sm text-slate-600">Vendor: {transaction.vendor_name || 'Vendor unavailable — historical record'}{transaction.vendor_id ? ` · ${transaction.vendor_id}${transaction.secondary_vendor_id ? ` / ${transaction.secondary_vendor_id}` : ''}` : ''}</p>
                   </div>
                   <span className="shrink-0 text-xl text-slate-400" aria-hidden="true">›</span>
                 </div>
@@ -120,7 +120,7 @@ export function TransactionTable({ transactions, salesRepNames, actorNames, enab
               <Detail label="Date" value={formatVisitDate(selectedTransaction.date)} />
               <Detail label="Cash collection date" value={selectedTransaction.cash_collected > 0 ? `${formatVisitDate(selectedTransaction.effective_cash_collection_date ?? selectedTransaction.cash_collection_date ?? undefined)}${selectedTransaction.cash_collection_date_is_fallback ? ' (recording-date fallback)' : ''}` : 'Not applicable'} />
               <Detail label="Recorded timestamp" value={formatRecordedAt(selectedTransaction.timestamp)} />
-              <Detail label="Vendor" value={selectedTransaction.vendor_name || 'Vendor unavailable — historical record'} />
+              <Detail label="Vendor" value={`${selectedTransaction.vendor_name || 'Vendor unavailable — historical record'}${selectedTransaction.vendor_id ? ` · ${selectedTransaction.vendor_id}${selectedTransaction.secondary_vendor_id ? ` / ${selectedTransaction.secondary_vendor_id}` : ''}` : ''}`} />
               <Detail label="Recorded By" value={selectedTransaction.actor || 'Actor unavailable — historical record'} />
               {Boolean(selectedTransaction.sales_rep_name?.trim()) && !samePerson(selectedTransaction.actor, selectedTransaction.sales_rep_name) ? <Detail label="Sales Representative" value={selectedTransaction.sales_rep_name || 'Sales representative unavailable — historical record'} /> : null}
               <Detail label="Product" value={selectedTransaction.product_name || 'Product unavailable — historical record'} />

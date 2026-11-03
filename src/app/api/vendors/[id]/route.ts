@@ -29,6 +29,7 @@ function formatDateTimeValue(value: unknown): string {
 function mapVendorRow(row: any): Vendor {
   return {
     vendor_id: String(row.vendor_id),
+    secondary_vendor_id: row.secondary_vendor_id == null ? undefined : String(row.secondary_vendor_id),
     vendor_name: String(row.vendor_name),
     phone: String(row.phone),
     location: String(row.location),
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const id = getIdFromUrl(request);
-    const [rows] = await getPool().query<any[]>(`SELECT v.vendor_id, v.vendor_name, v.phone, v.location, v.location_latitude, v.location_longitude, v.location_updated_at, v.location_updated_by, location_user.name AS location_updated_by_name, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by
+    const [rows] = await getPool().query<any[]>(`SELECT v.vendor_id, v.secondary_vendor_id, v.vendor_name, v.phone, v.location, v.location_latitude, v.location_longitude, v.location_updated_at, v.location_updated_by, location_user.name AS location_updated_by_name, v.sales_rep_id, v.acquired_by, acquired_name.name AS acquired_by_name, v.vendor_type_id, vt.name AS vendor_type_name, v.assigned_date, v.assigned_by, v.date_created, v.last_updated, v.status, vs.name AS status_name, v.created_by, v.updated_by
       FROM vendors v LEFT JOIN acquired_by_names acquired_name ON acquired_name.acquired_by_id = v.acquired_by
       LEFT JOIN vendor_types vt ON vt.vendor_type_id = v.vendor_type_id
       LEFT JOIN vendor_statuses vs ON vs.status_id = v.status

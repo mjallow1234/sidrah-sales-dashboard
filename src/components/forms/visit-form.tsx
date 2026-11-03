@@ -201,7 +201,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
             >
               {vendors.map((vendor) => (
                 <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                  {`${vendor.vendor_name} — ${vendor.vendor_id} — ${vendor.phone}`}
+                  {`${vendor.vendor_name} — ${vendor.vendor_id}${vendor.secondary_vendor_id ? ` / ${vendor.secondary_vendor_id}` : ''} — ${vendor.phone}`}
                 </option>
               ))}
             </select>
@@ -378,7 +378,7 @@ export function VisitForm({ vendors }: VisitFormProps) {
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs uppercase tracking-[0.24em] text-slate-500">Vendor</div>
                     <div className="mt-2 font-semibold text-slate-900">{selectedVendor ? `${selectedVendor.vendor_name}` : previewDraft.vendor_id}</div>
-                    <div className="text-sm text-slate-600">{selectedVendor ? `${selectedVendor.vendor_id}` : previewDraft.vendor_id}</div>
+                    <div className="text-sm text-slate-600">{selectedVendor ? `${selectedVendor.vendor_id}${selectedVendor.secondary_vendor_id ? ` · ${selectedVendor.secondary_vendor_id}` : ''}` : previewDraft.vendor_id}</div>
                     <div className="mt-2 text-sm text-slate-600">{selectedVendor?.phone}</div>
                   </div>
                   <div className="rounded-3xl border border-slate-200 bg-slate-50 p-4">

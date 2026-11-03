@@ -157,7 +157,7 @@ export default function AdminStockPage() {
                 Vendor
                 <select value={valuationVendorId} onChange={(event) => { setValuationVendorId(event.target.value); setValuationProductId(''); }} className="mt-2 w-full rounded-3xl border border-amber-200 bg-white px-4 py-3 outline-none">
                   <option value="">Select vendor</option>
-                  {vendorOptions.map((vendor) => <option key={vendor.vendor_id} value={vendor.vendor_id}>{vendor.vendor_name}</option>)}
+                  {vendorOptions.map((vendor) => <option key={vendor.vendor_id} value={vendor.vendor_id}>{vendor.vendor_name} ({vendor.vendor_id}{vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''})</option>)}
                 </select>
               </label>
               <label className="block text-sm text-slate-700">
@@ -215,7 +215,7 @@ export default function AdminStockPage() {
                     <option value="">Select source vendor</option>
                     {vendorOptions.map((vendor) => (
                       <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                        {vendor.vendor_name}
+                        {vendor.vendor_name} ({vendor.vendor_id}{vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''})
                       </option>
                     ))}
                   </select>
@@ -230,7 +230,7 @@ export default function AdminStockPage() {
                     <option value="">Select destination vendor</option>
                     {vendorOptions.map((vendor) => (
                       <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                        {vendor.vendor_name}
+                        {vendor.vendor_name} ({vendor.vendor_id}{vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''})
                       </option>
                     ))}
                   </select>
@@ -247,7 +247,7 @@ export default function AdminStockPage() {
                   <option value="">Select vendor</option>
                   {vendorOptions.map((vendor) => (
                     <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                      {vendor.vendor_name}
+                      {vendor.vendor_name} ({vendor.vendor_id}{vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''})
                     </option>
                   ))}
                 </select>

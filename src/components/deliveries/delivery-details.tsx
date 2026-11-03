@@ -188,6 +188,7 @@ export function DeliveryDetails({ deliveryId }: DeliveryDetailsProps) {
           <div>
             <p className="text-sm uppercase tracking-[0.22em] text-sidrah-500">Delivery details</p>
             <h1 className="mt-2 text-2xl font-semibold text-slate-900">{delivery.customer_name}</h1>
+            {delivery.vendor_id || delivery.vendor_secondary_vendor_id ? <p className="mt-1 text-sm font-medium text-sidrah-700">Vendor ID: {delivery.vendor_id || 'Not available'}{delivery.vendor_secondary_vendor_id ? ` · Secondary ID: ${delivery.vendor_secondary_vendor_id}` : ''}</p> : null}
           </div>
           <div className="space-y-2 text-sm text-slate-700">
             <div>

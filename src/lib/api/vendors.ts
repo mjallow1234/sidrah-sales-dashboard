@@ -1,4 +1,11 @@
-import type { Vendor } from '@/lib/types';
+import type { Vendor, VendorStatistics } from '@/lib/types';
+
+export async function fetchVendorStatistics(): Promise<VendorStatistics> {
+  const response = await fetch('/api/vendors/statistics');
+  if (!response.ok) throw new Error('Unable to fetch vendor statistics');
+  const json = await response.json();
+  return json.data;
+}
 
 function buildQueryString(params: Record<string, unknown | undefined>) {
   const searchParams = new URLSearchParams();

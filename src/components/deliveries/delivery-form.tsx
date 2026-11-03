@@ -140,7 +140,7 @@ export function DeliveryForm() {
             <option value="">Select vendor</option>
             {vendors.map((vendor) => (
               <option key={vendor.vendor_id} value={vendor.vendor_id}>
-                {vendor.vendor_name} ({vendor.vendor_id})
+                {vendor.vendor_name} ({vendor.vendor_id}{vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''})
               </option>
             ))}
           </select>

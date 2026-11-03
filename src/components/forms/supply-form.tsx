@@ -120,7 +120,7 @@ export function SupplyForm({ defaultVendorId }: SupplyFormProps) {
               <option value="">Select vendor</option>
               {vendorOptions.map((vendorOption) => (
                 <option key={vendorOption.vendor_id} value={vendorOption.vendor_id}>
-                  {vendorOption.vendor_name}
+                  {vendorOption.vendor_name} ({vendorOption.vendor_id}{vendorOption.secondary_vendor_id ? ` · ${vendorOption.secondary_vendor_id}` : ''})
                 </option>
               ))}
             </select>

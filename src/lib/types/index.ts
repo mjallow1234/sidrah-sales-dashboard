@@ -10,6 +10,8 @@ export interface User {
 
 export interface Vendor {
   vendor_id: string;
+  secondary_vendor_id?: string;
+  secondary_vendor_id_assignment_issue?: string;
   vendor_name: string;
   phone: string;
   location: string;
@@ -35,6 +37,17 @@ export interface Vendor {
   location_updated_by_name?: string;
   pending_location_request?: VendorLocationRequest | null;
   last_visit_date?: string | null;
+}
+
+export interface VendorStatistics {
+  total_vendors: number;
+  active_vendors: number;
+  inactive_vendors: number;
+  market_vendors: number;
+  street_food_vendors: number;
+  minimarkets: number;
+  supermarkets: number;
+  restaurants: number;
 }
 
 export type VendorLocationRequestStatus = 'pending' | 'approved' | 'rejected';
@@ -125,6 +138,7 @@ export interface VendorBalance {
 
 export interface VendorOwing {
   vendor_id: string;
+  secondary_vendor_id?: string;
   vendor_name: string;
   balance_owed: number;
   last_visit_date: string;
@@ -205,6 +219,7 @@ export interface DeliveryItem {
 export interface DeliveryRecord {
   delivery_id: string;
   vendor_id?: string;
+  vendor_secondary_vendor_id?: string;
   customer_name: string;
   customer_phone: string;
   delivery_address: string;
@@ -717,6 +732,7 @@ export interface Transaction {
   timestamp?: string;
   date: string;
   vendor_id: string;
+  secondary_vendor_id?: string;
   vendor_name?: string;
   product_id?: string;
   product_name?: string;

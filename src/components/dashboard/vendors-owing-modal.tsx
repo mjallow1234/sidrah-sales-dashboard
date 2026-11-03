@@ -8,6 +8,7 @@ import { vendorHref } from '@/lib/navigation/vendorNavigation';
 
 interface VendorOwing {
   vendor_id: string;
+  secondary_vendor_id?: string;
   vendor_name: string;
   balance_owed: number;
   last_visit_date: string;
@@ -68,6 +69,7 @@ export function VendorsOwingModal({ vendors, totalOwed, onClose }: VendorsOwingM
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <p className="text-base font-semibold text-slate-900">{vendor.vendor_name || vendor.vendor_id}</p>
+                      <p className="text-xs text-slate-500">{vendor.vendor_id}{vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''}</p>
                       <p className="text-sm text-slate-500">Last visit: {vendor.last_visit_date || 'Unknown'}</p>
                     </div>
                     <p className="mt-3 text-lg font-semibold text-slate-900 sm:mt-0">GMD {vendor.balance_owed.toLocaleString()}</p>

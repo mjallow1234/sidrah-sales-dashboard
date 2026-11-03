@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { SearchBar } from '@/components/ui/search-bar';
-import { usePaginatedVendorsQuery } from '@/lib/hooks/queries';
+import { useAuthQuery, usePaginatedVendorsQuery, useVendorStatisticsQuery } from '@/lib/hooks/queries';
 import type { Vendor } from '@/lib/types';
 import { vendorHref } from '@/lib/navigation/vendorNavigation';
 
@@ -21,6 +21,9 @@ interface PaginatedResult<T> {
 const PAGE_SIZE = 50;
 
 export function VendorList() {
+  const { data: session } = useAuthQuery();
+  const isAdmin = session?.role === 'admin' || session?.role === 'super_admin';
+  const statistics = useVendorStatisticsQuery(isAdmin);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -80,6 +83,26 @@ export function VendorList() {
 
   return (
     <div className="space-y-4">
+      {isAdmin ? (
+        <section aria-label="Vendor statistics" className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ['Total Vendors', statistics.data?.total_vendors],
+            ['Active Vendors', statistics.data?.active_vendors],
+            ['Inactive Vendors', statistics.data?.inactive_vendors],
+            ['Market Vendors', statistics.data?.market_vendors],
+            ['Street Food Vendors', statistics.data?.street_food_vendors],
+            ['Minimarkets', statistics.data?.minimarkets],
+            ['Supermarkets', statistics.data?.supermarkets],
+            ['Restaurants', statistics.data?.restaurants],
+          ].map(([label, value]) => (
+            <div key={label} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+              <p className="text-xs font-medium text-slate-500 sm:text-sm">{label}</p>
+              <p className="mt-1 text-xl font-semibold text-slate-900 sm:text-2xl">{statistics.isLoading ? '—' : Number(value ?? 0).toLocaleString()}</p>
+              {statistics.isError ? <p className="mt-1 text-xs text-rose-600">Unable to load</p> : null}
+            </div>
+          ))}
+        </section>
+      ) : null}
       <SearchBar value={searchInput} placeholder="Search by ID, name, phone, or location" onChange={(event) => handleSearchChange(event.target.value)} />
       {isLoading ? (
         <div className="rounded-3xl border border-slate-200 bg-white p-4 text-slate-500">Loading vendors…</div>
@@ -99,6 +122,7 @@ export function VendorList() {
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <p className="font-semibold text-slate-900">{vendor.vendor_name ?? vendor.vendor_id}</p>
+                  {vendor.secondary_vendor_id ? <p className="mt-1 text-sm font-medium text-sidrah-700">Vendor ID: {vendor.vendor_id} · Secondary ID: {vendor.secondary_vendor_id}</p> : null}
                   <p className="mt-1 text-sm text-slate-600">{vendor.location ?? ''}{vendor.location && vendor.phone ? ' • ' : ''}{vendor.phone ?? ''}</p>
                   <p className="mt-1 text-sm text-slate-600">Acquired By: {vendor.acquired_by_name || 'Not specified'}</p>
                   <p className="mt-1 text-sm text-slate-600">Vendor Type: {vendor.vendor_type_name || 'Not specified'}</p>

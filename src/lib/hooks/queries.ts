@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { createProduct, getProducts, getProduct, updateProduct } from '@/lib/api/products';
 import { createSalesRep, getSalesReps, getSalesRep, updateSalesRep } from '@/lib/api/salesreps';
 import { getStats } from '@/lib/api/stats';
-import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, updateVendor } from '@/lib/api/vendors';
+import { createVendor, fetchVendorById, fetchVendors, fetchPaginatedVendors, fetchVendorStatistics, updateVendor } from '@/lib/api/vendors';
 import { createVisit, createSupply, getTransactions, getTransactionsByVendor } from '@/lib/api/transactions';
 import { addDeliveryComment, addDeliveryItems, claimDelivery, createDelivery, decideAccountabilityTransfer, getAccountabilityAgents, getAccountabilityTransfers, getDelivery, getDeliveryAccountability, getDeliveries, getDeliveryActivity, getDeliveryPreparationSummary, getForemanDeliveryPreparationSummary, getDeliveryUsers, initiateAccountabilityTransfer, markDeliveryDelivered, recordAccountabilityCollection, recordAccountabilityReturn, reassignDelivery, cancelDelivery, updateDeliveryDate, updateDeliveryDetails, type DeliveryUserOption } from '@/lib/api/deliveries';
 import { reverseVisit, transferStock, retrieveStock, resolveVendorInventoryValuation } from '@/lib/api/adminStock';
@@ -56,6 +56,15 @@ export function useVendorQuery(vendorId: string) {
     queryKey: ['vendor', vendorId],
     queryFn: () => fetchVendorById(vendorId),
     enabled: !!vendorId,
+  });
+}
+
+export function useVendorStatisticsQuery(enabled = true) {
+  return useQuery({
+    queryKey: ['vendorStatistics'],
+    queryFn: fetchVendorStatistics,
+    enabled,
+    staleTime: 0,
   });
 }
 
@@ -344,6 +353,8 @@ export function useCreateVendorMutation() {
     mutationFn: createVendor,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsPage'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorStatistics'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
   });
@@ -355,6 +366,8 @@ export function useUpdateVendorMutation() {
     mutationFn: ({ id, payload }) => updateVendor(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsPage'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorStatistics'] });
       queryClient.invalidateQueries({ queryKey: ['vendor'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
     },
@@ -556,6 +569,8 @@ export function useCreateVisitMutation() {
       queryClient.invalidateQueries({ queryKey: ['vendorInventory'] });
       queryClient.invalidateQueries({ queryKey: ['stats'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsPage'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorStatistics'] });
     },
   });
 }
@@ -573,6 +588,8 @@ export function useReverseVisitMutation() {
       queryClient.invalidateQueries({ queryKey: ['vendorBalances'] });
       queryClient.invalidateQueries({ queryKey: ['vendorsOwing'] });
       queryClient.invalidateQueries({ queryKey: ['vendors'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorsPage'] });
+      queryClient.invalidateQueries({ queryKey: ['vendorStatistics'] });
     },
   });
 }

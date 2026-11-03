@@ -81,11 +81,16 @@ export function VendorForm({ initialValues, vendorId, onSuccess }: VendorFormPro
 
     try {
       if (vendorId) {
-        await updateMutation.mutateAsync({ id: vendorId, payload: formState });
+        const updated = await updateMutation.mutateAsync({ id: vendorId, payload: formState });
         if (formState.accountable_agent_user_id) {
           await fetch(`/api/vendors/${encodeURIComponent(vendorId)}/accountability`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_user_id: formState.accountable_agent_user_id }) });
         }
-        setNotification({ type: 'success', message: 'Vendor updated successfully' });
+        setNotification({
+          type: 'success',
+          message: updated.secondary_vendor_id_assignment_issue
+            ? `Vendor updated successfully. ${updated.secondary_vendor_id_assignment_issue}`
+            : 'Vendor updated successfully',
+        });
       } else {
         const creationPayload: {
           vendor_name: string;

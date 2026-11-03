@@ -5,6 +5,7 @@ import { NotFoundError } from './errors';
 
 export interface CreateVendorPayload {
   vendor_id: string;
+  secondary_vendor_id?: string | null;
   vendor_name: string;
   phone: string;
   location: string;
@@ -50,6 +51,7 @@ export class VendorRepository extends BaseRepository {
   private mapRow(row: any): Vendor {
     return {
       vendor_id: String(row.vendor_id),
+      secondary_vendor_id: row.secondary_vendor_id == null ? undefined : String(row.secondary_vendor_id),
       vendor_name: String(row.vendor_name),
       phone: String(row.phone),
       location: String(row.location),
@@ -138,6 +140,7 @@ export class VendorRepository extends BaseRepository {
     await (this.db.execute as any)(
       `INSERT INTO vendors (
         vendor_id,
+        secondary_vendor_id,
         vendor_name,
         phone,
         location,
@@ -153,6 +156,7 @@ export class VendorRepository extends BaseRepository {
         updated_by
       ) VALUES (
         :vendor_id,
+        :secondary_vendor_id,
         :vendor_name,
         :phone,
         :location,
@@ -169,6 +173,7 @@ export class VendorRepository extends BaseRepository {
       )`,
       {
         vendor_id: payload.vendor_id,
+        secondary_vendor_id: payload.secondary_vendor_id ?? null,
         vendor_name: payload.vendor_name,
         phone: payload.phone,
         location: payload.location,
@@ -248,6 +253,15 @@ export class VendorRepository extends BaseRepository {
     }
 
     return this.findById(vendorId);
+  }
+
+  /** Assigns an ID once; callers must hold the vendor row lock and an active transaction. */
+  public async assignSecondaryVendorIdIfNull(vendorId: string, secondaryVendorId: string): Promise<boolean> {
+    const [result] = await (this.db.execute as any)(
+      'UPDATE vendors SET secondary_vendor_id = ? WHERE vendor_id = ? AND secondary_vendor_id IS NULL',
+      [secondaryVendorId, vendorId],
+    );
+    return Number((result as import('mysql2/promise').OkPacket).affectedRows) === 1;
   }
 
   public async delete(vendorId: string): Promise<void> {

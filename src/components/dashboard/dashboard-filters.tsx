@@ -77,7 +77,7 @@ export function DashboardFilters() {
   const { data: vendors = [] } = useVendorsQuery();
 
   const vendorOptions = useMemo(
-    () => [{ value: '', label: 'All vendors' }, ...vendors.map((vendor) => ({ value: vendor.vendor_id, label: vendor.vendor_name }))],
+    () => [{ value: '', label: 'All vendors' }, ...vendors.map((vendor) => ({ value: vendor.vendor_id, label: `${vendor.vendor_name} (${vendor.vendor_id}${vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''})` }))],
     [vendors]
   );
 

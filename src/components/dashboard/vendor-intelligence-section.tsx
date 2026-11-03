@@ -206,7 +206,7 @@ export function VendorIntelligenceSection() {
       { value: '', label: 'Select a vendor' },
       ...vendors.map((vendor) => ({
         value: vendor.vendor_id,
-        label: `${vendor.vendor_id} - ${vendor.vendor_name}`,
+        label: `${vendor.vendor_id}${vendor.secondary_vendor_id ? ` · ${vendor.secondary_vendor_id}` : ''} - ${vendor.vendor_name}`,
       })),
     ],
     [vendors]

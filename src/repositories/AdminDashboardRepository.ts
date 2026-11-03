@@ -136,7 +136,7 @@ export class AdminDashboardRepository extends BaseRepository {
     const conditions = this.vendorConditions(filters, params);
     const where = conditions.length ? `AND ${conditions.join(' AND ')}` : '';
     const [rows] = await this.execute<any[]>(
-      `SELECT v.vendor_id, v.vendor_name, v.status AS stored_status_id, vs.name AS stored_status_name,
+      `SELECT v.vendor_id, v.secondary_vendor_id, v.vendor_name, v.status AS stored_status_id, vs.name AS stored_status_name,
               CASE
                 WHEN v.status = 'inactive' THEN 'inactive'
                 WHEN latest_payment.latest_payment_at IS NOT NULL
@@ -164,7 +164,7 @@ export class AdminDashboardRepository extends BaseRepository {
       const statusName = names.get(statusId) ?? (statusId === 'dormant' ? 'Dormant' : statusId === 'inactive' ? 'Inactive' : String(row.stored_status_name || statusId));
       const group = groups.get(statusId) ?? { statusId, statusName, count: 0, vendors: [] };
       group.count += 1;
-      group.vendors.push({ vendorId: String(row.vendor_id), vendorName: String(row.vendor_name), statusId, statusName });
+      group.vendors.push({ vendorId: String(row.vendor_id), secondaryVendorId: row.secondary_vendor_id == null ? undefined : String(row.secondary_vendor_id), vendorName: String(row.vendor_name), statusId, statusName });
       groups.set(statusId, group);
     }
     for (const row of statusRows ?? []) {
@@ -615,6 +615,7 @@ export class AdminDashboardRepository extends BaseRepository {
     const [rows] = await this.execute<Array<NumberRow & { vendorId: string; vendorName: string; location: string }>>(
       `SELECT
          v.vendor_id AS vendorId,
+         v.secondary_vendor_id AS secondaryVendorId,
          v.vendor_name AS vendorName,
          COALESCE(NULLIF(TRIM(v.location), ''), 'Unknown location') AS location,
          ${mode === 'owing' ? 'vb.balance_owed' : 'ABS(vb.balance_owed)'} AS amount
@@ -628,6 +629,7 @@ export class AdminDashboardRepository extends BaseRepository {
 
     return rows.map((row) => ({
       vendorId: String(row.vendorId),
+      secondaryVendorId: row.secondaryVendorId == null ? undefined : String(row.secondaryVendorId),
       vendorName: String(row.vendorName),
       location: normalizeLocation(row.location),
       amount: toNumber(row.amount),

@@ -31,6 +31,7 @@ export async function GET(request: NextRequest) {
     const sql = `
       SELECT
         vb.vendor_id,
+        v.secondary_vendor_id,
         v.vendor_name,
         vb.balance_owed,
         COALESCE(MAX(CASE WHEN COALESCE(vl.is_reversed, 0) = 0 THEN vl.date END), '') AS last_visit_date
@@ -38,13 +39,14 @@ export async function GET(request: NextRequest) {
       LEFT JOIN vendors v ON v.vendor_id = vb.vendor_id
       LEFT JOIN visit_logs vl ON vl.vendor_id = vb.vendor_id
       ${whereClause}
-      GROUP BY vb.vendor_id, v.vendor_name, vb.balance_owed
+      GROUP BY vb.vendor_id, v.secondary_vendor_id, v.vendor_name, vb.balance_owed
       ORDER BY vb.balance_owed DESC
     `;
 
     const [rows] = await dbQuery<any[]>(sql, params);
     const result = rows.map((row) => ({
       vendor_id: String(row.vendor_id),
+      secondary_vendor_id: row.secondary_vendor_id == null ? undefined : String(row.secondary_vendor_id),
       vendor_name: String(row.vendor_name ?? row.vendor_id ?? ''),
       balance_owed: Number(row.balance_owed) || 0,
       last_visit_date: formatDateValue(row.last_visit_date),
