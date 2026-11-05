@@ -7,7 +7,7 @@ import { ProductRepository } from '@/repositories/ProductRepository';
 import { VendorBalanceRepository } from '@/repositories/VendorBalanceRepository';
 import { VendorInventoryRepository } from '@/repositories/VendorInventoryRepository';
 import { VendorRepository } from '@/repositories/VendorRepository';
-import { allocateSecondaryVendorSequence } from '@/repositories/SecondaryVendorIdSequenceRepository';
+import { allocateSecondaryVendorSequenceIfNext } from '@/repositories/SecondaryVendorIdSequenceRepository';
 import { ValidationError, NotFoundError } from './errors';
 import { formatSecondaryVendorId, getSecondaryVendorPrefix, VENDOR_CATEGORY_CODES } from '@/lib/vendorSecondaryId';
 
@@ -57,15 +57,17 @@ function generateVendorInventoryId(): string {
   return `VI_${randomUUID().replace(/-/g, '').slice(0, 12)}`;
 }
 
-async function allocateSecondaryVendorId(connection: any, vendorTypeId: string | null, acquiredById: string | null): Promise<string | null> {
-  const { prefix, issue } = await getSecondaryVendorIdPrefix(connection, vendorTypeId, acquiredById);
-  if (issue?.startsWith('Unsupported vendor category')) throw new ValidationError(`${issue}.`);
+async function allocateSecondaryVendorId(connection: any, vendorTypeId: string | null, acquiredById: string | null, vendorId: string): Promise<string | null> {
+  const { prefix } = await getSecondaryVendorIdPrefix(connection, vendorTypeId, acquiredById);
+  // Vendors can be registered before all identity details are known or mapped.
+  // Keep the secondary ID null until a later edit makes the vendor eligible.
   if (!prefix) return null;
-
-  // The caller's createVendor transaction holds this prefix row lock through insert.
+  // createVendor holds the Vendors ID-sequence lock while checking the backlog and allocating.
   let sequence: number;
   try {
-    sequence = await allocateSecondaryVendorSequence(connection, prefix);
+    const allocated = await allocateSecondaryVendorSequenceIfNext(connection, prefix, vendorId, getSecondaryVendorPrefix);
+    if (allocated === null) return null;
+    sequence = allocated;
   } catch (error) {
     if (error instanceof Error && error.message.includes('sequence exhausted')) throw new ValidationError(error.message);
     throw error;
@@ -209,7 +211,7 @@ export async function createVendor(payload: Record<string, unknown>): Promise<Ve
 
     const sequence = await sequenceRepository.incrementAndGetCurrentValue('Vendors');
     const vendorId = `${sequence.prefix}${String(sequence.next_value).padStart(3, '0')}`;
-    const secondaryVendorId = await allocateSecondaryVendorId(connection, vendorTypeId, acquiredBy);
+    const secondaryVendorId = await allocateSecondaryVendorId(connection, vendorTypeId, acquiredBy, vendorId);
     const createdBy = typeof payload.created_by === 'string' ? payload.created_by : null;
     const assignedDate = salesRepId
       ? (typeof payload.assigned_date === 'string' && payload.assigned_date !== '' ? payload.assigned_date : nowDate)
@@ -307,6 +309,8 @@ export async function updateVendor(
   }
 
   return transaction(async (connection) => {
+    // Match create/backfill lock order so eligibility checks cannot race an allocation.
+    await new IdSequenceRepository(connection).lockForUpdate('Vendors');
     const [currentRows] = await connection.execute(
       'SELECT vendor_type_id, acquired_by, secondary_vendor_id FROM vendors WHERE vendor_id = ? FOR UPDATE',
       [vendorId],
@@ -358,18 +362,22 @@ export async function updateVendor(
       const acquiredById = updates.acquired_by === undefined ? current.acquired_by : updates.acquired_by;
       const { prefix, issue } = await getSecondaryVendorIdPrefix(connection, vendorTypeId, acquiredById);
       if (prefix) {
-        let sequence: number;
+        let sequence: number | null;
         try {
-          sequence = await allocateSecondaryVendorSequence(connection, prefix);
+          sequence = await allocateSecondaryVendorSequenceIfNext(connection, prefix, vendorId, getSecondaryVendorPrefix);
         } catch (error) {
           if (error instanceof Error && error.message.includes('sequence exhausted')) throw new ValidationError(error.message);
           throw error;
         }
-        const assigned = await vendorRepository.assignSecondaryVendorIdIfNull(
-          vendorId,
-          formatSecondaryVendorId(prefix, sequence),
-        );
-        if (!assigned) throw new Error('Secondary vendor ID assignment changed unexpectedly; update was rolled back.');
+        if (sequence === null) {
+          assignmentIssue = 'Secondary ID deferred until older eligible vendors are assigned first.';
+        } else {
+          const assigned = await vendorRepository.assignSecondaryVendorIdIfNull(
+            vendorId,
+            formatSecondaryVendorId(prefix, sequence),
+          );
+          if (!assigned) throw new Error('Secondary vendor ID assignment changed unexpectedly; update was rolled back.');
+        }
       } else {
         assignmentIssue = issue;
       }

@@ -28,6 +28,10 @@ npm run start
 
 > Note: `npm run start` runs the standalone server at `node .next/standalone/server.js`.
 
+## Secondary Vendor ID backfill operators
+
+The local and production secondary Vendor ID backfill scripts require Node.js with stable built-in TypeScript support: Node 24.12 or later in the 24.x line, Node 25.2 or later in the 25.x line, or Node 26 or later. This operator-only requirement does not change the Node.js version required to run the application. The local script refuses non-local database hosts. The production script requires its explicit production and database confirmation flags; use it only under an approved production backfill procedure.
+
 ## Deployment
 
 This repository is prepared for Hostinger Business Hosting deployment using a standalone Next.js build.

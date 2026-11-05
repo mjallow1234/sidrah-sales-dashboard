@@ -36,6 +36,20 @@ export class IdSequenceRepository extends BaseRepository {
     };
   }
 
+  /** Locks a business-ID sequence without consuming a value; caller must hold a transaction. */
+  public async lockForUpdate(entityName: string): Promise<IdSequenceRecord> {
+    const [rows] = await this.execute<any>(
+      'SELECT entity_name, prefix, next_value FROM id_sequences WHERE entity_name = ? FOR UPDATE',
+      [entityName],
+    );
+    if (rows.length === 0) throw new NotFoundError('IdSequence', entityName);
+    return {
+      entity_name: String(rows[0].entity_name),
+      prefix: String(rows[0].prefix),
+      next_value: Number(rows[0].next_value),
+    };
+  }
+
   public async incrementAndGetCurrentValue(entityName: string): Promise<IdSequenceRecord> {
     const [rows] = await this.execute<any>('SELECT entity_name, prefix, next_value FROM id_sequences WHERE entity_name = ? FOR UPDATE', [entityName]);
     if (rows.length === 0) {
